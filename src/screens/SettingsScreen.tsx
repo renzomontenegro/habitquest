@@ -7,9 +7,10 @@ interface SettingsScreenProps {
   onUpdateDailyGoal: (g: DailyXPGoal) => void
   onExport: () => string
   onImport: (json: string) => boolean
+  onReset: () => void
 }
 
-export function SettingsScreen({ state, onUpdateSettings, onUpdateDailyGoal, onExport, onImport }: SettingsScreenProps) {
+export function SettingsScreen({ state, onUpdateSettings, onUpdateDailyGoal, onExport, onImport, onReset }: SettingsScreenProps) {
   const handleExport = () => {
     const json = onExport()
     const blob = new Blob([json], { type: 'application/json' })
@@ -90,8 +91,22 @@ export function SettingsScreen({ state, onUpdateSettings, onUpdateDailyGoal, onE
         </div>
       </Section>
 
+      {/* Reset */}
+      <Section title="Zona peligrosa" subtitle="Borra todo y empieza de cero. Esta accion no se puede deshacer.">
+        <button
+          onClick={() => {
+            if (confirm('Estas seguro? Se borraran todos tus habitos, metas, logros y XP.')) {
+              onReset()
+            }
+          }}
+          className="btn-3d btn-3d-danger w-full !h-11 !text-[13px]"
+        >
+          Resetear todo
+        </button>
+      </Section>
+
       {/* Info */}
-      <div className="text-center pt-4">
+      <div className="text-center pt-2 pb-2">
         <p className="text-[11px] font-bold text-[#3C5564]">HabitQuest v1.0</p>
         <p className="text-[11px] font-bold text-[#3C5564]">Tus datos se guardan localmente en este dispositivo.</p>
       </div>

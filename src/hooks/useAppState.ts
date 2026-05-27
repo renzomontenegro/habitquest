@@ -325,6 +325,13 @@ export function useAppState() {
     return storage.exportJSON(state)
   }, [state])
 
+  const resetState = useCallback(() => {
+    storage.save(storage.load()) // triggers default state creation
+    // Reload from scratch
+    localStorage.removeItem('habitquest_state')
+    window.location.reload()
+  }, [])
+
   return {
     state,
     celebration,
@@ -342,5 +349,6 @@ export function useAppState() {
     updateDailyGoal,
     importState,
     exportState,
+    resetState,
   }
 }

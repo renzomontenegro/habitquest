@@ -52,6 +52,7 @@ export default function App() {
                 onUpdateDailyGoal={app.updateDailyGoal}
                 onExport={app.exportState}
                 onImport={app.importState}
+                onReset={app.resetState}
               />
             )}
           </motion.div>

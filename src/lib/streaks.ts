@@ -23,11 +23,11 @@ export function dailyXP(logs: HabitLog[], habits: Habit[], date: string): number
 }
 
 // ¿Se completaron TODOS los hábitos del día?
+// Requiere al menos 2 hábitos activos para que cuente (evita desbloqueo trivial)
 export function isPerfectDay(logs: HabitLog[], habits: Habit[], date: string): boolean {
-  if (habits.length === 0) return false
-  // Solo contar hábitos que existían en esa fecha
+  if (habits.length < 2) return false
   const activeHabits = habits.filter(h => h.createdAt <= date)
-  if (activeHabits.length === 0) return false
+  if (activeHabits.length < 2) return false
   return activeHabits.every(h => logs.some(l => l.habitId === h.id && l.date === date && l.completed))
 }
 
