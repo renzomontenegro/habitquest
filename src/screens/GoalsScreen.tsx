@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { BottomSheet, FormInput } from '../components/FormModal'
 import type { AppState, Goal, GoalCategory } from '../types'
+import { GAME_CONFIG } from '../lib/gameConfig'
 
 const ICONS = ['💰', '📈', '🏠', '🚗', '✈️', '🎓', '💻', '🏋️', '📚', '🎯', '❤️', '🌱']
 
@@ -13,11 +14,18 @@ interface GoalsScreenProps {
   onDeleteGoal: (id: string) => void
 }
 
-export function GoalsScreen({ state, onAddContribution, onAddGoal, onUpdateGoal, onDeleteGoal }: GoalsScreenProps) {
-  // Contribution modal
-  const [contrib, setContrib] = useState<{ goalId: string; amount: string; note: string } | null>(null)
+// Mensaje motivacional según el porcentaje
+function getMotivation(percent: number): string {
+  if (percent >= 100) return 'Meta cumplida!'
+  if (percent >= 75) return 'Ya casi! El ultimo tramo es el mas importante.'
+  if (percent >= 50) return 'Mas de la mitad! Vas con todo.'
+  if (percent >= 25) return 'Buen progreso, sigue sumando.'
+  if (percent > 0) return 'El primer paso esta dado. Cada aporte cuenta.'
+  return 'Registra tu primer aporte para arrancar.'
+}
 
-  // Goal form
+export function GoalsScreen({ state, onAddContribution, onAddGoal, onUpdateGoal, onDeleteGoal }: GoalsScreenProps) {
+  const [contrib, setContrib] = useState<{ goalId: string; goalName: string; amount: string; note: string } | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState({ name: '', icon: '💰', targetAmount: '', unit: 'S/', category: 'savings' as GoalCategory, deadline: '' })
@@ -70,7 +78,7 @@ export function GoalsScreen({ state, onAddContribution, onAddGoal, onUpdateGoal,
         )}
       </div>
       <p className="text-[13px] font-bold text-[#5C7680] mb-4">
-        Objetivos a largo plazo que acumulan progreso.
+        Objetivos a largo plazo. Cada aporte te da +{GAME_CONFIG.xp.goalContribution} XP.
       </p>
 
       {state.goals.length === 0 ? (
@@ -81,7 +89,7 @@ export function GoalsScreen({ state, onAddContribution, onAddGoal, onUpdateGoal,
             Las metas son objetivos progresivos que no se reinician cada dia.
           </p>
           <p className="text-[13px] font-bold text-[#5C7680] leading-relaxed mb-5">
-            Ideal para ahorros o inversiones. Vas registrando aportes y ves tu avance hacia el objetivo. Cada aporte te da +5 XP.
+            Ideal para ahorros o inversiones. Vas registrando aportes y ves tu avance. Cada aporte te da +{GAME_CONFIG.xp.goalContribution} XP, y hay celebraciones en cada hito (25%, 50%, 75%, 100%).
           </p>
           <button onClick={openNew} className="btn-3d btn-3d-blue w-full !text-[14px]">
             + Crear meta
@@ -94,11 +102,10 @@ export function GoalsScreen({ state, onAddContribution, onAddGoal, onUpdateGoal,
               key={goal.id}
               goal={goal}
               contributions={state.goalContributions.filter(c => c.goalId === goal.id)}
-              onAddContrib={() => setContrib({ goalId: goal.id, amount: '', note: '' })}
+              onAddContrib={() => setContrib({ goalId: goal.id, goalName: goal.name, amount: '', note: '' })}
               onEdit={() => openEdit(goal)}
             />
           ))}
-
           <button
             onClick={openNew}
             className="w-full h-12 rounded-2xl border-2 border-dashed border-surface-500 text-[#5C7680] font-bold text-[14px] flex items-center justify-center gap-2 active:bg-surface-700 transition-colors"
@@ -111,9 +118,15 @@ export function GoalsScreen({ state, onAddContribution, onAddGoal, onUpdateGoal,
       {/* --- Contribution modal --- */}
       <BottomSheet open={!!contrib} onClose={() => setContrib(null)} title="Registrar aporte">
         <div className="space-y-4">
+          {contrib && (
+            <div className="bg-surface-700 rounded-xl px-3 py-2 text-[13px] font-bold text-[#94A7B0] flex items-center justify-between">
+              <span>{contrib.goalName}</span>
+              <span className="text-duo-yellow text-[12px]">+{GAME_CONFIG.xp.goalContribution} XP</span>
+            </div>
+          )}
           <FormInput label="Monto" value={contrib?.amount ?? ''} onChange={v => contrib && setContrib({ ...contrib, amount: v })} placeholder="0.00" type="number" autoFocus />
           <FormInput label="Nota (opcional)" value={contrib?.note ?? ''} onChange={v => contrib && setContrib({ ...contrib, note: v })} placeholder="Ej: salario mayo" />
-          <button onClick={handleSubmitContrib} className="btn-3d btn-3d-blue w-full !h-12 !text-[14px]">
+          <button onClick={handleSubmitContrib} className="btn-3d w-full !h-12 !text-[14px]">
             Agregar aporte
           </button>
         </div>
@@ -176,7 +189,7 @@ export function GoalsScreen({ state, onAddContribution, onAddGoal, onUpdateGoal,
   )
 }
 
-// === Goal Card ===
+// === Goal Card con milestones y motivación ===
 function GoalCard({ goal, contributions, onAddContrib, onEdit }: {
   goal: Goal
   contributions: { date: string; amount: number; note?: string }[]
@@ -192,6 +205,8 @@ function GoalCard({ goal, contributions, onAddContrib, onEdit }: {
     : percent >= 50
       ? 'bg-gradient-to-r from-duo-yellow to-duo-green'
       : 'bg-gradient-to-r from-duo-blue to-duo-purple'
+
+  const milestones = [25, 50, 75]
 
   return (
     <div className={`card-3d ${isComplete ? '!border-duo-green !shadow-[0_2px_0_#43C000]' : ''}`}>
@@ -215,19 +230,38 @@ function GoalCard({ goal, contributions, onAddContrib, onEdit }: {
         </div>
       </div>
 
-      {/* Progress bar */}
-      <div className="progress-bar-track !h-3 mb-1.5">
-        <motion.div
-          className={`progress-bar-fill ${progressColor}`}
-          animate={{ width: `${Math.max(percent, 1)}%` }}
-          transition={{ duration: 0.5, ease: [0.3, 0.7, 0.4, 1] }}
-        />
+      {/* Progress bar con milestone markers */}
+      <div className="relative mb-1.5">
+        <div className="progress-bar-track !h-3.5">
+          <motion.div
+            className={`progress-bar-fill ${progressColor}`}
+            animate={{ width: `${Math.max(percent, 1)}%` }}
+            transition={{ duration: 0.5, ease: [0.3, 0.7, 0.4, 1] }}
+          />
+        </div>
+        {/* Milestone dots */}
+        {milestones.map(m => (
+          <div
+            key={m}
+            className={`absolute top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full border-2 ${
+              percent >= m
+                ? 'bg-white border-white'
+                : 'bg-surface-600 border-surface-500'
+            }`}
+            style={{ left: `${m}%`, marginLeft: -5 }}
+          />
+        ))}
       </div>
 
-      <div className="flex justify-between text-[11px] font-bold text-[#5C7680] mb-3">
+      <div className="flex justify-between text-[11px] font-bold text-[#5C7680] mb-2">
         <span>{goal.currentAmount.toLocaleString()} {goal.unit}</span>
         <span>{goal.targetAmount.toLocaleString()} {goal.unit}</span>
       </div>
+
+      {/* Mensaje motivacional */}
+      <p className="text-[12px] font-bold text-[#94A7B0] mb-3 italic">
+        {getMotivation(percent)}
+      </p>
 
       {/* Actions */}
       <div className="flex gap-2">
@@ -237,7 +271,7 @@ function GoalCard({ goal, contributions, onAddContrib, onEdit }: {
           </div>
         ) : (
           <button onClick={onAddContrib} className="btn-3d flex-1 !h-11 !text-[13px]">
-            + Aporte
+            + Aporte (+{GAME_CONFIG.xp.goalContribution} XP)
           </button>
         )}
         <button

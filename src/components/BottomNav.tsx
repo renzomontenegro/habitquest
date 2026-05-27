@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion'
 
-export type Tab = 'hoy' | 'metas' | 'stats' | 'logros' | 'ajustes'
+export type Tab = 'hoy' | 'metas' | 'stats' | 'ajustes'
 
 interface BottomNavProps {
   active: Tab
@@ -11,7 +11,6 @@ const tabs: { id: Tab; label: string; icon: string }[] = [
   { id: 'hoy', label: 'Hoy', icon: '⚡' },
   { id: 'metas', label: 'Metas', icon: '🎯' },
   { id: 'stats', label: 'Stats', icon: '📊' },
-  { id: 'logros', label: 'Logros', icon: '🏅' },
   { id: 'ajustes', label: 'Ajustes', icon: '⚙️' },
 ]
 
@@ -24,7 +23,7 @@ export function BottomNav({ active, onChange }: BottomNavProps) {
           <button
             key={tab.id}
             onClick={() => onChange(tab.id)}
-            className="relative flex flex-col items-center justify-center gap-0.5 w-14 h-full active:opacity-70 transition-opacity"
+            className="relative flex flex-col items-center justify-center gap-0.5 flex-1 h-full active:opacity-70 transition-opacity"
           >
             {isActive && (
               <motion.div

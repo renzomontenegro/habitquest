@@ -8,6 +8,7 @@ import type { AppState, Habit, HabitType } from '../types'
 import { dailyXP, calculateGlobalStreak, today, isPerfectDay } from '../lib/streaks'
 import { currentWeekXP, getWeeklyTier, bestWeekXP } from '../lib/streaks'
 import { LEAGUE_NAMES, LEAGUE_COLORS } from '../lib/gameConfig'
+import { getNextAchievement, getRecentUnlocks } from '../lib/achievementProgress'
 
 const ICONS = ['💪', '🏃', '🥗', '💧', '📚', '🧘', '💤', '✍️', '🏋️', '🚴', '🧠', '❤️', '🌱', '🎵']
 const COLORS = ['#58CC02', '#1CB0F6', '#FF9600', '#FF4B4B', '#CE82FF', '#FFC800']
@@ -33,6 +34,9 @@ export function TodayScreen({ state, onToggle, onUpdateQuant, onAddHabit, onUpda
   const completedCount = state.habits.filter(h =>
     state.habitLogs.some(l => l.habitId === h.id && l.date === todayStr && l.completed)
   ).length
+
+  const nextAchievement = getNextAchievement(state)
+  const recentUnlocks = getRecentUnlocks(state)
 
   // --- Form state ---
   const [showForm, setShowForm] = useState(false)
@@ -139,8 +143,7 @@ export function TodayScreen({ state, onToggle, onUpdateQuant, onAddHabit, onUpda
       </div>
 
       {state.habits.length === 0 ? (
-        /* --- Empty state explicativo --- */
-        <div className="card-3d text-center py-8 px-5">
+        <div className="card-3d text-center py-8 px-5 mb-5">
           <div className="text-4xl mb-3">⚡</div>
           <h3 className="text-[17px] font-black text-white mb-2">Crea tu primer habito</h3>
           <p className="text-[13px] font-bold text-[#94A7B0] leading-relaxed mb-1">
@@ -154,7 +157,7 @@ export function TodayScreen({ state, onToggle, onUpdateQuant, onAddHabit, onUpda
           </button>
         </div>
       ) : (
-        <div className="space-y-2.5">
+        <div className="space-y-2.5 mb-5">
           {state.habits.map(habit => {
             const log = state.habitLogs.find(l => l.habitId === habit.id && l.date === todayStr)
             return (
@@ -168,8 +171,6 @@ export function TodayScreen({ state, onToggle, onUpdateQuant, onAddHabit, onUpda
               />
             )
           })}
-
-          {/* Botón agregar más */}
           <button
             onClick={openNew}
             className="w-full h-12 rounded-2xl border-2 border-dashed border-surface-500 text-[#5C7680] font-bold text-[14px] flex items-center justify-center gap-2 active:bg-surface-700 transition-colors"
@@ -179,12 +180,54 @@ export function TodayScreen({ state, onToggle, onUpdateQuant, onAddHabit, onUpda
         </div>
       )}
 
+      {/* --- Próximo logro --- */}
+      {nextAchievement && (
+        <div className="mb-5">
+          <h2 className="text-[14px] font-extrabold text-[#94A7B0] uppercase tracking-wider mb-3">
+            Proximo logro
+          </h2>
+          <div className="card-3d flex items-center gap-3">
+            <div className="text-3xl flex-shrink-0">{nextAchievement.icon}</div>
+            <div className="flex-1 min-w-0">
+              <div className="text-[14px] font-black text-white mb-0.5">{nextAchievement.name}</div>
+              <div className="text-[11px] font-bold text-[#5C7680] mb-2">{nextAchievement.description}</div>
+              <div className="progress-bar-track !h-2.5">
+                <motion.div
+                  className="progress-bar-fill bg-gradient-to-r from-duo-yellow to-duo-orange"
+                  animate={{ width: `${Math.max(nextAchievement.percent, 2)}%` }}
+                  transition={{ duration: 0.5 }}
+                />
+              </div>
+              <div className="text-[10px] font-bold text-[#5C7680] mt-1">
+                {nextAchievement.current} / {nextAchievement.target} — {Math.round(nextAchievement.percent)}%
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- Logros recientes --- */}
+      {recentUnlocks.length > 0 && (
+        <div>
+          <h2 className="text-[14px] font-extrabold text-[#94A7B0] uppercase tracking-wider mb-3">
+            Desbloqueados
+          </h2>
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {recentUnlocks.map(a => (
+              <div key={a.id} className="flex-shrink-0 card-3d !border-duo-yellow !shadow-[0_2px_0_#E58700] !py-3 !px-4 text-center min-w-[100px]">
+                <div className="text-2xl mb-1">{a.icon}</div>
+                <div className="text-[11px] font-black text-white">{a.name}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* --- Form modal --- */}
       <BottomSheet open={showForm} onClose={() => setShowForm(false)} title={editingId ? 'Editar habito' : 'Nuevo habito'}>
         <div className="space-y-4">
           <FormInput label="Nombre" value={form.name} onChange={v => setForm({ ...form, name: v })} placeholder="Ej: Ir al gym" autoFocus />
 
-          {/* Tipo */}
           <div>
             <label className="text-[11px] font-bold text-[#5C7680] uppercase tracking-wider mb-1.5 block">Tipo</label>
             <div className="flex gap-2">
@@ -210,7 +253,6 @@ export function TodayScreen({ state, onToggle, onUpdateQuant, onAddHabit, onUpda
             </p>
           </div>
 
-          {/* Quant fields */}
           <AnimatePresence>
             {form.type === 'quant' && (
               <motion.div
@@ -227,35 +269,25 @@ export function TodayScreen({ state, onToggle, onUpdateQuant, onAddHabit, onUpda
             )}
           </AnimatePresence>
 
-          {/* Icono */}
           <div>
             <label className="text-[11px] font-bold text-[#5C7680] uppercase tracking-wider mb-1.5 block">Icono</label>
             <div className="flex flex-wrap gap-1.5">
               {ICONS.map(icon => (
-                <button
-                  key={icon}
-                  onClick={() => setForm({ ...form, icon })}
+                <button key={icon} onClick={() => setForm({ ...form, icon })}
                   className={`w-10 h-10 rounded-lg flex items-center justify-center text-lg border-2 transition-all ${
                     form.icon === icon ? 'bg-duo-blue/20 border-duo-blue' : 'bg-surface-700 border-surface-600'
                   }`}
-                >
-                  {icon}
-                </button>
+                >{icon}</button>
               ))}
             </div>
           </div>
 
-          {/* Color */}
           <div>
             <label className="text-[11px] font-bold text-[#5C7680] uppercase tracking-wider mb-1.5 block">Color</label>
             <div className="flex gap-2">
               {COLORS.map(color => (
-                <button
-                  key={color}
-                  onClick={() => setForm({ ...form, color })}
-                  className={`w-8 h-8 rounded-full border-2 transition-all ${
-                    form.color === color ? 'scale-110 border-white' : 'border-transparent'
-                  }`}
+                <button key={color} onClick={() => setForm({ ...form, color })}
+                  className={`w-8 h-8 rounded-full border-2 transition-all ${form.color === color ? 'scale-110 border-white' : 'border-transparent'}`}
                   style={{ backgroundColor: color }}
                 />
               ))}

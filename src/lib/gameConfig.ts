@@ -5,7 +5,7 @@ export const GAME_CONFIG = {
   xp: {
     binaryHabitComplete: 10,
     quantHabitComplete: 10,
-    goalContribution: 5,
+    goalContribution: 10,
     perfectDayBonus: 20,
   },
 

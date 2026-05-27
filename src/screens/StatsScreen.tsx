@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { motion } from 'framer-motion'
 import { XAxis, YAxis, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts'
 import { format, subDays } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -27,17 +28,18 @@ export function StatsScreen({ state }: StatsScreenProps) {
   }, [state.habitLogs, state.habits])
 
   const maxCount = Math.max(...heatmap.map(d => d.count), 1)
+  const unlockedCount = state.achievements.filter(a => a.unlockedAt).length
 
   if (state.habits.length === 0 && state.goals.length === 0) {
     return (
       <div className="px-4 pt-2 pb-8">
-        <h1 className="text-xl font-black text-white leading-tight mb-1">Estadisticas</h1>
+        <h1 className="text-xl font-black text-white leading-tight mb-1">Stats</h1>
         <p className="text-[13px] font-bold text-[#5C7680] mb-6">Tu progreso en numeros</p>
         <div className="card-3d text-center py-8 px-5">
           <div className="text-4xl mb-3">📊</div>
           <h3 className="text-[17px] font-black text-white mb-2">Aun no hay datos</h3>
           <p className="text-[13px] font-bold text-[#5C7680] leading-relaxed">
-            Crea habitos en la pestana "Hoy" y empieza a completarlos. Aqui veras tu heatmap, rachas y graficas de XP.
+            Crea habitos en la pestana "Hoy" y empieza a completarlos. Aqui veras tu heatmap, rachas, graficas de XP y logros.
           </p>
         </div>
       </div>
@@ -47,7 +49,7 @@ export function StatsScreen({ state }: StatsScreenProps) {
   return (
     <div className="px-4 pt-2 pb-8 space-y-5">
       <div>
-        <h1 className="text-xl font-black text-white leading-tight mb-1">Estadisticas</h1>
+        <h1 className="text-xl font-black text-white leading-tight mb-1">Stats</h1>
         <p className="text-[13px] font-bold text-[#5C7680]">Tu progreso en numeros</p>
       </div>
 
@@ -139,6 +141,54 @@ export function StatsScreen({ state }: StatsScreenProps) {
           </div>
         </div>
       )}
+
+      {/* === Logros === */}
+      <div>
+        <h2 className="text-[13px] font-extrabold text-[#94A7B0] uppercase tracking-wider mb-1">Logros</h2>
+        <p className="text-[11px] font-bold text-[#5C7680] mb-2.5">
+          {unlockedCount} de {state.achievements.length} desbloqueados
+        </p>
+
+        <div className="progress-bar-track !h-2.5 mb-3">
+          <motion.div
+            className="progress-bar-fill bg-gradient-to-r from-duo-yellow to-duo-orange"
+            animate={{ width: `${Math.max((unlockedCount / state.achievements.length) * 100, 2)}%` }}
+            transition={{ duration: 0.6 }}
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          {state.achievements.map(achievement => {
+            const isUnlocked = !!achievement.unlockedAt
+            return (
+              <div
+                key={achievement.id}
+                className={`card-3d text-center !py-3 !px-2.5 ${
+                  isUnlocked
+                    ? '!border-duo-yellow !shadow-[0_2px_0_#E58700]'
+                    : 'opacity-40'
+                }`}
+              >
+                <div className={`text-3xl mb-1.5 ${isUnlocked ? '' : 'grayscale'}`}>
+                  {achievement.icon}
+                </div>
+                <div className={`text-[12px] font-black mb-0.5 ${isUnlocked ? 'text-white' : 'text-[#5C7680]'}`}>
+                  {achievement.name}
+                </div>
+                <div className={`text-[10px] font-bold leading-snug ${isUnlocked ? 'text-[#94A7B0]' : 'text-[#3C5564]'}`}>
+                  {achievement.description}
+                </div>
+                {isUnlocked && (
+                  <div className="mt-1 text-[9px] font-bold text-duo-yellow">
+                    {new Date(achievement.unlockedAt!).toLocaleDateString('es', { day: 'numeric', month: 'short' })}
+                  </div>
+                )}
+                {!isUnlocked && <div className="mt-1 text-[13px]">🔒</div>}
+              </div>
+            )
+          })}
+        </div>
+      </div>
     </div>
   )
 }

@@ -5,7 +5,6 @@ import { CelebrationModal } from './components/CelebrationModal'
 import { TodayScreen } from './screens/TodayScreen'
 import { GoalsScreen } from './screens/GoalsScreen'
 import { StatsScreen } from './screens/StatsScreen'
-import { AchievementsScreen } from './screens/AchievementsScreen'
 import { SettingsScreen } from './screens/SettingsScreen'
 import { useAppState } from './hooks/useAppState'
 
@@ -15,10 +14,8 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      {/* Top safe area — bg extends behind Dynamic Island */}
       <div className="app-header-safe" />
 
-      {/* Scrollable content area */}
       <main className="app-content">
         <AnimatePresence mode="wait">
           <motion.div
@@ -48,7 +45,6 @@ export default function App() {
               />
             )}
             {tab === 'stats' && <StatsScreen state={app.state} />}
-            {tab === 'logros' && <AchievementsScreen state={app.state} />}
             {tab === 'ajustes' && (
               <SettingsScreen
                 state={app.state}
@@ -62,9 +58,7 @@ export default function App() {
         </AnimatePresence>
       </main>
 
-      {/* Bottom tab bar — sits above home indicator */}
       <BottomNav active={tab} onChange={setTab} />
-
       <CelebrationModal celebration={app.celebration} onClose={() => app.setCelebration(null)} />
     </div>
   )
