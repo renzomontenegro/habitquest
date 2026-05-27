@@ -102,9 +102,6 @@ export function TodayScreen({ state, onToggle, onUpdateQuant, onAddHabit, onUpda
           <div className={`badge-streak ${streak === 0 ? 'opacity-40' : ''}`}>
             <span>🔥</span><span>{streak}</span>
           </div>
-          <div className="badge-freeze">
-            <span>🧊</span><span>{state.profile.streakFreezes}</span>
-          </div>
           <div className="badge-xp">
             <span>💎</span><span>{state.profile.totalXP}</span>
           </div>

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { BottomSheet, FormInput } from '../components/FormModal'
-import type { AppState, Goal, GoalCategory } from '../types'
+import type { AppState, Goal } from '../types'
 import { GAME_CONFIG } from '../lib/gameConfig'
 
 const ICONS = ['💰', '📈', '🏠', '🚗', '✈️', '🎓', '💻', '🏋️', '📚', '🎯', '❤️', '🌱']
@@ -28,15 +28,15 @@ export function GoalsScreen({ state, onAddContribution, onAddGoal, onUpdateGoal,
   const [contrib, setContrib] = useState<{ goalId: string; goalName: string; amount: string; note: string } | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [form, setForm] = useState({ name: '', icon: '💰', targetAmount: '', unit: 'S/', category: 'savings' as GoalCategory, deadline: '' })
+  const [form, setForm] = useState({ name: '', icon: '💰', targetAmount: '', unit: '', deadline: '' })
 
   const openNew = () => {
-    setForm({ name: '', icon: '💰', targetAmount: '', unit: 'S/', category: 'savings', deadline: '' })
+    setForm({ name: '', icon: '💰', targetAmount: '', unit: '', deadline: '' })
     setEditingId(null)
     setShowForm(true)
   }
   const openEdit = (g: Goal) => {
-    setForm({ name: g.name, icon: g.icon, targetAmount: g.targetAmount.toString(), unit: g.unit, category: g.category, deadline: g.deadline ?? '' })
+    setForm({ name: g.name, icon: g.icon, targetAmount: g.targetAmount.toString(), unit: g.unit, deadline: g.deadline ?? '' })
     setEditingId(g.id)
     setShowForm(true)
   }
@@ -45,7 +45,7 @@ export function GoalsScreen({ state, onAddContribution, onAddGoal, onUpdateGoal,
     const data = {
       name: form.name.trim(), icon: form.icon,
       targetAmount: parseFloat(form.targetAmount) || 0,
-      unit: form.unit, category: form.category,
+      unit: form.unit,
       deadline: form.deadline || undefined,
     }
     if (editingId) onUpdateGoal(editingId, data)
@@ -89,7 +89,7 @@ export function GoalsScreen({ state, onAddContribution, onAddGoal, onUpdateGoal,
             Las metas son objetivos progresivos que no se reinician cada dia.
           </p>
           <p className="text-[13px] font-bold text-[#5C7680] leading-relaxed mb-5">
-            Ideal para ahorros o inversiones. Vas registrando aportes y ves tu avance. Cada aporte te da +{GAME_CONFIG.xp.goalContribution} XP, y hay celebraciones en cada hito (25%, 50%, 75%, 100%).
+            Puede ser cualquier cosa: ahorrar S/5000, leer 24 libros, correr 500km. Vas registrando aportes y cada uno te da +{GAME_CONFIG.xp.goalContribution} XP.
           </p>
           <button onClick={openNew} className="btn-3d btn-3d-blue w-full !text-[14px]">
             + Crear meta
@@ -151,25 +151,8 @@ export function GoalsScreen({ state, onAddContribution, onAddGoal, onUpdateGoal,
           </div>
 
           <div className="flex gap-2">
-            <FormInput label="Monto objetivo" value={form.targetAmount} onChange={v => setForm({ ...form, targetAmount: v })} placeholder="5000" type="number" className="flex-1" />
-            <FormInput label="Moneda" value={form.unit} onChange={v => setForm({ ...form, unit: v })} placeholder="S/" className="w-20" />
-          </div>
-
-          <div>
-            <label className="text-[11px] font-bold text-[#5C7680] uppercase tracking-wider mb-1.5 block">Categoria</label>
-            <div className="flex gap-2">
-              {(['savings', 'investment'] as GoalCategory[]).map(cat => (
-                <button key={cat} onClick={() => setForm({ ...form, category: cat })}
-                  className={`flex-1 py-2.5 rounded-xl text-[13px] font-black border-2 transition-all duration-100 ${
-                    form.category === cat
-                      ? 'bg-duo-blue border-duo-blue-dark shadow-[0_3px_0_#1899D6] text-white'
-                      : 'bg-surface-700 border-surface-500 shadow-[0_3px_0_var(--color-surface-600)] text-[#94A7B0]'
-                  } active:shadow-none active:translate-y-[3px]`}
-                >
-                  {cat === 'savings' ? 'Ahorro' : 'Inversion'}
-                </button>
-              ))}
-            </div>
+            <FormInput label="Objetivo" value={form.targetAmount} onChange={v => setForm({ ...form, targetAmount: v })} placeholder="5000" type="number" className="flex-1" />
+            <FormInput label="Unidad" value={form.unit} onChange={v => setForm({ ...form, unit: v })} placeholder="S/, km, libros..." className="flex-1" />
           </div>
 
           <FormInput label="Fecha limite (opcional)" value={form.deadline} onChange={v => setForm({ ...form, deadline: v })} type="date" />
@@ -216,9 +199,11 @@ function GoalCard({ goal, contributions, onAddContrib, onEdit }: {
           <h3 className={`font-extrabold text-[15px] truncate ${isComplete ? 'text-duo-green' : 'text-white'}`}>
             {goal.name}
           </h3>
-          <p className="text-[11px] font-bold text-[#5C7680] uppercase tracking-wider">
-            {goal.category === 'savings' ? 'Ahorro' : 'Inversion'}
-          </p>
+          {goal.deadline && (
+            <p className="text-[11px] font-bold text-[#5C7680]">
+              Limite: {new Date(goal.deadline).toLocaleDateString('es', { day: 'numeric', month: 'short', year: 'numeric' })}
+            </p>
+          )}
         </div>
         <div className={`min-w-[46px] h-[46px] rounded-xl flex flex-col items-center justify-center border-2 ${
           isComplete ? 'bg-[rgba(88,204,2,0.12)] border-duo-green' : 'bg-surface-700 border-surface-500'

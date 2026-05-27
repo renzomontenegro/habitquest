@@ -22,8 +22,6 @@ export interface HabitLog {
 }
 
 // --- Metas ---
-export type GoalCategory = 'savings' | 'investment'
-
 export interface Goal {
   id: string
   name: string
@@ -32,7 +30,6 @@ export interface Goal {
   currentAmount: number
   unit: string
   deadline?: string
-  category: GoalCategory
 }
 
 export interface GoalContribution {
