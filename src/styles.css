@@ -1,0 +1,236 @@
+@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap');
+
+@theme {
+  /* Duolingo-inspired palette */
+  --color-duo-green: #58CC02;
+  --color-duo-green-dark: #43C000;
+  --color-duo-green-light: #BFF199;
+  --color-duo-blue: #1CB0F6;
+  --color-duo-blue-dark: #1899D6;
+  --color-duo-red: #FF4B4B;
+  --color-duo-red-dark: #E53838;
+  --color-duo-orange: #FF9600;
+  --color-duo-orange-dark: #E58700;
+  --color-duo-yellow: #FFC800;
+  --color-duo-purple: #CE82FF;
+  --color-duo-purple-dark: #A560E8;
+
+  /* Surfaces (dark mode) */
+  --color-surface-900: #131F24;
+  --color-surface-800: #1B2B32;
+  --color-surface-700: #233742;
+  --color-surface-600: #2E4450;
+  --color-surface-500: #3C5564;
+
+  /* Text */
+  --color-text-primary: #FFFFFF;
+  --color-text-secondary: #94A7B0;
+  --color-text-muted: #5C7680;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
+
+html {
+  background-color: #131F24;
+  color-scheme: dark;
+}
+
+body {
+  font-family: 'Nunito', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-weight: 700;
+  overscroll-behavior: none;
+  overflow-x: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+  color: #FFFFFF;
+}
+
+/* iOS inputs fix */
+input, button, textarea, select {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  font-family: inherit;
+  font-weight: inherit;
+}
+
+/* Scrollbar invisible */
+::-webkit-scrollbar {
+  display: none;
+}
+
+/* Input number sin flechas */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+/* ===== DUOLINGO 3D BUTTON SYSTEM ===== */
+
+/* Primary button (green CTA) */
+.btn-3d {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 24px;
+  height: 52px;
+  border: none;
+  border-radius: 16px;
+  font-family: 'Nunito', sans-serif;
+  font-weight: 800;
+  font-size: 15px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  cursor: pointer;
+  user-select: none;
+  background: var(--color-duo-green);
+  color: #FFFFFF;
+  box-shadow: 0 5px 0 var(--color-duo-green-dark);
+  transform: translateY(0);
+  transition: transform 0.1s ease, box-shadow 0.1s ease, filter 0.15s ease;
+}
+.btn-3d:active {
+  box-shadow: none;
+  transform: translateY(5px);
+}
+
+/* Danger */
+.btn-3d-danger {
+  background: var(--color-duo-red);
+  box-shadow: 0 5px 0 var(--color-duo-red-dark);
+}
+
+/* Blue */
+.btn-3d-blue {
+  background: var(--color-duo-blue);
+  box-shadow: 0 5px 0 var(--color-duo-blue-dark);
+}
+
+/* Purple */
+.btn-3d-purple {
+  background: var(--color-duo-purple);
+  box-shadow: 0 5px 0 var(--color-duo-purple-dark);
+}
+
+/* Orange */
+.btn-3d-orange {
+  background: var(--color-duo-orange);
+  box-shadow: 0 5px 0 var(--color-duo-orange-dark);
+}
+
+/* Disabled */
+.btn-3d:disabled {
+  background: var(--color-surface-600);
+  color: var(--color-text-muted);
+  box-shadow: 0 5px 0 var(--color-surface-700);
+  cursor: not-allowed;
+}
+
+/* ===== PROGRESS BAR WITH SHIMMER ===== */
+.progress-bar-track {
+  width: 100%;
+  height: 16px;
+  background: var(--color-surface-700);
+  border-radius: 8px;
+  overflow: hidden;
+  position: relative;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  border-radius: 8px;
+  position: relative;
+  transition: width 0.6s cubic-bezier(0.3, 0.7, 0.4, 1);
+}
+
+.progress-bar-fill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 50%;
+  background: linear-gradient(180deg, rgba(255,255,255,0.3) 0%, transparent 100%);
+  border-radius: 8px 8px 0 0;
+}
+
+/* ===== CARD SYSTEM ===== */
+.card-3d {
+  background: var(--color-surface-800);
+  border-radius: 14px;
+  border: 2px solid var(--color-surface-600);
+  box-shadow: 0 2px 0 var(--color-surface-700);
+  padding: 14px;
+}
+
+.card-3d-interactive {
+  cursor: pointer;
+  box-shadow: 0 4px 0 var(--color-surface-700);
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+.card-3d-interactive:active {
+  box-shadow: none;
+  transform: translateY(4px);
+}
+
+/* ===== BADGE STYLES ===== */
+.badge-streak {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255, 150, 0, 0.12);
+  border: 2px solid var(--color-duo-orange);
+  border-radius: 16px;
+  padding: 4px 10px;
+  font-weight: 800;
+  font-size: 14px;
+  color: var(--color-duo-orange);
+}
+
+.badge-xp {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255, 200, 0, 0.12);
+  border: 2px solid var(--color-duo-yellow);
+  border-radius: 16px;
+  padding: 4px 10px;
+  font-weight: 800;
+  font-size: 14px;
+  color: var(--color-duo-yellow);
+}
+
+.badge-freeze {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(28, 176, 246, 0.12);
+  border: 2px solid var(--color-duo-blue);
+  border-radius: 16px;
+  padding: 4px 10px;
+  font-weight: 800;
+  font-size: 14px;
+  color: var(--color-duo-blue);
+}
+
+/* ===== MINIMAL ANIMATIONS ===== */
+/* Respect reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
