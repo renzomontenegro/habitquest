@@ -142,6 +142,52 @@ export function StatsScreen({ state }: StatsScreenProps) {
         </div>
       )}
 
+      {/* === Resumen de metas === */}
+      {state.goals.length > 0 && (
+        <div>
+          <h2 className="text-[13px] font-extrabold text-[#94A7B0] uppercase tracking-wider mb-2.5">Metas</h2>
+          <div className="space-y-1.5">
+            {state.goals.map(goal => {
+              const percent = goal.targetAmount > 0 ? Math.min((goal.currentAmount / goal.targetAmount) * 100, 100) : 0
+              const isComplete = percent >= 100
+              return (
+                <div key={goal.id} className={`card-3d !p-2.5 ${isComplete ? '!border-duo-green !shadow-[0_2px_0_#43C000]' : ''}`}>
+                  <div className="flex items-center gap-2.5 mb-2">
+                    <span className="text-xl">{goal.icon}</span>
+                    <span className={`flex-1 font-bold text-[14px] truncate ${isComplete ? 'text-duo-green' : 'text-white'}`}>{goal.name}</span>
+                    <span className={`text-[14px] font-black ${isComplete ? 'text-duo-green' : 'text-white'}`}>{Math.round(percent)}%</span>
+                  </div>
+                  <div className="progress-bar-track !h-2">
+                    <div
+                      className={`progress-bar-fill ${isComplete ? 'bg-duo-green' : 'bg-gradient-to-r from-duo-blue to-duo-purple'}`}
+                      style={{ width: `${Math.max(percent, 1)}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-[10px] font-bold text-[#5C7680] mt-1">
+                    <span>{goal.currentAmount.toLocaleString()} {goal.unit}</span>
+                    <span>{goal.targetAmount.toLocaleString()} {goal.unit}</span>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Resumen total de aportes */}
+          <div className="grid grid-cols-2 gap-2 mt-3">
+            <div className="card-3d text-center py-2.5">
+              <div className="text-[10px] font-bold text-[#5C7680] uppercase">Total aportes</div>
+              <div className="text-xl font-black text-duo-blue">{state.goalContributions.length}</div>
+            </div>
+            <div className="card-3d text-center py-2.5">
+              <div className="text-[10px] font-bold text-[#5C7680] uppercase">Metas completas</div>
+              <div className="text-xl font-black text-duo-green">
+                {state.goals.filter(g => g.currentAmount >= g.targetAmount).length}/{state.goals.length}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* === Logros === */}
       <div>
         <h2 className="text-[13px] font-extrabold text-[#94A7B0] uppercase tracking-wider mb-1">Logros</h2>

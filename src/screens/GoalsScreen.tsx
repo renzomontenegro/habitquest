@@ -4,7 +4,7 @@ import { BottomSheet, FormInput } from '../components/FormModal'
 import type { AppState, Goal } from '../types'
 import { GAME_CONFIG } from '../lib/gameConfig'
 
-const ICONS = ['💰', '📈', '🏠', '🚗', '✈️', '🎓', '💻', '🏋️', '📚', '🎯', '❤️', '🌱']
+const SUGGESTED_ICONS = ['💰', '📈', '🏠', '🚗', '✈️', '🎓', '💻', '🏋️', '📚', '🎯', '❤️', '🌱', '🏖️', '💍', '🐕', '🎸']
 
 interface GoalsScreenProps {
   state: AppState
@@ -139,10 +139,22 @@ export function GoalsScreen({ state, onAddContribution, onAddGoal, onUpdateGoal,
 
           <div>
             <label className="text-[11px] font-bold text-[#5C7680] uppercase tracking-wider mb-1.5 block">Icono</label>
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-12 h-12 rounded-xl bg-surface-700 border-2 border-surface-500 flex items-center justify-center text-2xl">
+                {form.icon || '❓'}
+              </div>
+              <input
+                type="text"
+                value={form.icon}
+                onChange={e => setForm({ ...form, icon: e.target.value })}
+                placeholder="Escribe o pega un emoji"
+                className="flex-1 h-11 bg-surface-700 text-white rounded-xl px-3 font-bold text-[15px] border-2 border-surface-500 outline-none focus:border-duo-blue transition-colors"
+              />
+            </div>
             <div className="flex flex-wrap gap-1.5">
-              {ICONS.map(icon => (
+              {SUGGESTED_ICONS.map(icon => (
                 <button key={icon} onClick={() => setForm({ ...form, icon })}
-                  className={`w-10 h-10 rounded-lg flex items-center justify-center text-lg border-2 transition-all ${
+                  className={`w-9 h-9 rounded-lg flex items-center justify-center text-base border-2 transition-all ${
                     form.icon === icon ? 'bg-duo-blue/20 border-duo-blue' : 'bg-surface-700 border-surface-600'
                   }`}
                 >{icon}</button>
