@@ -3,7 +3,7 @@ import type { AppState, Habit, HabitLog, Goal, GoalContribution, DailyXPGoal } f
 import { storage } from '../lib/storage'
 import { addXP } from '../lib/xp'
 import { GAME_CONFIG } from '../lib/gameConfig'
-import { today, calculateGlobalStreak, calculateEarnedFreezes, isPerfectDay, checkEarlyBird, perfectDayStreak, currentWeekXP, getWeeklyTier, getWeekStart } from '../lib/streaks'
+import { today, updateStreak, isPerfectDay, checkEarlyBird, perfectDayStreak, currentWeekXP, getWeeklyTier, getWeekStart } from '../lib/streaks'
 import { playComplete, playLevelUp, playAchievement } from '../lib/sounds'
 import confetti from 'canvas-confetti'
 
@@ -19,6 +19,26 @@ export function useAppState() {
   }, [state])
 
   const genId = () => crypto.randomUUID()
+
+  // Al abrir la app: actualizar racha (detectar días perdidos)
+  useEffect(() => {
+    setState(prev => {
+      const streakUpdate = updateStreak(prev.habitLogs, prev.habits, prev.profile)
+      if (
+        streakUpdate.currentStreak === prev.profile.currentStreak &&
+        streakUpdate.streakDate === prev.profile.streakDate
+      ) return prev // sin cambios
+      return {
+        ...prev,
+        profile: {
+          ...prev.profile,
+          currentStreak: streakUpdate.currentStreak,
+          streakDate: streakUpdate.streakDate,
+          streakFreezes: streakUpdate.streakFreezes,
+        },
+      }
+    })
+  }, []) // solo al montar
 
   const celebrate = useCallback((type: string, message: string) => {
     setCelebration({ type, message })
@@ -36,7 +56,7 @@ export function useAppState() {
   const checkAchievements = useCallback((newState: AppState): AppState => {
     const { habitLogs, habits, profile, goals, achievements } = newState
     const todayStr = today()
-    const { streak } = calculateGlobalStreak(habitLogs, habits, profile)
+    const streak = profile.currentStreak
     const updated = [...achievements]
     let changed = false
 
@@ -115,15 +135,18 @@ export function useAppState() {
         }, 300)
       }
 
+      // Actualizar racha hacia adelante
+      const streakUpdate = updateStreak(newLogs, prev.habits, profile)
+
       const newState: AppState = {
         ...prev,
         habitLogs: newLogs,
         profile: {
           ...profile,
           lastActiveDate: todayStr,
-          streakFreezes: calculateEarnedFreezes(
-            calculateGlobalStreak(newLogs, prev.habits, profile).streak
-          ),
+          currentStreak: streakUpdate.currentStreak,
+          streakDate: streakUpdate.streakDate,
+          streakFreezes: streakUpdate.streakFreezes,
         },
       }
       return checkAchievements(newState)
@@ -174,10 +197,18 @@ export function useAppState() {
         }, 300)
       }
 
+      const streakUpdate = updateStreak(newLogs, prev.habits, profile)
+
       const newState: AppState = {
         ...prev,
         habitLogs: newLogs,
-        profile: { ...profile, lastActiveDate: todayStr },
+        profile: {
+          ...profile,
+          lastActiveDate: todayStr,
+          currentStreak: streakUpdate.currentStreak,
+          streakDate: streakUpdate.streakDate,
+          streakFreezes: streakUpdate.streakFreezes,
+        },
       }
       return checkAchievements(newState)
     })
@@ -242,10 +273,10 @@ export function useAppState() {
   }, [])
 
   const deleteHabit = useCallback((id: string) => {
+    // Los logs se conservan como huérfanos para preservar el historial de XP/racha
     setState(prev => ({
       ...prev,
       habits: prev.habits.filter(h => h.id !== id),
-      habitLogs: prev.habitLogs.filter(l => l.habitId !== id),
     }))
   }, [])
 

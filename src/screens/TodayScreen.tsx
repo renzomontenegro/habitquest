@@ -5,7 +5,7 @@ import { LevelBar } from '../components/LevelBar'
 import { HabitCard } from '../components/HabitCard'
 import { BottomSheet, FormInput } from '../components/FormModal'
 import type { AppState, Habit, HabitType } from '../types'
-import { dailyXP, calculateGlobalStreak, today, isPerfectDay } from '../lib/streaks'
+import { dailyXP, today, isPerfectDay } from '../lib/streaks'
 import { currentWeekXP, getWeeklyTier, bestWeekXP } from '../lib/streaks'
 import { LEAGUE_NAMES, LEAGUE_COLORS } from '../lib/gameConfig'
 import { getNextAchievement, getRecentUnlocks } from '../lib/achievementProgress'
@@ -25,7 +25,7 @@ interface TodayScreenProps {
 export function TodayScreen({ state, onToggle, onUpdateQuant, onAddHabit, onUpdateHabit, onDeleteHabit }: TodayScreenProps) {
   const todayStr = today()
   const todayXP = dailyXP(state.habitLogs, state.habits, todayStr)
-  const { streak } = calculateGlobalStreak(state.habitLogs, state.habits, state.profile)
+  const streak = state.profile.currentStreak
   const perfectDay = isPerfectDay(state.habitLogs, state.habits, todayStr)
   const weekXP = currentWeekXP(state.habitLogs, state.habits)
   const tier = getWeeklyTier(weekXP)

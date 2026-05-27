@@ -1,5 +1,5 @@
 import type { AppState } from '../types'
-import { calculateGlobalStreak, perfectDayStreak } from './streaks'
+import { perfectDayStreak } from './streaks'
 
 // Calcula el progreso hacia cada logro no desbloqueado
 // Retorna el más cercano a completarse
@@ -15,7 +15,7 @@ export interface AchievementProgress {
 
 export function getNextAchievement(state: AppState): AchievementProgress | null {
   const { habitLogs, habits, profile, goals, achievements } = state
-  const { streak } = calculateGlobalStreak(habitLogs, habits, profile)
+  const streak = profile.currentStreak
   const perfectStreak = perfectDayStreak(habitLogs, habits)
 
   const progressMap: Record<string, { current: number; target: number }> = {

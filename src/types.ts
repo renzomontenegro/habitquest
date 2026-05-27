@@ -49,6 +49,9 @@ export interface UserProfile {
   dailyXPGoal: DailyXPGoal
   streakFreezes: number
   lastActiveDate: string
+  // Racha almacenada — se actualiza hacia adelante, nunca se recalcula retroactivamente
+  currentStreak: number
+  streakDate: string // último día que contó para la racha (YYYY-MM-DD)
 }
 
 // --- Logros ---

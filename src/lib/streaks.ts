@@ -8,14 +8,14 @@ export function today(): string {
 }
 
 // XP ganado en un día específico (solo de hábitos)
+// Si un hábito fue borrado, el log huérfano usa 10 XP por defecto
 export function dailyXP(logs: HabitLog[], habits: Habit[], date: string): number {
   const dayLogs = logs.filter(l => l.date === date && l.completed)
   let xp = 0
   for (const log of dayLogs) {
     const habit = habits.find(h => h.id === log.habitId)
-    if (habit) xp += habit.xpReward
+    xp += habit ? habit.xpReward : 10 // default XP para logs huérfanos
   }
-  // Bonus día perfecto
   if (isPerfectDay(logs, habits, date)) {
     xp += GAME_CONFIG.xp.perfectDayBonus
   }
@@ -31,42 +31,83 @@ export function isPerfectDay(logs: HabitLog[], habits: Habit[], date: string): b
   return activeHabits.every(h => logs.some(l => l.habitId === h.id && l.date === date && l.completed))
 }
 
-// Racha global: días consecutivos donde el XP diario >= objetivo
-export function calculateGlobalStreak(
+// Racha global almacenada — se actualiza hacia adelante, nunca retroactivamente.
+// Llamar al abrir la app o al completar un hábito.
+export function updateStreak(
   logs: HabitLog[],
   habits: Habit[],
   profile: UserProfile
-): { streak: number; usedFreeze: boolean } {
-  let streak = 0
-  let freezesAvailable = profile.streakFreezes
-  let usedFreeze = false
-  let date = today()
+): { currentStreak: number; streakDate: string; streakFreezes: number; usedFreeze: boolean } {
+  const todayStr = today()
+  const yesterdayStr = format(subDays(new Date(), 1), 'yyyy-MM-dd')
 
-  // Si hoy no tiene XP suficiente, empezar desde ayer (el día aún no termina)
-  const todayXP = dailyXP(logs, habits, date)
-  if (todayXP < profile.dailyXPGoal) {
-    date = format(subDays(new Date(), 1), 'yyyy-MM-dd')
-  }
-
-  while (true) {
-    const xp = dailyXP(logs, habits, date)
-    // No contar días antes de que haya hábitos
-    const activeHabits = habits.filter(h => h.createdAt <= date)
-    if (activeHabits.length === 0) break
-
-    if (xp >= profile.dailyXPGoal) {
-      streak++
-    } else if (freezesAvailable > 0) {
-      freezesAvailable--
-      usedFreeze = true
-      streak++ // El freeze mantiene la racha
-    } else {
-      break
+  // Si ya actualizamos hoy, solo verificar si hoy cumple
+  if (profile.streakDate === todayStr) {
+    const todayMet = dailyXP(logs, habits, todayStr) >= profile.dailyXPGoal
+    return {
+      currentStreak: todayMet ? Math.max(profile.currentStreak, 1) : profile.currentStreak,
+      streakDate: todayStr,
+      streakFreezes: profile.streakFreezes,
+      usedFreeze: false,
     }
-    date = format(subDays(parseISO(date), 1), 'yyyy-MM-dd')
   }
 
-  return { streak, usedFreeze }
+  // Primera vez usando la app (sin historial)
+  if (!profile.streakDate) {
+    const todayMet = dailyXP(logs, habits, todayStr) >= profile.dailyXPGoal
+    return {
+      currentStreak: todayMet ? 1 : 0,
+      streakDate: todayStr,
+      streakFreezes: profile.streakFreezes,
+      usedFreeze: false,
+    }
+  }
+
+  // Calcular días perdidos desde la última vez
+  const daysMissed = differenceInCalendarDays(new Date(), parseISO(profile.streakDate))
+  let streak = profile.currentStreak
+  let freezes = profile.streakFreezes
+  let usedFreeze = false
+
+  if (daysMissed === 1) {
+    // Ayer fue el último día de racha — verificar si ayer cumplió
+    const yesterdayMet = dailyXP(logs, habits, yesterdayStr) >= profile.dailyXPGoal
+    if (yesterdayMet) {
+      streak++ // ayer sumó
+    } else if (freezes > 0) {
+      freezes--
+      usedFreeze = true
+      // Streak sobrevive pero no suma
+    } else {
+      streak = 0 // racha rota
+    }
+  } else if (daysMissed > 1) {
+    // Perdimos más de un día
+    if (daysMissed === 2 && freezes > 0) {
+      // Solo 1 día perdido (ayer) con freeze
+      freezes--
+      usedFreeze = true
+    } else {
+      streak = 0 // demasiados días perdidos
+    }
+  }
+
+  // Verificar hoy
+  const todayMet = dailyXP(logs, habits, todayStr) >= profile.dailyXPGoal
+  if (todayMet && profile.streakDate !== todayStr) {
+    streak++
+  }
+
+  // Recalcular freezes ganados
+  const earnedFreezes = calculateEarnedFreezes(streak)
+  freezes = Math.max(freezes, earnedFreezes)
+
+  return {
+    currentStreak: streak,
+    streakDate: todayStr,
+    streakFreezes: freezes,
+    usedFreeze,
+  }
 }
 
 // Racha de un hábito específico

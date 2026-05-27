@@ -10,6 +10,8 @@ const defaultState: AppState = {
     dailyXPGoal: 20,
     streakFreezes: 0,
     lastActiveDate: '',
+    currentStreak: 0,
+    streakDate: '',
   },
   habits: [],
   habitLogs: [],
