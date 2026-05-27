@@ -69,7 +69,7 @@ export function TodayScreen({ state, onToggle, onUpdateQuant, onAddHabit, onUpda
   }
 
   return (
-    <div className="px-4 pt-3 pb-4">
+    <div className="px-4 pt-2 pb-8">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div>

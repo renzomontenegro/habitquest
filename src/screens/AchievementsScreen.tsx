@@ -10,7 +10,7 @@ export function AchievementsScreen({ state }: AchievementsScreenProps) {
   const total = state.achievements.length
 
   return (
-    <div className="px-4 pt-3 pb-4 space-y-4">
+    <div className="px-4 pt-2 pb-8 space-y-4">
       <div>
         <h1 className="text-xl font-black text-white leading-tight mb-1">Logros</h1>
         <p className="text-[13px] font-bold text-[#5C7680]">

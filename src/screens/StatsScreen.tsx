@@ -30,7 +30,7 @@ export function StatsScreen({ state }: StatsScreenProps) {
 
   if (state.habits.length === 0 && state.goals.length === 0) {
     return (
-      <div className="px-4 pt-3 pb-4">
+      <div className="px-4 pt-2 pb-8">
         <h1 className="text-xl font-black text-white leading-tight mb-1">Estadisticas</h1>
         <p className="text-[13px] font-bold text-[#5C7680] mb-6">Tu progreso en numeros</p>
         <div className="card-3d text-center py-8 px-5">
@@ -45,7 +45,7 @@ export function StatsScreen({ state }: StatsScreenProps) {
   }
 
   return (
-    <div className="px-4 pt-3 pb-4 space-y-5">
+    <div className="px-4 pt-2 pb-8 space-y-5">
       <div>
         <h1 className="text-xl font-black text-white leading-tight mb-1">Estadisticas</h1>
         <p className="text-[13px] font-bold text-[#5C7680]">Tu progreso en numeros</p>

@@ -14,17 +14,19 @@ export default function App() {
   const app = useAppState()
 
   return (
-    <div className="min-h-dvh bg-surface-900 text-white max-w-lg mx-auto relative">
-      <div style={{ paddingTop: 'env(safe-area-inset-top)' }} />
+    <div className="app-shell">
+      {/* Top safe area — bg extends behind Dynamic Island */}
+      <div className="app-header-safe" />
 
-      <main className="pb-20">
+      {/* Scrollable content area */}
+      <main className="app-content">
         <AnimatePresence mode="wait">
           <motion.div
             key={tab}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.12 }}
+            transition={{ duration: 0.1 }}
           >
             {tab === 'hoy' && (
               <TodayScreen
@@ -60,7 +62,9 @@ export default function App() {
         </AnimatePresence>
       </main>
 
+      {/* Bottom tab bar — sits above home indicator */}
       <BottomNav active={tab} onChange={setTab} />
+
       <CelebrationModal celebration={app.celebration} onClose={() => app.setCelebration(null)} />
     </div>
   )

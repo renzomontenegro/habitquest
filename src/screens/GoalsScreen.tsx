@@ -60,7 +60,7 @@ export function GoalsScreen({ state, onAddContribution, onAddGoal, onUpdateGoal,
   }
 
   return (
-    <div className="px-4 pt-3 pb-4">
+    <div className="px-4 pt-2 pb-8">
       <div className="flex items-center justify-between mb-1">
         <h1 className="text-xl font-black text-white leading-tight">Metas</h1>
         {state.goals.length > 0 && (
