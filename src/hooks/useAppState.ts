@@ -5,7 +5,7 @@ import { addXP } from '../lib/xp'
 import { GAME_CONFIG } from '../lib/gameConfig'
 import { today, updateStreak, isPerfectDay, checkEarlyBird, perfectDayStreak, currentWeekXP, getWeeklyTier, getWeekStart } from '../lib/streaks'
 import { playComplete, playLevelUp, playAchievement } from '../lib/sounds'
-import { debouncedSave, loadFromBackend } from '../lib/sync'
+import { debouncedSave, loadFromBackend, isSyncEnabled, getSyncError } from '../lib/sync'
 import confetti from 'canvas-confetti'
 
 const DUO_COLORS = ['#58CC02', '#FFC800', '#1CB0F6', '#CE82FF', '#FF9600']
@@ -13,11 +13,12 @@ const DUO_COLORS = ['#58CC02', '#FFC800', '#1CB0F6', '#CE82FF', '#FF9600']
 export function useAppState() {
   const [state, setState] = useState<AppState>(() => storage.load())
   const [celebration, setCelebration] = useState<{ type: string; message: string } | null>(null)
+  const [syncError, setSyncError] = useState<string | null>(null)
 
   // Persistir en cada cambio (localStorage + backend sync)
   useEffect(() => {
     storage.save(state)
-    debouncedSave(state.settings.syncUrl, state.settings.syncToken, state)
+    debouncedSave(state, setSyncError)
   }, [state])
 
   const genId = () => crypto.randomUUID()
@@ -26,10 +27,10 @@ export function useAppState() {
   useEffect(() => {
     const init = async () => {
       const local = storage.load()
-      const { syncUrl, syncToken } = local.settings
 
-      if (syncUrl) {
-        const remote = await loadFromBackend(syncUrl, syncToken)
+      if (isSyncEnabled()) {
+        const remote = await loadFromBackend()
+        setSyncError(getSyncError())
         if (remote) {
           // Usar el más reciente (comparar lastActiveDate)
           const useRemote = remote.profile.lastActiveDate > local.profile.lastActiveDate
@@ -387,6 +388,8 @@ export function useAppState() {
 
   return {
     state,
+    syncError,
+    syncEnabled: isSyncEnabled(),
     celebration,
     setCelebration,
     toggleHabit,

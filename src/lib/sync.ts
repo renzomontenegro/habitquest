@@ -1,74 +1,91 @@
 import type { AppState } from '../types'
 
-let debounceTimer: ReturnType<typeof setTimeout> | null = null
+const SYNC_URL = import.meta.env.VITE_SYNC_URL as string | undefined
+const SYNC_TOKEN = import.meta.env.VITE_SYNC_TOKEN as string | undefined
 
-function buildHeaders(token: string): Record<string, string> {
+let debounceTimer: ReturnType<typeof setTimeout> | null = null
+let lastSyncError: string | null = null
+
+function buildHeaders(): Record<string, string> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-  if (token) headers['Authorization'] = `Bearer ${token}`
+  if (SYNC_TOKEN) headers['Authorization'] = `Bearer ${SYNC_TOKEN}`
   return headers
 }
 
-// Cargar estado desde el backend (n8n -> Google Sheets)
-export async function loadFromBackend(syncUrl: string, syncToken: string): Promise<AppState | null> {
-  if (!syncUrl) return null
-  try {
-    const url = syncUrl.replace(/\/$/, '')
-    const loadUrl = url.replace(/habitquest-save$/, 'habitquest-load')
-    const finalUrl = loadUrl.endsWith('habitquest-load') ? loadUrl : `${loadUrl}/habitquest-load`
+function getUrl(endpoint: 'habitquest-save' | 'habitquest-load'): string | null {
+  if (!SYNC_URL) return null
+  const base = SYNC_URL.replace(/\/$/, '')
+  // Si la URL ya apunta a un endpoint específico, reemplazar; si no, concatenar
+  const cleaned = base.replace(/habitquest-(save|load)$/, endpoint)
+  return cleaned.endsWith(endpoint) ? cleaned : `${cleaned}/${endpoint}`
+}
 
-    const res = await fetch(finalUrl, {
-      method: 'GET',
-      headers: buildHeaders(syncToken),
-    })
-    if (!res.ok) return null
+/** Último error de sync (null si ok o sync deshabilitado) */
+export function getSyncError(): string | null {
+  return lastSyncError
+}
+
+/** True si hay env vars de sync configuradas */
+export function isSyncEnabled(): boolean {
+  return !!SYNC_URL
+}
+
+// Cargar estado desde el backend (n8n -> Google Sheets)
+export async function loadFromBackend(): Promise<AppState | null> {
+  const url = getUrl('habitquest-load')
+  if (!url) return null
+  try {
+    const res = await fetch(url, { method: 'GET', headers: buildHeaders() })
+    if (!res.ok) {
+      lastSyncError = `Load falló: ${res.status} ${res.statusText}`
+      return null
+    }
+    lastSyncError = null
 
     const text = await res.text()
     if (!text || text === '{}') return null
 
-    // Intentar parsear — puede venir como JSON directo o como string escapado
     let data: unknown
-    try {
-      data = JSON.parse(text)
-    } catch {
-      return null
-    }
+    try { data = JSON.parse(text) } catch { return null }
 
-    // Si es un AppState válido directamente
     if (data && typeof data === 'object' && 'profile' in data && 'habits' in data) {
       return data as AppState
     }
-
     return null
-  } catch {
-    // Offline o error de red — no romper la app
+  } catch (e) {
+    lastSyncError = `Load error: ${e instanceof Error ? e.message : String(e)}`
     return null
   }
 }
 
 // Guardar estado al backend (n8n -> Google Sheets)
-export async function saveToBackend(syncUrl: string, syncToken: string, state: AppState): Promise<boolean> {
-  if (!syncUrl) return false
+export async function saveToBackend(state: AppState): Promise<boolean> {
+  const url = getUrl('habitquest-save')
+  if (!url) return false
   try {
-    const url = syncUrl.replace(/\/$/, '')
-    const saveUrl = url.replace(/habitquest-load$/, 'habitquest-save')
-    const finalUrl = saveUrl.endsWith('habitquest-save') ? saveUrl : `${saveUrl}/habitquest-save`
-
-    const res = await fetch(finalUrl, {
+    const res = await fetch(url, {
       method: 'POST',
-      headers: buildHeaders(syncToken),
+      headers: buildHeaders(),
       body: JSON.stringify(state),
     })
-    return res.ok
-  } catch {
+    if (!res.ok) {
+      lastSyncError = `Save falló: ${res.status} ${res.statusText}`
+      return false
+    }
+    lastSyncError = null
+    return true
+  } catch (e) {
+    lastSyncError = `Save error: ${e instanceof Error ? e.message : String(e)}`
     return false
   }
 }
 
-// Auto-save con debounce (3 segundos)
-export function debouncedSave(syncUrl: string, syncToken: string, state: AppState): void {
-  if (!syncUrl) return
+// Auto-save con debounce (3 segundos), notifica errores via callback
+export function debouncedSave(state: AppState, onError?: (err: string | null) => void): void {
+  if (!SYNC_URL) return
   if (debounceTimer) clearTimeout(debounceTimer)
-  debounceTimer = setTimeout(() => {
-    saveToBackend(syncUrl, syncToken, state)
+  debounceTimer = setTimeout(async () => {
+    await saveToBackend(state)
+    onError?.(lastSyncError)
   }, 3000)
 }

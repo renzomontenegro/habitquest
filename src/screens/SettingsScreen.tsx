@@ -3,12 +3,14 @@ import { Toggle } from '../components/FormModal'
 
 interface SettingsScreenProps {
   state: AppState
+  syncEnabled: boolean
+  syncError: string | null
   onUpdateSettings: (s: Partial<AppState['settings']>) => void
   onUpdateDailyGoal: (g: DailyXPGoal) => void
   onReset: () => void
 }
 
-export function SettingsScreen({ state, onUpdateSettings, onUpdateDailyGoal, onReset }: SettingsScreenProps) {
+export function SettingsScreen({ state, syncEnabled, syncError, onUpdateSettings, onUpdateDailyGoal, onReset }: SettingsScreenProps) {
   return (
     <div className="px-4 pt-2 pb-8 space-y-4">
       <div>
@@ -41,12 +43,24 @@ export function SettingsScreen({ state, onUpdateSettings, onUpdateDailyGoal, onR
       </Section>
 
       {/* Sync status */}
-      {state.settings.syncUrl && (
+      {syncEnabled && (
         <Section title="Sincronizacion" subtitle="Tus datos se sincronizan automaticamente con la nube.">
-          <div className="flex items-center gap-2 text-[13px] font-bold text-duo-green">
-            <span className="w-2 h-2 rounded-full bg-duo-green animate-pulse" />
-            Sync activo
-          </div>
+          {syncError ? (
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 text-[13px] font-bold text-red-400">
+                <span className="w-2 h-2 rounded-full bg-red-400" />
+                Error de sync
+              </div>
+              <p className="text-[11px] font-mono text-red-300/80 bg-red-900/20 rounded-lg px-3 py-2 break-all">
+                {syncError}
+              </p>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 text-[13px] font-bold text-duo-green">
+              <span className="w-2 h-2 rounded-full bg-duo-green animate-pulse" />
+              Sync activo
+            </div>
+          )}
         </Section>
       )}
 

@@ -48,6 +48,8 @@ export default function App() {
             {tab === 'ajustes' && (
               <SettingsScreen
                 state={app.state}
+                syncEnabled={app.syncEnabled}
+                syncError={app.syncError}
                 onUpdateSettings={app.updateSettings}
                 onUpdateDailyGoal={app.updateDailyGoal}
                 onReset={app.resetState}
