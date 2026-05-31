@@ -66,6 +66,13 @@ El archivo `.mcp.json` en la raiz del proyecto configura el MCP de n8n con la AP
 
 ## Reglas de desarrollo
 - **Versionado**: Despues de cada cambio, incrementar la version en `src/screens/SettingsScreen.tsx` (buscar `HabitQuest v`). El usuario usa este numero para verificar que el deploy se aplico correctamente.
+- **Deploy**: Solo hacer `git push origin main`. Vercel hace auto-deploy. NO usar `vercel` CLI. NO hacer deploy manual.
+- **Docker Compose en Pi**: Para aplicar nuevas env vars usar `sudo docker compose up -d` (NO `restart`, que no recarga variables nuevas del compose). Siempre hacer backup antes: `sudo cp docker-compose.yml docker-compose.yml.bak-$(date +%Y%m%d-%H%M)`.
+- **VITE_ env vars son build-time**: Se embeben en el bundle JS durante el build. Cambiar una env var en Vercel requiere redeploy para que tome efecto. No son leidas en runtime.
+- **No usar curl de prueba con datos falsos al webhook**: Los datos se guardan en la DataTable y sobreescriben el estado real del usuario. Si hay que probar, usar datos que no rompan el estado (ej: leer con GET, no escribir con POST).
+- **Errores deben mostrarse inline**: No esconder errores solo en Settings. Mostrar alerts visibles donde ocurre la accion. El usuario necesita feedback inmediato.
+- **Cloud-only, sin fallback local**: Si el backend falla, la app se bloquea. No usar localStorage como fuente de verdad alternativa. localStorage es solo cache.
+- **UI en espanol**: Toda la interfaz esta en espanol (sin tildes en el codigo por consistencia).
 
 ## Problemas conocidos
 - **Service Worker en iOS**: el SW se actualiza lento en Safari/PWA standalone (hasta 24h). Si la app muestra pantalla blanca despues de un deploy, hay que limpiar datos del sitio en Safari.
