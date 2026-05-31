@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { BottomNav, type Tab } from './components/BottomNav'
 import { CelebrationModal } from './components/CelebrationModal'
@@ -19,18 +19,55 @@ export default function App() {
     setTab(newTab)
   }, [tab, app.refreshFromCloud])
 
+  // Pull-to-refresh
+  const [pullDistance, setPullDistance] = useState(0)
+  const touchStartY = useRef(0)
+  const pulling = useRef(false)
+  const threshold = 80
+
+  const onTouchStart = useCallback((e: React.TouchEvent) => {
+    const scrollTop = (e.currentTarget as HTMLElement).scrollTop
+    if (scrollTop <= 0) {
+      touchStartY.current = e.touches[0].clientY
+      pulling.current = true
+    }
+  }, [])
+
+  const onTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!pulling.current) return
+    const dy = e.touches[0].clientY - touchStartY.current
+    if (dy > 0) setPullDistance(Math.min(dy * 0.5, 120))
+    else pulling.current = false
+  }, [])
+
+  const onTouchEnd = useCallback(() => {
+    if (pulling.current && pullDistance >= threshold && !app.refreshing) {
+      app.refreshFromCloud()
+    }
+    pulling.current = false
+    setPullDistance(0)
+  }, [pullDistance, app.refreshing, app.refreshFromCloud])
+
   return (
     <div className="app-shell">
       <div className="app-header-safe" />
 
-      <main className="app-content">
-        <AnimatePresence>
-          {app.refreshing && (
+      <main
+        className="app-content"
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+      >
+        {/* Pull-to-refresh indicator */}
+        <div
+          className="flex items-center justify-center overflow-hidden transition-[height] duration-200"
+          style={{ height: app.refreshing ? 36 : pullDistance > 10 ? pullDistance : 0 }}
+        >
+          {app.refreshing ? (
             <motion.div
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="flex items-center justify-center gap-2 py-2 text-[12px] font-bold text-duo-green"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="flex items-center gap-2 text-[12px] font-bold text-duo-green"
             >
               <motion.span
                 animate={{ rotate: 360 }}
@@ -41,8 +78,15 @@ export default function App() {
               </motion.span>
               Sincronizando...
             </motion.div>
+          ) : pullDistance > 10 && (
+            <span
+              className="text-[12px] font-bold transition-colors"
+              style={{ color: pullDistance >= threshold ? '#58CC02' : '#5C7680' }}
+            >
+              {pullDistance >= threshold ? 'Soltar para sincronizar' : 'Tirar para sincronizar'}
+            </span>
           )}
-        </AnimatePresence>
+        </div>
         <AnimatePresence mode="wait">
           <motion.div
             key={tab}
