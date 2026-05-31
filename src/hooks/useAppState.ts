@@ -23,42 +23,40 @@ export function useAppState() {
 
   const genId = () => crypto.randomUUID()
 
-  // Al abrir la app: intentar cargar desde backend, luego actualizar racha
-  useEffect(() => {
-    const init = async () => {
-      const local = storage.load()
-
-      if (isSyncEnabled()) {
-        const remote = await loadFromBackend()
-        setSyncError(getSyncError())
-        if (remote) {
-          // Nube siempre tiene prioridad
-          setState(remote)
-          storage.save(remote)
-          return
-        }
+  // Cargar estado desde la nube y actualizar racha
+  const refreshFromCloud = useCallback(async () => {
+    if (isSyncEnabled()) {
+      const remote = await loadFromBackend()
+      setSyncError(getSyncError())
+      if (remote) {
+        setState(remote)
+        storage.save(remote)
+        return
       }
-
-      // Actualizar racha con datos locales
-      setState(prev => {
-        const streakUpdate = updateStreak(prev.habitLogs, prev.habits, prev.profile)
-        if (
-          streakUpdate.currentStreak === prev.profile.currentStreak &&
-          streakUpdate.streakDate === prev.profile.streakDate
-        ) return prev
-        return {
-          ...prev,
-          profile: {
-            ...prev.profile,
-            currentStreak: streakUpdate.currentStreak,
-            streakDate: streakUpdate.streakDate,
-            streakFreezes: streakUpdate.streakFreezes,
-          },
-        }
-      })
     }
-    init()
-  }, []) // solo al montar
+
+    setState(prev => {
+      const streakUpdate = updateStreak(prev.habitLogs, prev.habits, prev.profile)
+      if (
+        streakUpdate.currentStreak === prev.profile.currentStreak &&
+        streakUpdate.streakDate === prev.profile.streakDate
+      ) return prev
+      return {
+        ...prev,
+        profile: {
+          ...prev.profile,
+          currentStreak: streakUpdate.currentStreak,
+          streakDate: streakUpdate.streakDate,
+          streakFreezes: streakUpdate.streakFreezes,
+        },
+      }
+    })
+  }, [])
+
+  // Al abrir la app
+  useEffect(() => {
+    refreshFromCloud()
+  }, [refreshFromCloud])
 
   const celebrate = useCallback((type: string, message: string) => {
     setCelebration({ type, message })
@@ -387,6 +385,7 @@ export function useAppState() {
     state,
     syncError,
     syncEnabled: isSyncEnabled(),
+    refreshFromCloud,
     celebration,
     setCelebration,
     toggleHabit,

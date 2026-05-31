@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { BottomNav, type Tab } from './components/BottomNav'
 import { CelebrationModal } from './components/CelebrationModal'
@@ -11,6 +11,13 @@ import { useAppState } from './hooks/useAppState'
 export default function App() {
   const [tab, setTab] = useState<Tab>('hoy')
   const app = useAppState()
+
+  const handleTabChange = useCallback((newTab: Tab) => {
+    if (newTab === tab && newTab === 'hoy') {
+      app.refreshFromCloud()
+    }
+    setTab(newTab)
+  }, [tab, app.refreshFromCloud])
 
   return (
     <div className="app-shell">
@@ -59,7 +66,7 @@ export default function App() {
         </AnimatePresence>
       </main>
 
-      <BottomNav active={tab} onChange={setTab} />
+      <BottomNav active={tab} onChange={handleTabChange} />
       <CelebrationModal celebration={app.celebration} onClose={() => app.setCelebration(null)} />
     </div>
   )
