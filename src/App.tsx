@@ -135,10 +135,8 @@ export default function App() {
                 state={app.state}
                 syncEnabled={app.syncEnabled}
                 syncError={app.syncError}
-                refreshing={app.refreshing}
                 onUpdateSettings={app.updateSettings}
                 onUpdateDailyGoal={app.updateDailyGoal}
-                onRefresh={app.refreshFromCloud}
                 onReset={app.resetState}
               />
             )}

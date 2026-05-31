@@ -5,14 +5,12 @@ interface SettingsScreenProps {
   state: AppState
   syncEnabled: boolean
   syncError: string | null
-  refreshing: boolean
   onUpdateSettings: (s: Partial<AppState['settings']>) => void
   onUpdateDailyGoal: (g: DailyXPGoal) => void
-  onRefresh: () => void
   onReset: () => void
 }
 
-export function SettingsScreen({ state, syncEnabled, syncError, refreshing, onUpdateSettings, onUpdateDailyGoal, onRefresh, onReset }: SettingsScreenProps) {
+export function SettingsScreen({ state, syncEnabled, syncError, onUpdateSettings, onUpdateDailyGoal, onReset }: SettingsScreenProps) {
   return (
     <div className="px-4 pt-2 pb-8 space-y-4">
       <div>
@@ -57,11 +55,10 @@ export function SettingsScreen({ state, syncEnabled, syncError, refreshing, onUp
                 {syncError}
               </p>
               <button
-                onClick={onRefresh}
-                disabled={refreshing}
+                onClick={() => window.location.reload()}
                 className="btn-3d w-full !h-10 !text-[13px] bg-surface-700 border-surface-500 text-[#94A7B0]"
               >
-                {refreshing ? 'Sincronizando...' : 'Reintentar sincronizacion'}
+                Reintentar sincronizacion
               </button>
             </div>
           ) : (
@@ -71,11 +68,10 @@ export function SettingsScreen({ state, syncEnabled, syncError, refreshing, onUp
                 Sync activo
               </div>
               <button
-                onClick={onRefresh}
-                disabled={refreshing}
+                onClick={() => window.location.reload()}
                 className="text-[12px] font-bold text-[#5C7680] active:text-duo-green transition-colors"
               >
-                {refreshing ? 'Sincronizando...' : 'Refrescar'}
+                Refrescar
               </button>
             </div>
           )}
@@ -106,7 +102,7 @@ export function SettingsScreen({ state, syncEnabled, syncError, refreshing, onUp
       </Section>
 
       <div className="text-center pt-2 pb-2">
-        <p className="text-[11px] font-bold text-[#3C5564]">HabitQuest v1.4</p>
+        <p className="text-[11px] font-bold text-[#3C5564]">HabitQuest v1.5</p>
       </div>
     </div>
   )
