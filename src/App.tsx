@@ -24,6 +24,25 @@ export default function App() {
       <div className="app-header-safe" />
 
       <main className="app-content">
+        <AnimatePresence>
+          {app.refreshing && (
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="flex items-center justify-center gap-2 py-2 text-[12px] font-bold text-duo-green"
+            >
+              <motion.span
+                animate={{ rotate: 360 }}
+                transition={{ repeat: Infinity, duration: 0.8, ease: 'linear' }}
+                className="inline-block"
+              >
+                ~
+              </motion.span>
+              Sincronizando...
+            </motion.div>
+          )}
+        </AnimatePresence>
         <AnimatePresence mode="wait">
           <motion.div
             key={tab}

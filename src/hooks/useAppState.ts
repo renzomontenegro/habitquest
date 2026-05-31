@@ -14,6 +14,7 @@ export function useAppState() {
   const [state, setState] = useState<AppState>(() => storage.load())
   const [celebration, setCelebration] = useState<{ type: string; message: string } | null>(null)
   const [syncError, setSyncError] = useState<string | null>(null)
+  const [refreshing, setRefreshing] = useState(false)
 
   // Persistir en cada cambio (localStorage + backend sync)
   useEffect(() => {
@@ -25,12 +26,14 @@ export function useAppState() {
 
   // Cargar estado desde la nube y actualizar racha
   const refreshFromCloud = useCallback(async () => {
+    setRefreshing(true)
     if (isSyncEnabled()) {
       const remote = await loadFromBackend()
       setSyncError(getSyncError())
       if (remote) {
         setState(remote)
         storage.save(remote)
+        setRefreshing(false)
         return
       }
     }
@@ -51,6 +54,7 @@ export function useAppState() {
         },
       }
     })
+    setRefreshing(false)
   }, [])
 
   // Al abrir la app
@@ -385,6 +389,7 @@ export function useAppState() {
     state,
     syncError,
     syncEnabled: isSyncEnabled(),
+    refreshing,
     refreshFromCloud,
     celebration,
     setCelebration,
