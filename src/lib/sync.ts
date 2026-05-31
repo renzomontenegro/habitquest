@@ -9,9 +9,9 @@ let lastSyncError: string | null = null
 // Traduce errores técnicos a mensajes amigables
 function friendlyError(e: unknown): string {
   const msg = e instanceof Error ? e.message : String(e)
-  if (msg.includes('no encontró ningún servidor') || msg.includes('hostname') || msg.includes('nodename nor servname'))
+  if (msg.includes('no encontró ningún servidor') || msg.includes('hostname') || msg.includes('nodename nor servname') || msg.includes('Load failed'))
     return 'Sin conexion a Tailscale. Activa la VPN para sincronizar.'
-  if (msg.includes('network') || msg.includes('Network') || msg.includes('Failed to fetch'))
+  if (msg.includes('network') || msg.includes('Network') || msg.includes('Failed to fetch') || msg.includes('NetworkError'))
     return 'Sin conexion a internet.'
   if (msg.includes('timed out') || msg.includes('timeout'))
     return 'El servidor tardo demasiado en responder.'

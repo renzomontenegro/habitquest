@@ -94,8 +94,9 @@ export default function App() {
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
-              className="mx-4 mb-2 px-3 py-2 rounded-xl bg-red-900/30 border border-red-500/30"
+              className="mx-4 mb-2 px-3 py-2.5 rounded-xl bg-red-900/30 border border-red-500/30 flex items-center gap-2"
             >
+              <span className="text-[16px]">&#x26A0;</span>
               <p className="text-[12px] font-bold text-red-400">{app.syncError}</p>
             </motion.div>
           )}
@@ -107,6 +108,7 @@ export default function App() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.1 }}
+            className={app.syncError ? 'pointer-events-none opacity-40' : ''}
           >
             {tab === 'hoy' && (
               <TodayScreen
