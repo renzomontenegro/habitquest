@@ -37,7 +37,6 @@
 }
 
 html {
-  height: -webkit-fill-available;
   height: 100%;
   overflow: hidden;
   background-color: #131F24;
@@ -45,7 +44,6 @@ html {
 }
 
 body {
-  height: -webkit-fill-available;
   height: 100%;
   margin: 0;
   overflow: hidden;
@@ -63,7 +61,6 @@ body {
   display: flex;
   flex-direction: column;
   height: 100dvh;
-  height: -webkit-fill-available; /* fallback */
   max-width: 512px;
   margin: 0 auto;
   position: relative;
@@ -73,7 +70,7 @@ body {
 /* Header safe area — background extends behind Dynamic Island/status bar */
 .app-header-safe {
   flex-shrink: 0;
-  padding-top: env(safe-area-inset-top, 59px);
+  padding-top: env(safe-area-inset-top, 0px);
   background: var(--color-surface-900);
 }
 
@@ -83,22 +80,32 @@ body {
   overflow-y: auto;
   overflow-x: hidden;
   overscroll-behavior-y: contain;
-  /* Padding for left/right safe areas (landscape) */
   padding-left: env(safe-area-inset-left, 0px);
   padding-right: env(safe-area-inset-right, 0px);
 }
 
-/* Bottom tab bar — extends to absolute bottom edge */
+/* Bottom tab bar — fixed to absolute bottom, extends behind home indicator */
 .app-tab-bar {
-  flex-shrink: 0;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  max-width: 512px;
+  margin: 0 auto;
   display: flex;
   align-items: center;
   justify-content: space-around;
-  min-height: 52px;
+  height: calc(52px + env(safe-area-inset-bottom, 0px));
   padding-bottom: env(safe-area-inset-bottom, 0px);
   background: var(--color-surface-900);
   border-top: 1.5px solid var(--color-surface-600);
   z-index: 40;
+}
+
+/* Spacer so content doesn't hide behind fixed tab bar */
+.app-tab-spacer {
+  flex-shrink: 0;
+  height: calc(52px + env(safe-area-inset-bottom, 0px));
 }
 
 /* Invisible scrollbar */
