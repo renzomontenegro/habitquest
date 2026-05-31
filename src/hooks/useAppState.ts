@@ -32,13 +32,10 @@ export function useAppState() {
         const remote = await loadFromBackend()
         setSyncError(getSyncError())
         if (remote) {
-          // Usar el más reciente (comparar lastActiveDate)
-          const useRemote = remote.profile.lastActiveDate > local.profile.lastActiveDate
-          if (useRemote) {
-            setState(remote)
-            storage.save(remote)
-            return
-          }
+          // Nube siempre tiene prioridad
+          setState(remote)
+          storage.save(remote)
+          return
         }
       }
 
