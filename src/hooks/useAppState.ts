@@ -5,7 +5,7 @@ import { addXP } from '../lib/xp'
 import { GAME_CONFIG } from '../lib/gameConfig'
 import { today, updateStreak, isPerfectDay, checkEarlyBird, perfectDayStreak, currentWeekXP, getWeeklyTier, getWeekStart } from '../lib/streaks'
 import { playComplete, playLevelUp, playAchievement } from '../lib/sounds'
-import { debouncedSave, loadFromBackend, isSyncEnabled, getSyncError } from '../lib/sync'
+import { debouncedSave, loadFromBackend, saveToBackend, isSyncEnabled, getSyncError } from '../lib/sync'
 import confetti from 'canvas-confetti'
 
 const DUO_COLORS = ['#58CC02', '#FFC800', '#1CB0F6', '#CE82FF', '#FF9600']
@@ -372,10 +372,14 @@ export function useAppState() {
     return storage.exportJSON(state)
   }, [state])
 
-  const resetState = useCallback(() => {
-    storage.save(storage.load()) // triggers default state creation
-    // Reload from scratch
+  const resetState = useCallback(async () => {
+    // Limpiar localStorage para obtener estado por defecto
     localStorage.removeItem('habitquest_state')
+    const fresh = storage.load() // devuelve defaultState
+    // Subir estado limpio a la nube antes de recargar
+    if (isSyncEnabled()) {
+      await saveToBackend(fresh)
+    }
     window.location.reload()
   }, [])
 
