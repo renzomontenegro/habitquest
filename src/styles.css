@@ -56,11 +56,16 @@ body {
   -webkit-text-size-adjust: 100%;
 }
 
-/* App shell — flex column, full viewport */
+/* #root must also be full height */
+#root {
+  height: 100%;
+}
+
+/* App shell — flex column, full viewport including safe areas */
 .app-shell {
   display: flex;
   flex-direction: column;
-  height: 100dvh;
+  height: 100%;
   max-width: 512px;
   margin: 0 auto;
   position: relative;
@@ -84,14 +89,9 @@ body {
   padding-right: env(safe-area-inset-right, 0px);
 }
 
-/* Bottom tab bar — fixed to absolute bottom, extends behind home indicator */
+/* Bottom tab bar — in flex flow, extends into home indicator area */
 .app-tab-bar {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  max-width: 512px;
-  margin: 0 auto;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-around;
@@ -100,12 +100,6 @@ body {
   background: var(--color-surface-900);
   border-top: 1.5px solid var(--color-surface-600);
   z-index: 40;
-}
-
-/* Spacer so content doesn't hide behind fixed tab bar */
-.app-tab-spacer {
-  flex-shrink: 0;
-  height: calc(52px + env(safe-area-inset-bottom, 0px));
 }
 
 /* Invisible scrollbar */

@@ -142,7 +142,6 @@ export default function App() {
             )}
           </motion.div>
         </AnimatePresence>
-        <div className="app-tab-spacer" />
       </main>
 
       <BottomNav active={tab} onChange={handleTabChange} />
