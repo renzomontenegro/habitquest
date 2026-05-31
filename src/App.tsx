@@ -42,11 +42,11 @@ export default function App() {
 
   const onTouchEnd = useCallback(() => {
     if (pulling.current && pullDistance >= threshold && !app.refreshing) {
-      app.refreshFromCloud()
+      window.location.reload()
     }
     pulling.current = false
     setPullDistance(0)
-  }, [pullDistance, app.refreshing, app.refreshFromCloud])
+  }, [pullDistance])
 
   return (
     <div className="app-shell">
@@ -83,7 +83,7 @@ export default function App() {
               className="text-[12px] font-bold transition-colors"
               style={{ color: pullDistance >= threshold ? '#58CC02' : '#5C7680' }}
             >
-              {pullDistance >= threshold ? 'Soltar para sincronizar' : 'Tirar para sincronizar'}
+              {pullDistance >= threshold ? 'Soltar para refrescar' : 'Tirar para refrescar'}
             </span>
           )}
         </div>
