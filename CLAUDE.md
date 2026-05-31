@@ -64,6 +64,9 @@ El archivo `.mcp.json` en la raiz del proyecto configura el MCP de n8n con la AP
 - `vite.config.ts` — PWA config (registerType: autoUpdate)
 - `index.html` — viewport-fit=cover, apple-mobile-web-app-capable
 
+## Reglas de desarrollo
+- **Versionado**: Despues de cada cambio, incrementar la version en `src/screens/SettingsScreen.tsx` (buscar `HabitQuest v`). El usuario usa este numero para verificar que el deploy se aplico correctamente.
+
 ## Problemas conocidos
 - **Service Worker en iOS**: el SW se actualiza lento en Safari/PWA standalone (hasta 24h). Si la app muestra pantalla blanca despues de un deploy, hay que limpiar datos del sitio en Safari.
 - **Bottom nav safe area**: el tab bar usa `position: fixed; bottom: 0` con `padding-bottom: env(safe-area-inset-bottom)` pero en iOS PWA standalone puede no bajar hasta el borde absoluto — esto es una limitacion de WebKit.
