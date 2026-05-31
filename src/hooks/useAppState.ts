@@ -5,6 +5,7 @@ import { addXP } from '../lib/xp'
 import { GAME_CONFIG } from '../lib/gameConfig'
 import { today, updateStreak, isPerfectDay, checkEarlyBird, perfectDayStreak, currentWeekXP, getWeeklyTier, getWeekStart } from '../lib/streaks'
 import { playComplete, playLevelUp, playAchievement } from '../lib/sounds'
+import { debouncedSave, loadFromBackend } from '../lib/sync'
 import confetti from 'canvas-confetti'
 
 const DUO_COLORS = ['#58CC02', '#FFC800', '#1CB0F6', '#CE82FF', '#FF9600']
@@ -13,31 +14,52 @@ export function useAppState() {
   const [state, setState] = useState<AppState>(() => storage.load())
   const [celebration, setCelebration] = useState<{ type: string; message: string } | null>(null)
 
-  // Persistir en cada cambio
+  // Persistir en cada cambio (localStorage + backend sync)
   useEffect(() => {
     storage.save(state)
+    debouncedSave(state.settings.syncUrl, state.settings.syncToken, state)
   }, [state])
 
   const genId = () => crypto.randomUUID()
 
-  // Al abrir la app: actualizar racha (detectar días perdidos)
+  // Al abrir la app: intentar cargar desde backend, luego actualizar racha
   useEffect(() => {
-    setState(prev => {
-      const streakUpdate = updateStreak(prev.habitLogs, prev.habits, prev.profile)
-      if (
-        streakUpdate.currentStreak === prev.profile.currentStreak &&
-        streakUpdate.streakDate === prev.profile.streakDate
-      ) return prev // sin cambios
-      return {
-        ...prev,
-        profile: {
-          ...prev.profile,
-          currentStreak: streakUpdate.currentStreak,
-          streakDate: streakUpdate.streakDate,
-          streakFreezes: streakUpdate.streakFreezes,
-        },
+    const init = async () => {
+      const local = storage.load()
+      const { syncUrl, syncToken } = local.settings
+
+      if (syncUrl) {
+        const remote = await loadFromBackend(syncUrl, syncToken)
+        if (remote) {
+          // Usar el más reciente (comparar lastActiveDate)
+          const useRemote = remote.profile.lastActiveDate > local.profile.lastActiveDate
+          if (useRemote) {
+            setState(remote)
+            storage.save(remote)
+            return
+          }
+        }
       }
-    })
+
+      // Actualizar racha con datos locales
+      setState(prev => {
+        const streakUpdate = updateStreak(prev.habitLogs, prev.habits, prev.profile)
+        if (
+          streakUpdate.currentStreak === prev.profile.currentStreak &&
+          streakUpdate.streakDate === prev.profile.streakDate
+        ) return prev
+        return {
+          ...prev,
+          profile: {
+            ...prev.profile,
+            currentStreak: streakUpdate.currentStreak,
+            streakDate: streakUpdate.streakDate,
+            streakFreezes: streakUpdate.streakFreezes,
+          },
+        }
+      })
+    }
+    init()
   }, []) // solo al montar
 
   const celebrate = useCallback((type: string, message: string) => {

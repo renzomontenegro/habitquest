@@ -1,5 +1,7 @@
+import { useState } from 'react'
 import type { AppState, DailyXPGoal } from '../types'
-import { Toggle } from '../components/FormModal'
+import { Toggle, FormInput } from '../components/FormModal'
+import { saveToBackend, loadFromBackend } from '../lib/sync'
 
 interface SettingsScreenProps {
   state: AppState
@@ -11,6 +13,8 @@ interface SettingsScreenProps {
 }
 
 export function SettingsScreen({ state, onUpdateSettings, onUpdateDailyGoal, onExport, onImport, onReset }: SettingsScreenProps) {
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'saving' | 'loading' | 'ok' | 'error'>('idle')
+
   const handleExport = () => {
     const json = onExport()
     const blob = new Blob([json], { type: 'application/json' })
@@ -39,6 +43,25 @@ export function SettingsScreen({ state, onUpdateSettings, onUpdateDailyGoal, onE
     input.click()
   }
 
+  const handleSyncPush = async () => {
+    setSyncStatus('saving')
+    const ok = await saveToBackend(state.settings.syncUrl, state.settings.syncToken, state)
+    setSyncStatus(ok ? 'ok' : 'error')
+    setTimeout(() => setSyncStatus('idle'), 2500)
+  }
+
+  const handleSyncPull = async () => {
+    setSyncStatus('loading')
+    const remote = await loadFromBackend(state.settings.syncUrl, state.settings.syncToken)
+    if (remote) {
+      onImport(JSON.stringify(remote))
+      setSyncStatus('ok')
+    } else {
+      setSyncStatus('error')
+    }
+    setTimeout(() => setSyncStatus('idle'), 2500)
+  }
+
   return (
     <div className="px-4 pt-2 pb-8 space-y-4">
       <div>
@@ -47,7 +70,7 @@ export function SettingsScreen({ state, onUpdateSettings, onUpdateDailyGoal, onE
       </div>
 
       {/* Objetivo diario */}
-      <Section title="Objetivo diario de XP" subtitle="Define cuanto XP necesitas por dia para mantener tu racha. Afecta la dificultad.">
+      <Section title="Objetivo diario de XP" subtitle="Define cuanto XP necesitas por dia para mantener tu racha.">
         <div className="grid grid-cols-4 gap-2">
           {([10, 20, 30, 50] as DailyXPGoal[]).map(val => {
             const labels: Record<number, string> = { 10: 'Casual', 20: 'Regular', 30: 'Serio', 50: 'Insano' }
@@ -70,6 +93,49 @@ export function SettingsScreen({ state, onUpdateSettings, onUpdateDailyGoal, onE
         </div>
       </Section>
 
+      {/* Sync */}
+      <Section title="Sincronizacion" subtitle="Conecta con n8n para respaldar tus datos en Google Sheets. Los cambios se sincronizan automaticamente.">
+        <div className="space-y-3">
+          <FormInput
+            label="URL del webhook"
+            value={state.settings.syncUrl}
+            onChange={v => onUpdateSettings({ syncUrl: v })}
+            placeholder="https://n8n.example.com/webhook/"
+          />
+          <FormInput
+            label="Token secreto"
+            value={state.settings.syncToken}
+            onChange={v => onUpdateSettings({ syncToken: v })}
+            placeholder="Tu token de seguridad"
+          />
+          {state.settings.syncUrl && (
+            <div className="flex gap-2">
+              <button
+                onClick={handleSyncPush}
+                disabled={syncStatus !== 'idle'}
+                className={`btn-3d flex-1 !h-11 !text-[12px] ${
+                  syncStatus === 'ok' ? '!bg-duo-green !shadow-[0_5px_0_#43C000]' :
+                  syncStatus === 'error' ? '!bg-duo-red !shadow-[0_5px_0_#E53838]' :
+                  'btn-3d-purple'
+                }`}
+              >
+                {syncStatus === 'saving' ? 'Subiendo...' :
+                 syncStatus === 'ok' ? 'Listo!' :
+                 syncStatus === 'error' ? 'Error' :
+                 'Subir datos'}
+              </button>
+              <button
+                onClick={handleSyncPull}
+                disabled={syncStatus !== 'idle'}
+                className="btn-3d btn-3d-blue flex-1 !h-11 !text-[12px]"
+              >
+                {syncStatus === 'loading' ? 'Cargando...' : 'Descargar datos'}
+              </button>
+            </div>
+          )}
+        </div>
+      </Section>
+
       {/* Sonido */}
       <Section title="Sonido" subtitle="Efectos al completar habitos y subir de nivel.">
         <Toggle
@@ -80,7 +146,7 @@ export function SettingsScreen({ state, onUpdateSettings, onUpdateDailyGoal, onE
       </Section>
 
       {/* Datos */}
-      <Section title="Datos" subtitle="Exporta un backup JSON o importa uno para restaurar tu progreso.">
+      <Section title="Datos" subtitle="Backup local en JSON.">
         <div className="flex gap-2.5">
           <button onClick={handleExport} className="btn-3d btn-3d-blue flex-1 !h-11 !text-[13px]">
             Exportar
@@ -105,10 +171,9 @@ export function SettingsScreen({ state, onUpdateSettings, onUpdateDailyGoal, onE
         </button>
       </Section>
 
-      {/* Info */}
       <div className="text-center pt-2 pb-2">
         <p className="text-[11px] font-bold text-[#3C5564]">HabitQuest v1.0</p>
-        <p className="text-[11px] font-bold text-[#3C5564]">Tus datos se guardan localmente en este dispositivo.</p>
+        <p className="text-[11px] font-bold text-[#3C5564]">Tus datos se guardan localmente. El sync es opcional.</p>
       </div>
     </div>
   )

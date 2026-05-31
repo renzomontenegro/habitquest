@@ -76,6 +76,8 @@ export interface WeeklyLeague {
 // --- Settings ---
 export interface AppSettings {
   soundEnabled: boolean
+  syncUrl: string    // URL base del webhook n8n
+  syncToken: string  // Token secreto para autenticar requests al webhook
 }
 
 // --- Estado global ---
