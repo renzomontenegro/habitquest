@@ -6,6 +6,20 @@ const SYNC_TOKEN = import.meta.env.VITE_SYNC_TOKEN as string | undefined
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
 let lastSyncError: string | null = null
 
+// Traduce errores técnicos a mensajes amigables
+function friendlyError(e: unknown): string {
+  const msg = e instanceof Error ? e.message : String(e)
+  if (msg.includes('no encontró ningún servidor') || msg.includes('hostname') || msg.includes('nodename nor servname'))
+    return 'Sin conexion a Tailscale. Activa la VPN para sincronizar.'
+  if (msg.includes('network') || msg.includes('Network') || msg.includes('Failed to fetch'))
+    return 'Sin conexion a internet.'
+  if (msg.includes('timed out') || msg.includes('timeout'))
+    return 'El servidor tardo demasiado en responder.'
+  if (msg.includes('CORS') || msg.includes('access control'))
+    return 'Error de permisos CORS en el servidor.'
+  return msg
+}
+
 function buildHeaders(): Record<string, string> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
   if (SYNC_TOKEN) headers['Authorization'] = `Bearer ${SYNC_TOKEN}`
@@ -53,12 +67,12 @@ export async function loadFromBackend(): Promise<AppState | null> {
     }
     return null
   } catch (e) {
-    lastSyncError = `Load error: ${e instanceof Error ? e.message : String(e)}`
+    lastSyncError = friendlyError(e)
     return null
   }
 }
 
-// Guardar estado al backend (n8n -> Google Sheets)
+// Guardar estado al backend
 export async function saveToBackend(state: AppState): Promise<boolean> {
   const url = getUrl('habitquest-save')
   if (!url) return false
@@ -75,7 +89,7 @@ export async function saveToBackend(state: AppState): Promise<boolean> {
     lastSyncError = null
     return true
   } catch (e) {
-    lastSyncError = `Save error: ${e instanceof Error ? e.message : String(e)}`
+    lastSyncError = friendlyError(e)
     return false
   }
 }

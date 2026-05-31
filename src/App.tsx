@@ -87,6 +87,19 @@ export default function App() {
             </span>
           )}
         </div>
+        {/* Sync error alert */}
+        <AnimatePresence>
+          {app.syncError && !app.refreshing && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="mx-4 mb-2 px-3 py-2 rounded-xl bg-red-900/30 border border-red-500/30"
+            >
+              <p className="text-[12px] font-bold text-red-400">{app.syncError}</p>
+            </motion.div>
+          )}
+        </AnimatePresence>
         <AnimatePresence mode="wait">
           <motion.div
             key={tab}
