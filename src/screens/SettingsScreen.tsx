@@ -5,12 +5,14 @@ interface SettingsScreenProps {
   state: AppState
   syncEnabled: boolean
   syncError: string | null
+  refreshing: boolean
   onUpdateSettings: (s: Partial<AppState['settings']>) => void
   onUpdateDailyGoal: (g: DailyXPGoal) => void
+  onRefresh: () => void
   onReset: () => void
 }
 
-export function SettingsScreen({ state, syncEnabled, syncError, onUpdateSettings, onUpdateDailyGoal, onReset }: SettingsScreenProps) {
+export function SettingsScreen({ state, syncEnabled, syncError, refreshing, onUpdateSettings, onUpdateDailyGoal, onRefresh, onReset }: SettingsScreenProps) {
   return (
     <div className="px-4 pt-2 pb-8 space-y-4">
       <div>
@@ -46,7 +48,7 @@ export function SettingsScreen({ state, syncEnabled, syncError, onUpdateSettings
       {syncEnabled && (
         <Section title="Sincronizacion" subtitle="Tus datos se sincronizan automaticamente con la nube.">
           {syncError ? (
-            <div className="space-y-1">
+            <div className="space-y-2">
               <div className="flex items-center gap-2 text-[13px] font-bold text-red-400">
                 <span className="w-2 h-2 rounded-full bg-red-400" />
                 Error de sync
@@ -54,11 +56,27 @@ export function SettingsScreen({ state, syncEnabled, syncError, onUpdateSettings
               <p className="text-[11px] font-mono text-red-300/80 bg-red-900/20 rounded-lg px-3 py-2 break-all">
                 {syncError}
               </p>
+              <button
+                onClick={onRefresh}
+                disabled={refreshing}
+                className="btn-3d w-full !h-10 !text-[13px] bg-surface-700 border-surface-500 text-[#94A7B0]"
+              >
+                {refreshing ? 'Sincronizando...' : 'Reintentar sincronizacion'}
+              </button>
             </div>
           ) : (
-            <div className="flex items-center gap-2 text-[13px] font-bold text-duo-green">
-              <span className="w-2 h-2 rounded-full bg-duo-green animate-pulse" />
-              Sync activo
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-[13px] font-bold text-duo-green">
+                <span className="w-2 h-2 rounded-full bg-duo-green animate-pulse" />
+                Sync activo
+              </div>
+              <button
+                onClick={onRefresh}
+                disabled={refreshing}
+                className="text-[12px] font-bold text-[#5C7680] active:text-duo-green transition-colors"
+              >
+                {refreshing ? 'Sincronizando...' : 'Refrescar'}
+              </button>
             </div>
           )}
         </Section>
