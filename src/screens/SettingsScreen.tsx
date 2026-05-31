@@ -102,7 +102,7 @@ export function SettingsScreen({ state, syncEnabled, syncError, onUpdateSettings
       </Section>
 
       <div className="text-center pt-2 pb-2">
-        <p className="text-[11px] font-bold text-[#3C5564]">HabitQuest v1.7</p>
+        <p className="text-[11px] font-bold text-[#3C5564]">HabitQuest v1.8</p>
       </div>
     </div>
   )

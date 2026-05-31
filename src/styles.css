@@ -56,19 +56,17 @@ body {
   -webkit-text-size-adjust: 100%;
 }
 
-/* #root must also be full height */
-#root {
-  height: 100%;
-}
-
-/* App shell — flex column, full viewport including safe areas */
+/* App shell — fixed to physical screen edges (viewport-fit: cover) */
 .app-shell {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   display: flex;
   flex-direction: column;
-  height: 100%;
   max-width: 512px;
   margin: 0 auto;
-  position: relative;
   background: var(--color-surface-900);
 }
 
