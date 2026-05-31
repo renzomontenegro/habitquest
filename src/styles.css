@@ -92,8 +92,8 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-around;
-  height: calc(52px + env(safe-area-inset-bottom, 0px));
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+  height: calc(52px + env(safe-area-inset-bottom));
+  padding-bottom: env(safe-area-inset-bottom);
   background: var(--color-surface-900);
   border-top: 1.5px solid var(--color-surface-600);
   z-index: 40;

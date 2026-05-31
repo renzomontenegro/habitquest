@@ -16,44 +16,38 @@ export function useAppState() {
   const [syncError, setSyncError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
 
-  // Persistir en cada cambio (localStorage + backend sync)
+  // Persistir en cada cambio (solo backend, localStorage es cache)
   useEffect(() => {
-    storage.save(state)
-    debouncedSave(state, setSyncError)
-  }, [state])
+    storage.save(state) // cache local para carga inicial rápida
+    if (!syncError) debouncedSave(state, setSyncError)
+  }, [state, syncError])
 
   const genId = () => crypto.randomUUID()
 
-  // Cargar estado desde la nube y actualizar racha
+  // Cargar estado desde la nube
   const refreshFromCloud = useCallback(async () => {
     setRefreshing(true)
     if (isSyncEnabled()) {
       const remote = await loadFromBackend()
-      setSyncError(getSyncError())
+      const error = getSyncError()
+      setSyncError(error)
       if (remote) {
-        setState(remote)
-        storage.save(remote)
-        setRefreshing(false)
-        return
+        // Actualizar racha con datos de la nube
+        const streakUpdate = updateStreak(remote.habitLogs, remote.habits, remote.profile)
+        const updated = {
+          ...remote,
+          profile: {
+            ...remote.profile,
+            currentStreak: streakUpdate.currentStreak,
+            streakDate: streakUpdate.streakDate,
+            streakFreezes: streakUpdate.streakFreezes,
+          },
+        }
+        setState(updated)
+        storage.save(updated)
       }
+      // Si falla, syncError ya está seteado y la UI se bloquea
     }
-
-    setState(prev => {
-      const streakUpdate = updateStreak(prev.habitLogs, prev.habits, prev.profile)
-      if (
-        streakUpdate.currentStreak === prev.profile.currentStreak &&
-        streakUpdate.streakDate === prev.profile.streakDate
-      ) return prev
-      return {
-        ...prev,
-        profile: {
-          ...prev.profile,
-          currentStreak: streakUpdate.currentStreak,
-          streakDate: streakUpdate.streakDate,
-          streakFreezes: streakUpdate.streakFreezes,
-        },
-      }
-    })
     setRefreshing(false)
   }, [])
 
