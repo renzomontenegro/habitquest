@@ -21,8 +21,8 @@ const defaultState: AppState = {
   weeklyLeagues: [],
   settings: {
     soundEnabled: false,
-    syncUrl: '',
-    syncToken: '',
+    syncUrl: import.meta.env.VITE_SYNC_URL ?? '',
+    syncToken: import.meta.env.VITE_SYNC_TOKEN ?? '',
   },
 }
 
