@@ -50,8 +50,6 @@ export default function App() {
                 state={app.state}
                 onUpdateSettings={app.updateSettings}
                 onUpdateDailyGoal={app.updateDailyGoal}
-                onExport={app.exportState}
-                onImport={app.importState}
                 onReset={app.resetState}
               />
             )}

@@ -1,67 +1,14 @@
-import { useState } from 'react'
 import type { AppState, DailyXPGoal } from '../types'
-import { Toggle, FormInput } from '../components/FormModal'
-import { saveToBackend, loadFromBackend } from '../lib/sync'
+import { Toggle } from '../components/FormModal'
 
 interface SettingsScreenProps {
   state: AppState
   onUpdateSettings: (s: Partial<AppState['settings']>) => void
   onUpdateDailyGoal: (g: DailyXPGoal) => void
-  onExport: () => string
-  onImport: (json: string) => boolean
   onReset: () => void
 }
 
-export function SettingsScreen({ state, onUpdateSettings, onUpdateDailyGoal, onExport, onImport, onReset }: SettingsScreenProps) {
-  const [syncStatus, setSyncStatus] = useState<'idle' | 'saving' | 'loading' | 'ok' | 'error'>('idle')
-
-  const handleExport = () => {
-    const json = onExport()
-    const blob = new Blob([json], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `habitquest-${new Date().toISOString().slice(0, 10)}.json`
-    a.click()
-    URL.revokeObjectURL(url)
-  }
-
-  const handleImport = () => {
-    const input = document.createElement('input')
-    input.type = 'file'
-    input.accept = '.json'
-    input.onchange = (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0]
-      if (!file) return
-      const reader = new FileReader()
-      reader.onload = () => {
-        const ok = onImport(reader.result as string)
-        if (!ok) alert('Archivo invalido')
-      }
-      reader.readAsText(file)
-    }
-    input.click()
-  }
-
-  const handleSyncPush = async () => {
-    setSyncStatus('saving')
-    const ok = await saveToBackend(state.settings.syncUrl, state.settings.syncToken, state)
-    setSyncStatus(ok ? 'ok' : 'error')
-    setTimeout(() => setSyncStatus('idle'), 2500)
-  }
-
-  const handleSyncPull = async () => {
-    setSyncStatus('loading')
-    const remote = await loadFromBackend(state.settings.syncUrl, state.settings.syncToken)
-    if (remote) {
-      onImport(JSON.stringify(remote))
-      setSyncStatus('ok')
-    } else {
-      setSyncStatus('error')
-    }
-    setTimeout(() => setSyncStatus('idle'), 2500)
-  }
-
+export function SettingsScreen({ state, onUpdateSettings, onUpdateDailyGoal, onReset }: SettingsScreenProps) {
   return (
     <div className="px-4 pt-2 pb-8 space-y-4">
       <div>
@@ -93,48 +40,15 @@ export function SettingsScreen({ state, onUpdateSettings, onUpdateDailyGoal, onE
         </div>
       </Section>
 
-      {/* Sync */}
-      <Section title="Sincronizacion" subtitle="Conecta con n8n para respaldar tus datos en Google Sheets. Los cambios se sincronizan automaticamente.">
-        <div className="space-y-3">
-          <FormInput
-            label="URL del webhook"
-            value={state.settings.syncUrl}
-            onChange={v => onUpdateSettings({ syncUrl: v })}
-            placeholder="https://n8n.example.com/webhook/"
-          />
-          <FormInput
-            label="Token secreto"
-            value={state.settings.syncToken}
-            onChange={v => onUpdateSettings({ syncToken: v })}
-            placeholder="Tu token de seguridad"
-          />
-          {state.settings.syncUrl && (
-            <div className="flex gap-2">
-              <button
-                onClick={handleSyncPush}
-                disabled={syncStatus !== 'idle'}
-                className={`btn-3d flex-1 !h-11 !text-[12px] ${
-                  syncStatus === 'ok' ? '!bg-duo-green !shadow-[0_5px_0_#43C000]' :
-                  syncStatus === 'error' ? '!bg-duo-red !shadow-[0_5px_0_#E53838]' :
-                  'btn-3d-purple'
-                }`}
-              >
-                {syncStatus === 'saving' ? 'Subiendo...' :
-                 syncStatus === 'ok' ? 'Listo!' :
-                 syncStatus === 'error' ? 'Error' :
-                 'Subir datos'}
-              </button>
-              <button
-                onClick={handleSyncPull}
-                disabled={syncStatus !== 'idle'}
-                className="btn-3d btn-3d-blue flex-1 !h-11 !text-[12px]"
-              >
-                {syncStatus === 'loading' ? 'Cargando...' : 'Descargar datos'}
-              </button>
-            </div>
-          )}
-        </div>
-      </Section>
+      {/* Sync status */}
+      {state.settings.syncUrl && (
+        <Section title="Sincronizacion" subtitle="Tus datos se sincronizan automaticamente con la nube.">
+          <div className="flex items-center gap-2 text-[13px] font-bold text-duo-green">
+            <span className="w-2 h-2 rounded-full bg-duo-green animate-pulse" />
+            Sync activo
+          </div>
+        </Section>
+      )}
 
       {/* Sonido */}
       <Section title="Sonido" subtitle="Efectos al completar habitos y subir de nivel.">
@@ -143,18 +57,6 @@ export function SettingsScreen({ state, onUpdateSettings, onUpdateDailyGoal, onE
           value={state.settings.soundEnabled}
           onChange={v => onUpdateSettings({ soundEnabled: v })}
         />
-      </Section>
-
-      {/* Datos */}
-      <Section title="Datos" subtitle="Backup local en JSON.">
-        <div className="flex gap-2.5">
-          <button onClick={handleExport} className="btn-3d btn-3d-blue flex-1 !h-11 !text-[13px]">
-            Exportar
-          </button>
-          <button onClick={handleImport} className="btn-3d btn-3d-orange flex-1 !h-11 !text-[13px]">
-            Importar
-          </button>
-        </div>
       </Section>
 
       {/* Reset */}
@@ -173,7 +75,6 @@ export function SettingsScreen({ state, onUpdateSettings, onUpdateDailyGoal, onE
 
       <div className="text-center pt-2 pb-2">
         <p className="text-[11px] font-bold text-[#3C5564]">HabitQuest v1.0</p>
-        <p className="text-[11px] font-bold text-[#3C5564]">Tus datos se guardan localmente. El sync es opcional.</p>
       </div>
     </div>
   )
