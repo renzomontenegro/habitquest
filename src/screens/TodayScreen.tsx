@@ -41,15 +41,15 @@ export function TodayScreen({ state, onToggle, onUpdateQuant, onAddHabit, onUpda
   // --- Form state ---
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [form, setForm] = useState({ name: '', icon: '💪', type: 'binary' as HabitType, target: '', unit: '', color: COLORS[0], xpReward: 10 })
+  const [form, setForm] = useState({ name: '', icon: '💪', type: 'binary' as HabitType, target: '', unit: '', color: COLORS[0], xpReward: 10, category: '' })
 
   const openNew = () => {
-    setForm({ name: '', icon: '💪', type: 'binary', target: '', unit: '', color: COLORS[0], xpReward: 10 })
+    setForm({ name: '', icon: '💪', type: 'binary', target: '', unit: '', color: COLORS[0], xpReward: 10, category: '' })
     setEditingId(null)
     setShowForm(true)
   }
   const openEdit = (h: Habit) => {
-    setForm({ name: h.name, icon: h.icon, type: h.type, target: h.target?.toString() ?? '', unit: h.unit ?? '', color: h.color, xpReward: h.xpReward })
+    setForm({ name: h.name, icon: h.icon, type: h.type, target: h.target?.toString() ?? '', unit: h.unit ?? '', color: h.color, xpReward: h.xpReward, category: h.category ?? '' })
     setEditingId(h.id)
     setShowForm(true)
   }
@@ -60,6 +60,7 @@ export function TodayScreen({ state, onToggle, onUpdateQuant, onAddHabit, onUpda
       target: form.type === 'quant' ? parseFloat(form.target) || 0 : undefined,
       unit: form.type === 'quant' ? form.unit : undefined,
       color: form.color, xpReward: form.xpReward,
+      category: form.category || undefined,
     }
     if (editingId) onUpdateHabit(editingId, data)
     else onAddHabit(data)
