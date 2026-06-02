@@ -5,7 +5,7 @@ import { format, subDays } from 'date-fns'
 import { es } from 'date-fns/locale'
 import type { AppState } from '../types'
 import { generateHeatmapData, habitStreak, completionRate, dailyXP, completionRateForHabits } from '../lib/streaks'
-import { CATEGORIES, getCategoryById } from '../lib/gameConfig'
+import { getCategoryById } from '../lib/gameConfig'
 
 interface StatsScreenProps {
   state: AppState
