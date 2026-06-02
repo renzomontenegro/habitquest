@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { BottomSheet, FormInput } from '../components/FormModal'
 import type { AppState, Goal } from '../types'
-import { GAME_CONFIG } from '../lib/gameConfig'
+import { GAME_CONFIG, CATEGORIES, getCategoryById } from '../lib/gameConfig'
 
 const SUGGESTED_ICONS = ['💰', '📈', '🏠', '🚗', '✈️', '🎓', '💻', '🏋️', '📚', '🎯', '❤️', '🌱', '🏖️', '💍', '🐕', '🎸']
 
@@ -28,15 +28,15 @@ export function GoalsScreen({ state, onAddContribution, onAddGoal, onUpdateGoal,
   const [contrib, setContrib] = useState<{ goalId: string; goalName: string; amount: string; note: string } | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [form, setForm] = useState({ name: '', icon: '💰', targetAmount: '', unit: '', deadline: '' })
+  const [form, setForm] = useState({ name: '', icon: '💰', targetAmount: '', unit: '', deadline: '', category: '' })
 
   const openNew = () => {
-    setForm({ name: '', icon: '💰', targetAmount: '', unit: '', deadline: '' })
+    setForm({ name: '', icon: '💰', targetAmount: '', unit: '', deadline: '', category: '' })
     setEditingId(null)
     setShowForm(true)
   }
   const openEdit = (g: Goal) => {
-    setForm({ name: g.name, icon: g.icon, targetAmount: g.targetAmount.toString(), unit: g.unit, deadline: g.deadline ?? '' })
+    setForm({ name: g.name, icon: g.icon, targetAmount: g.targetAmount.toString(), unit: g.unit, deadline: g.deadline ?? '', category: g.category ?? '' })
     setEditingId(g.id)
     setShowForm(true)
   }
@@ -47,6 +47,7 @@ export function GoalsScreen({ state, onAddContribution, onAddGoal, onUpdateGoal,
       targetAmount: parseFloat(form.targetAmount) || 0,
       unit: form.unit,
       deadline: form.deadline || undefined,
+      category: form.category || undefined,
     }
     if (editingId) onUpdateGoal(editingId, data)
     else onAddGoal(data)
@@ -97,15 +98,39 @@ export function GoalsScreen({ state, onAddContribution, onAddGoal, onUpdateGoal,
         </div>
       ) : (
         <div className="space-y-3">
-          {state.goals.map(goal => (
-            <GoalCard
-              key={goal.id}
-              goal={goal}
-              contributions={state.goalContributions.filter(c => c.goalId === goal.id)}
-              onAddContrib={() => setContrib({ goalId: goal.id, goalName: goal.name, amount: '', note: '' })}
-              onEdit={() => openEdit(goal)}
-            />
-          ))}
+          {(() => {
+            const grouped = new Map<string, typeof state.goals>()
+            for (const g of state.goals) {
+              const key = g.category || ''
+              if (!grouped.has(key)) grouped.set(key, [])
+              grouped.get(key)!.push(g)
+            }
+            const hasCategories = state.goals.some(g => g.category)
+            return Array.from(grouped.entries()).map(([catId, goals]) => {
+              const cat = catId ? getCategoryById(catId) : null
+              return (
+                <div key={catId || '_none'} className="space-y-3">
+                  {hasCategories && (
+                    <div className="flex items-center gap-1.5 mt-1">
+                      <span className="text-[13px]">{cat?.icon || '📋'}</span>
+                      <span className="text-[11px] font-extrabold text-[#5C7680] uppercase tracking-wider">
+                        {cat?.name || 'Sin categoria'}
+                      </span>
+                    </div>
+                  )}
+                  {goals.map(goal => (
+                    <GoalCard
+                      key={goal.id}
+                      goal={goal}
+                      contributions={state.goalContributions.filter(c => c.goalId === goal.id)}
+                      onAddContrib={() => setContrib({ goalId: goal.id, goalName: goal.name, amount: '', note: '' })}
+                      onEdit={() => openEdit(goal)}
+                    />
+                  ))}
+                </div>
+              )
+            })
+          })()}
           <button
             onClick={openNew}
             className="w-full h-12 rounded-2xl border-2 border-dashed border-surface-500 text-[#5C7680] font-bold text-[14px] flex items-center justify-center gap-2 active:bg-surface-700 transition-colors"
@@ -168,6 +193,34 @@ export function GoalsScreen({ state, onAddContribution, onAddGoal, onUpdateGoal,
           </div>
 
           <FormInput label="Fecha limite (opcional)" value={form.deadline} onChange={v => setForm({ ...form, deadline: v })} type="date" />
+
+          <div>
+            <label className="text-[11px] font-bold text-[#5C7680] uppercase tracking-wider mb-1.5 block">Categoria (opcional)</label>
+            <div className="flex flex-wrap gap-1.5">
+              <button
+                onClick={() => setForm({ ...form, category: '' })}
+                className={`h-8 px-3 rounded-lg text-[12px] font-bold border-2 transition-all ${
+                  !form.category ? 'bg-duo-blue/20 border-duo-blue text-white' : 'bg-surface-700 border-surface-600 text-[#5C7680]'
+                }`}
+              >
+                Ninguna
+              </button>
+              {CATEGORIES.map(cat => (
+                <button
+                  key={cat.id}
+                  onClick={() => setForm({ ...form, category: cat.id })}
+                  className={`h-8 px-3 rounded-lg text-[12px] font-bold border-2 transition-all ${
+                    form.category === cat.id
+                      ? 'border-white text-white'
+                      : 'bg-surface-700 border-surface-600 text-[#94A7B0]'
+                  }`}
+                  style={form.category === cat.id ? { backgroundColor: cat.color + '30', borderColor: cat.color } : undefined}
+                >
+                  {cat.icon} {cat.name}
+                </button>
+              ))}
+            </div>
+          </div>
 
           <button onClick={handleSaveGoal} className="btn-3d btn-3d-blue w-full !h-12 !text-[14px]">
             {editingId ? 'Guardar cambios' : 'Crear meta'}

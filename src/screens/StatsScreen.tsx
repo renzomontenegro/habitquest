@@ -4,7 +4,8 @@ import { XAxis, YAxis, Tooltip, ResponsiveContainer, Area, AreaChart } from 'rec
 import { format, subDays } from 'date-fns'
 import { es } from 'date-fns/locale'
 import type { AppState } from '../types'
-import { generateHeatmapData, habitStreak, completionRate, dailyXP } from '../lib/streaks'
+import { generateHeatmapData, habitStreak, completionRate, dailyXP, completionRateForHabits } from '../lib/streaks'
+import { CATEGORIES, getCategoryById } from '../lib/gameConfig'
 
 interface StatsScreenProps {
   state: AppState
@@ -141,6 +142,54 @@ export function StatsScreen({ state }: StatsScreenProps) {
           </div>
         </div>
       )}
+
+      {/* === Stats por categoría === */}
+      {(() => {
+        const usedCats = new Set<string>()
+        state.habits.forEach(h => { if (h.category) usedCats.add(h.category) })
+        state.goals.forEach(g => { if (g.category) usedCats.add(g.category) })
+        if (usedCats.size === 0) return null
+
+        return (
+          <div>
+            <h2 className="text-[13px] font-extrabold text-[#94A7B0] uppercase tracking-wider mb-2.5">Por categoria</h2>
+            <div className="space-y-1.5">
+              {Array.from(usedCats).map(catId => {
+                const cat = getCategoryById(catId)
+                if (!cat) return null
+                const catHabits = state.habits.filter(h => h.category === catId)
+                const catGoals = state.goals.filter(g => g.category === catId)
+                const rate = catHabits.length > 0 ? completionRateForHabits(state.habitLogs, catHabits, 7) : null
+                const completedGoals = catGoals.filter(g => g.currentAmount >= g.targetAmount).length
+                return (
+                  <div key={catId} className="card-3d !p-2.5">
+                    <div className="flex items-center gap-2.5 mb-1">
+                      <span className="text-xl">{cat.icon}</span>
+                      <span className="flex-1 text-white font-bold text-[14px]">{cat.name}</span>
+                    </div>
+                    <div className="flex gap-3 text-[11px] font-bold text-[#5C7680]">
+                      {catHabits.length > 0 && (
+                        <span>{catHabits.length} habito{catHabits.length > 1 ? 's' : ''} · <span className="text-duo-green">{rate}%</span> (7d)</span>
+                      )}
+                      {catGoals.length > 0 && (
+                        <span>{completedGoals}/{catGoals.length} meta{catGoals.length > 1 ? 's' : ''}</span>
+                      )}
+                    </div>
+                    {catHabits.length > 0 && (
+                      <div className="progress-bar-track !h-2 mt-1.5">
+                        <div
+                          className="progress-bar-fill"
+                          style={{ width: `${Math.max(rate || 0, 1)}%`, backgroundColor: cat.color }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })()}
 
       {/* === Resumen de metas === */}
       {state.goals.length > 0 && (

@@ -37,6 +37,24 @@ export const GAME_CONFIG = {
   goalMilestones: [25, 50, 75, 100],
 } as const
 
+// Categorías predefinidas para hábitos y metas
+export const CATEGORIES = [
+  { id: 'salud', name: 'Salud', icon: '❤️', color: '#FF4B4B' },
+  { id: 'fitness', name: 'Fitness', icon: '🏋️', color: '#FF9600' },
+  { id: 'finanzas', name: 'Finanzas', icon: '💰', color: '#58CC02' },
+  { id: 'estudio', name: 'Estudio', icon: '📚', color: '#1CB0F6' },
+  { id: 'trabajo', name: 'Trabajo', icon: '💼', color: '#CE82FF' },
+  { id: 'bienestar', name: 'Bienestar', icon: '🧘', color: '#FFC800' },
+  { id: 'social', name: 'Social', icon: '👥', color: '#FF6B9D' },
+  { id: 'hogar', name: 'Hogar', icon: '🏠', color: '#4ECDC4' },
+] as const
+
+export type CategoryId = typeof CATEGORIES[number]['id']
+
+export function getCategoryById(id: string) {
+  return CATEGORIES.find(c => c.id === id)
+}
+
 // Nombres de liga en español
 export const LEAGUE_NAMES: Record<string, string> = {
   bronce: 'Bronce',

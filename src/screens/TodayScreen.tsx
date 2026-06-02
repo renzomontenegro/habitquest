@@ -7,7 +7,7 @@ import { BottomSheet, FormInput } from '../components/FormModal'
 import type { AppState, Habit, HabitType } from '../types'
 import { dailyXP, today, isPerfectDay } from '../lib/streaks'
 import { currentWeekXP, getWeeklyTier, bestWeekXP } from '../lib/streaks'
-import { LEAGUE_NAMES, LEAGUE_COLORS } from '../lib/gameConfig'
+import { LEAGUE_NAMES, LEAGUE_COLORS, CATEGORIES, getCategoryById } from '../lib/gameConfig'
 import { getNextAchievement, getRecentUnlocks } from '../lib/achievementProgress'
 
 const SUGGESTED_ICONS = ['💪', '🏃', '🥗', '💧', '📚', '🧘', '💤', '✍️', '🏋️', '🚴', '🧠', '❤️', '🌱', '🎵', '🧹', '💊', '🎨', '🐕']
@@ -78,7 +78,7 @@ export function TodayScreen({ state, onToggle, onUpdateQuant, onAddHabit, onUpda
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h1 className="text-xl font-black text-white leading-tight">HabitQuest</h1>
+          <h1 className="text-xl font-black text-white leading-tight">HabitQuest <span className="text-[11px] font-bold text-[#5C7680]">v1.9</span></h1>
           <p className="text-[#5C7680] text-[13px] font-bold capitalize">
             {new Date().toLocaleDateString('es', { weekday: 'long', day: 'numeric', month: 'long' })}
           </p>
@@ -156,19 +156,43 @@ export function TodayScreen({ state, onToggle, onUpdateQuant, onAddHabit, onUpda
         </div>
       ) : (
         <div className="space-y-2.5 mb-5">
-          {state.habits.map(habit => {
-            const log = state.habitLogs.find(l => l.habitId === habit.id && l.date === todayStr)
-            return (
-              <HabitCard
-                key={habit.id}
-                habit={habit}
-                log={log}
-                onToggle={onToggle}
-                onUpdateQuant={onUpdateQuant}
-                onLongPress={() => openEdit(habit)}
-              />
-            )
-          })}
+          {(() => {
+            const grouped = new Map<string, typeof state.habits>()
+            for (const h of state.habits) {
+              const key = h.category || ''
+              if (!grouped.has(key)) grouped.set(key, [])
+              grouped.get(key)!.push(h)
+            }
+            const hasCategories = state.habits.some(h => h.category)
+            return Array.from(grouped.entries()).map(([catId, habits]) => {
+              const cat = catId ? getCategoryById(catId) : null
+              return (
+                <div key={catId || '_none'} className={hasCategories ? 'space-y-2' : 'space-y-2.5'}>
+                  {hasCategories && (
+                    <div className="flex items-center gap-1.5 mt-1">
+                      <span className="text-[13px]">{cat?.icon || '📋'}</span>
+                      <span className="text-[11px] font-extrabold text-[#5C7680] uppercase tracking-wider">
+                        {cat?.name || 'Sin categoria'}
+                      </span>
+                    </div>
+                  )}
+                  {habits.map(habit => {
+                    const log = state.habitLogs.find(l => l.habitId === habit.id && l.date === todayStr)
+                    return (
+                      <HabitCard
+                        key={habit.id}
+                        habit={habit}
+                        log={log}
+                        onToggle={onToggle}
+                        onUpdateQuant={onUpdateQuant}
+                        onLongPress={() => openEdit(habit)}
+                      />
+                    )
+                  })}
+                </div>
+              )
+            })
+          })()}
           <button
             onClick={openNew}
             className="w-full h-12 rounded-2xl border-2 border-dashed border-surface-500 text-[#5C7680] font-bold text-[14px] flex items-center justify-center gap-2 active:bg-surface-700 transition-colors"
@@ -300,6 +324,34 @@ export function TodayScreen({ state, onToggle, onUpdateQuant, onAddHabit, onUpda
                   className={`w-8 h-8 rounded-full border-2 transition-all ${form.color === color ? 'scale-110 border-white' : 'border-transparent'}`}
                   style={{ backgroundColor: color }}
                 />
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="text-[11px] font-bold text-[#5C7680] uppercase tracking-wider mb-1.5 block">Categoria (opcional)</label>
+            <div className="flex flex-wrap gap-1.5">
+              <button
+                onClick={() => setForm({ ...form, category: '' })}
+                className={`h-8 px-3 rounded-lg text-[12px] font-bold border-2 transition-all ${
+                  !form.category ? 'bg-duo-blue/20 border-duo-blue text-white' : 'bg-surface-700 border-surface-600 text-[#5C7680]'
+                }`}
+              >
+                Ninguna
+              </button>
+              {CATEGORIES.map(cat => (
+                <button
+                  key={cat.id}
+                  onClick={() => setForm({ ...form, category: cat.id })}
+                  className={`h-8 px-3 rounded-lg text-[12px] font-bold border-2 transition-all ${
+                    form.category === cat.id
+                      ? 'border-white text-white'
+                      : 'bg-surface-700 border-surface-600 text-[#94A7B0]'
+                  }`}
+                  style={form.category === cat.id ? { backgroundColor: cat.color + '30', borderColor: cat.color } : undefined}
+                >
+                  {cat.icon} {cat.name}
+                </button>
               ))}
             </div>
           </div>

@@ -11,6 +11,7 @@ export interface Habit {
   xpReward: number
   color: string
   createdAt: string
+  category?: string
 }
 
 export interface HabitLog {
@@ -30,6 +31,7 @@ export interface Goal {
   currentAmount: number
   unit: string
   deadline?: string
+  category?: string
 }
 
 export interface GoalContribution {

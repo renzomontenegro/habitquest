@@ -28,6 +28,10 @@ export function getNextAchievement(state: AppState): AchievementProgress | null 
     xp_1000: { current: Math.min(profile.totalXP, 1000), target: 1000 },
     level_10: { current: Math.min(profile.level, 10), target: 10 },
     // early_bird and comeback are event-based, hard to show progress
+    // Logros de categoría
+    cat_3: { current: Math.min(new Set(habits.filter(h => h.category).map(h => h.category!)).size, 3), target: 3 },
+    cat_5_habits: { current: Math.min(Math.max(...(Array.from(new Set(habits.filter(h => h.category).map(h => h.category!))).map(c => habits.filter(h => h.category === c).length).concat([0]))), 5), target: 5 },
+    // cat_perfect is event-based
   }
 
   const locked = achievements.filter(a => !a.unlockedAt && progressMap[a.condition])

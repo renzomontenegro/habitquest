@@ -218,6 +218,25 @@ export function generateHeatmapData(
   return result
 }
 
+// Porcentaje de cumplimiento para un subconjunto de hábitos (últimos N días)
+export function completionRateForHabits(logs: HabitLog[], habits: Habit[], days: number): number {
+  if (habits.length === 0) return 0
+  const habitIds = new Set(habits.map(h => h.id))
+  const now = new Date()
+  let totalPossible = 0
+  let totalCompleted = 0
+
+  for (let i = 0; i < days; i++) {
+    const date = format(subDays(now, i), 'yyyy-MM-dd')
+    const active = habits.filter(h => h.createdAt <= date)
+    totalPossible += active.length
+    totalCompleted += logs.filter(l => l.date === date && l.completed && habitIds.has(l.habitId)).length
+  }
+
+  if (totalPossible === 0) return 0
+  return Math.round((totalCompleted / totalPossible) * 100)
+}
+
 // Porcentaje de cumplimiento (últimos N días)
 export function completionRate(logs: HabitLog[], habits: Habit[], days: number): number {
   const now = new Date()

@@ -71,4 +71,25 @@ export const DEFAULT_ACHIEVEMENTS: Achievement[] = [
     icon: '🧊',
     condition: 'comeback',
   },
+  {
+    id: 'cat_3',
+    name: 'Equilibrista',
+    description: 'Usa 3 categorias distintas en tus habitos',
+    icon: '🎪',
+    condition: 'cat_3',
+  },
+  {
+    id: 'cat_perfect',
+    name: 'Categoria Perfecta',
+    description: 'Completa todos los habitos de una categoria en un dia',
+    icon: '🏅',
+    condition: 'cat_perfect',
+  },
+  {
+    id: 'cat_5_habits',
+    name: 'Especialista',
+    description: 'Crea 5 habitos en una misma categoria',
+    icon: '🔬',
+    condition: 'cat_5_habits',
+  },
 ]

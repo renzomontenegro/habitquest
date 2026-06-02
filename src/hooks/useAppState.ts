@@ -98,6 +98,27 @@ export function useAppState() {
     if (profile.level >= 10) unlock('level_10')
     if (checkEarlyBird(habitLogs, habits, todayStr)) unlock('early_bird')
 
+    // Logros de categoría
+    const catSet = new Set(habits.filter(h => h.category).map(h => h.category!))
+    if (catSet.size >= 3) unlock('cat_3')
+
+    // Categoría perfecta: todos los hábitos de al menos una categoría completados hoy
+    for (const cat of catSet) {
+      const catHabits = habits.filter(h => h.category === cat)
+      if (catHabits.length >= 2 && catHabits.every(h => habitLogs.some(l => l.habitId === h.id && l.date === todayStr && l.completed))) {
+        unlock('cat_perfect')
+        break
+      }
+    }
+
+    // Especialista: 5+ hábitos en una categoría
+    for (const cat of catSet) {
+      if (habits.filter(h => h.category === cat).length >= 5) {
+        unlock('cat_5_habits')
+        break
+      }
+    }
+
     return changed ? { ...newState, achievements: updated } : newState
   }, [celebrate])
 
