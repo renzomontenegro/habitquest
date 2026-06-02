@@ -1,0 +1,19 @@
+{
+  "mcpServers": {
+    "n8n-mcp": {
+      "command": "npx",
+      "args": ["-y", "n8n-mcp"],
+      "env": {
+        "MCP_MODE": "stdio",
+        "LOG_LEVEL": "error",
+        "DISABLE_CONSOLE_OUTPUT": "true",
+        "N8N_API_URL": "https://raspberrypi.tail4656aa.ts.net:5678/",
+        "N8N_API_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkNmQ4NjcxMC1lNzFkLTRkZjAtYWY3Ny03MzViY2Q2Y2Y5MWIiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwianRpIjoiYzEwYzc3M2ItMWFiOC00MjIxLThkZGYtODhjMjgzMzA0NDEwIiwiaWF0IjoxNzgwMDI3ODA3fQ.qKyJHjdQpX2PJuCq-OCVxc-g1DVenNRe6KM76uzhqWQ"
+      }
+    },
+    "playwright": {
+      "command": "npx",
+      "args": ["-y", "@playwright/mcp@latest"]
+    }
+  }
+}

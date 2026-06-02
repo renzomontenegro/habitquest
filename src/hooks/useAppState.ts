@@ -127,7 +127,7 @@ export function useAppState() {
     setState(prev => {
       const todayStr = today()
       const habit = prev.habits.find(h => h.id === habitId)
-      if (!habit || habit.type !== 'binary') return prev
+      if (!habit || (habit.type !== 'binary' && habit.type !== 'cycle')) return prev
 
       const existingLog = prev.habitLogs.find(l => l.habitId === habitId && l.date === todayStr)
       let newLogs: HabitLog[]

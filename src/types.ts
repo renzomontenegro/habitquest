@@ -1,5 +1,5 @@
 // --- Hábitos ---
-export type HabitType = 'binary' | 'quant'
+export type HabitType = 'binary' | 'quant' | 'cycle'
 
 export interface Habit {
   id: string
@@ -12,6 +12,7 @@ export interface Habit {
   color: string
   createdAt: string
   category?: string
+  cycleSteps?: string[]  // pasos del ciclo, ej: ["Upper", "Lower", "Descanso", "Push", "Pull", "Legs", "Descanso"]
 }
 
 export interface HabitLog {

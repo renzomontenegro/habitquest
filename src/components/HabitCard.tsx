@@ -5,12 +5,13 @@ import type { Habit, HabitLog } from '../types'
 interface HabitCardProps {
   habit: Habit
   log?: HabitLog
+  cycleStep?: string  // paso actual del ciclo
   onToggle: (id: string) => void
   onUpdateQuant: (id: string, value: number) => void
   onLongPress?: () => void
 }
 
-export function HabitCard({ habit, log, onToggle, onUpdateQuant, onLongPress }: HabitCardProps) {
+export function HabitCard({ habit, log, cycleStep, onToggle, onUpdateQuant, onLongPress }: HabitCardProps) {
   const completed = log?.completed ?? false
   const [showXP, setShowXP] = useState(false)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -29,7 +30,7 @@ export function HabitCard({ habit, log, onToggle, onUpdateQuant, onLongPress }: 
     if (timerRef.current) clearTimeout(timerRef.current)
   }
 
-  if (habit.type === 'binary') {
+  if (habit.type === 'binary' || habit.type === 'cycle') {
     return (
       <div className="relative">
         <AnimatePresence>
@@ -61,9 +62,16 @@ export function HabitCard({ habit, log, onToggle, onUpdateQuant, onLongPress }: 
           } active:translate-y-[2px] active:shadow-none`}
         >
           <span className="text-2xl flex-shrink-0">{habit.icon}</span>
-          <span className={`flex-1 text-left font-extrabold text-[15px] ${completed ? 'text-duo-green' : 'text-white'}`}>
-            {habit.name}
-          </span>
+          <div className="flex-1 text-left min-w-0">
+            <span className={`font-extrabold text-[15px] ${completed ? 'text-duo-green' : 'text-white'}`}>
+              {habit.name}
+            </span>
+            {habit.type === 'cycle' && cycleStep && (
+              <div className="text-[12px] font-bold text-[#5C7680]">
+                Hoy: {cycleStep}
+              </div>
+            )}
+          </div>
           <div className={`w-9 h-9 rounded-lg flex items-center justify-center border-2 transition-colors ${
             completed
               ? 'bg-duo-green border-duo-green-dark'

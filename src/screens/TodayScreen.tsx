@@ -41,26 +41,35 @@ export function TodayScreen({ state, onToggle, onUpdateQuant, onAddHabit, onUpda
   // --- Form state ---
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [form, setForm] = useState({ name: '', icon: '💪', type: 'binary' as HabitType, target: '', unit: '', color: COLORS[0], xpReward: 10, category: '' })
+  const [form, setForm] = useState({ name: '', icon: '💪', type: 'binary' as HabitType, target: '', unit: '', color: COLORS[0], xpReward: 10, category: '', cycleSteps: '' })
 
   const openNew = () => {
-    setForm({ name: '', icon: '💪', type: 'binary', target: '', unit: '', color: COLORS[0], xpReward: 10, category: '' })
+    setForm({ name: '', icon: '💪', type: 'binary', target: '', unit: '', color: COLORS[0], xpReward: 10, category: '', cycleSteps: '' })
     setEditingId(null)
     setShowForm(true)
   }
   const openEdit = (h: Habit) => {
-    setForm({ name: h.name, icon: h.icon, type: h.type, target: h.target?.toString() ?? '', unit: h.unit ?? '', color: h.color, xpReward: h.xpReward, category: h.category ?? '' })
+    setForm({ name: h.name, icon: h.icon, type: h.type, target: h.target?.toString() ?? '', unit: h.unit ?? '', color: h.color, xpReward: h.xpReward, category: h.category ?? '', cycleSteps: h.cycleSteps?.join(', ') ?? '' })
     setEditingId(h.id)
     setShowForm(true)
   }
+
+  // Calcula el paso actual de un hábito cíclico basado en completions
+  const getCycleStep = (habit: Habit): string => {
+    if (!habit.cycleSteps || habit.cycleSteps.length === 0) return ''
+    const completedCount = state.habitLogs.filter(l => l.habitId === habit.id && l.completed).length
+    return habit.cycleSteps[completedCount % habit.cycleSteps.length]
+  }
   const handleSave = () => {
     if (!form.name.trim()) return
+    const parsedSteps = form.cycleSteps.split(',').map(s => s.trim()).filter(Boolean)
     const data = {
       name: form.name.trim(), icon: form.icon, type: form.type,
       target: form.type === 'quant' ? parseFloat(form.target) || 0 : undefined,
       unit: form.type === 'quant' ? form.unit : undefined,
       color: form.color, xpReward: form.xpReward,
       category: form.category || undefined,
+      cycleSteps: form.type === 'cycle' && parsedSteps.length > 0 ? parsedSteps : undefined,
     }
     if (editingId) onUpdateHabit(editingId, data)
     else onAddHabit(data)
@@ -78,7 +87,7 @@ export function TodayScreen({ state, onToggle, onUpdateQuant, onAddHabit, onUpda
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h1 className="text-xl font-black text-white leading-tight">HabitQuest <span className="text-[11px] font-bold text-[#5C7680]">v1.9</span></h1>
+          <h1 className="text-xl font-black text-white leading-tight">HabitQuest <span className="text-[11px] font-bold text-[#5C7680]">v2.0</span></h1>
           <p className="text-[#5C7680] text-[13px] font-bold capitalize">
             {new Date().toLocaleDateString('es', { weekday: 'long', day: 'numeric', month: 'long' })}
           </p>
@@ -183,6 +192,7 @@ export function TodayScreen({ state, onToggle, onUpdateQuant, onAddHabit, onUpda
                         key={habit.id}
                         habit={habit}
                         log={log}
+                        cycleStep={habit.type === 'cycle' ? getCycleStep(habit) : undefined}
                         onToggle={onToggle}
                         onUpdateQuant={onUpdateQuant}
                         onLongPress={() => openEdit(habit)}
@@ -253,7 +263,7 @@ export function TodayScreen({ state, onToggle, onUpdateQuant, onAddHabit, onUpda
           <div>
             <label className="text-[11px] font-bold text-[#5C7680] uppercase tracking-wider mb-1.5 block">Tipo</label>
             <div className="flex gap-2">
-              {(['binary', 'quant'] as HabitType[]).map(type => (
+              {([['binary', 'Si / No'], ['quant', 'Cuantitativo'], ['cycle', 'Ciclico']] as [HabitType, string][]).map(([type, label]) => (
                 <button
                   key={type}
                   onClick={() => setForm({ ...form, type })}
@@ -263,17 +273,37 @@ export function TodayScreen({ state, onToggle, onUpdateQuant, onAddHabit, onUpda
                       : 'bg-surface-700 border-surface-500 shadow-[0_3px_0_var(--color-surface-600)] text-[#94A7B0]'
                   } active:shadow-none active:translate-y-[3px]`}
                 >
-                  {type === 'binary' ? 'Si / No' : 'Cuantitativo'}
+                  {label}
                 </button>
               ))}
             </div>
             <p className="text-[11px] font-bold text-[#5C7680] mt-1.5">
               {form.type === 'binary'
                 ? 'Un tap para marcar como hecho. Ej: "Fui al gym", "Comi sano".'
-                : 'Registras un numero y tiene un objetivo. Ej: "10,000 pasos", "2L de agua".'
+                : form.type === 'quant'
+                  ? 'Registras un numero y tiene un objetivo. Ej: "10,000 pasos", "2L de agua".'
+                  : 'Rota entre pasos al completar. Ej: "Upper, Lower, Descanso, Push, Pull, Legs, Descanso".'
               }
             </p>
           </div>
+
+          <AnimatePresence>
+            {form.type === 'cycle' && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                className="overflow-hidden"
+              >
+                <FormInput
+                  label="Pasos del ciclo (separados por coma)"
+                  value={form.cycleSteps}
+                  onChange={v => setForm({ ...form, cycleSteps: v })}
+                  placeholder="Upper, Lower, Descanso, Push, Pull, Legs, Descanso"
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           <AnimatePresence>
             {form.type === 'quant' && (

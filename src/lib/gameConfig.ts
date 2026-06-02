@@ -37,16 +37,13 @@ export const GAME_CONFIG = {
   goalMilestones: [25, 50, 75, 100],
 } as const
 
-// Categorías predefinidas para hábitos y metas
+// 5 pilares de leverage — categorías para hábitos y metas
 export const CATEGORIES = [
-  { id: 'salud', name: 'Salud', icon: '❤️', color: '#FF4B4B' },
-  { id: 'fitness', name: 'Fitness', icon: '🏋️', color: '#FF9600' },
-  { id: 'finanzas', name: 'Finanzas', icon: '💰', color: '#58CC02' },
-  { id: 'estudio', name: 'Estudio', icon: '📚', color: '#1CB0F6' },
-  { id: 'trabajo', name: 'Trabajo', icon: '💼', color: '#CE82FF' },
-  { id: 'bienestar', name: 'Bienestar', icon: '🧘', color: '#FFC800' },
-  { id: 'social', name: 'Social', icon: '👥', color: '#FF6B9D' },
-  { id: 'hogar', name: 'Hogar', icon: '🏠', color: '#4ECDC4' },
+  { id: 'capital', name: 'Capital', icon: '💰', color: '#58CC02' },
+  { id: 'code', name: 'Code', icon: '💻', color: '#1CB0F6' },
+  { id: 'content', name: 'Content', icon: '🎬', color: '#CE82FF' },
+  { id: 'collab', name: 'Collab', icon: '🤝', color: '#FF9600' },
+  { id: 'care', name: 'Care', icon: '❤️', color: '#FF4B4B' },
 ] as const
 
 export type CategoryId = typeof CATEGORIES[number]['id']
