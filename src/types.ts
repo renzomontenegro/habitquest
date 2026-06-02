@@ -12,7 +12,8 @@ export interface Habit {
   color: string
   createdAt: string
   category?: string
-  cycleSteps?: string[]  // pasos del ciclo, ej: ["Upper", "Lower", "Descanso", "Push", "Pull", "Legs", "Descanso"]
+  cycleSteps?: string[]       // pasos del ciclo, ej: ["Upper", "Lower", "Descanso", "Push", "Pull", "Legs", "Descanso"]
+  cycleStartIndex?: number   // desde qué paso empezar (default 0)
 }
 
 export interface HabitLog {

@@ -41,24 +41,26 @@ export function TodayScreen({ state, onToggle, onUpdateQuant, onAddHabit, onUpda
   // --- Form state ---
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [form, setForm] = useState({ name: '', icon: '💪', type: 'binary' as HabitType, target: '', unit: '', color: COLORS[0], xpReward: 10, category: '', cycleSteps: '' })
+  const [form, setForm] = useState({ name: '', icon: '💪', type: 'binary' as HabitType, target: '', unit: '', color: COLORS[0], xpReward: 10, category: '', cycleSteps: '', cycleStartIndex: 0 })
 
   const openNew = () => {
-    setForm({ name: '', icon: '💪', type: 'binary', target: '', unit: '', color: COLORS[0], xpReward: 10, category: '', cycleSteps: '' })
+    setForm({ name: '', icon: '💪', type: 'binary', target: '', unit: '', color: COLORS[0], xpReward: 10, category: '', cycleSteps: '', cycleStartIndex: 0 })
     setEditingId(null)
     setShowForm(true)
   }
   const openEdit = (h: Habit) => {
-    setForm({ name: h.name, icon: h.icon, type: h.type, target: h.target?.toString() ?? '', unit: h.unit ?? '', color: h.color, xpReward: h.xpReward, category: h.category ?? '', cycleSteps: h.cycleSteps?.join(', ') ?? '' })
+    setForm({ name: h.name, icon: h.icon, type: h.type, target: h.target?.toString() ?? '', unit: h.unit ?? '', color: h.color, xpReward: h.xpReward, category: h.category ?? '', cycleSteps: h.cycleSteps?.join(', ') ?? '', cycleStartIndex: h.cycleStartIndex ?? 0 })
     setEditingId(h.id)
     setShowForm(true)
   }
 
-  // Calcula el paso actual de un hábito cíclico basado en completions
+  // Calcula el paso actual: solo cuenta completions de días anteriores a hoy
+  // Así el paso no cambia al marcar hoy — recién avanza mañana
   const getCycleStep = (habit: Habit): string => {
     if (!habit.cycleSteps || habit.cycleSteps.length === 0) return ''
-    const completedCount = state.habitLogs.filter(l => l.habitId === habit.id && l.completed).length
-    return habit.cycleSteps[completedCount % habit.cycleSteps.length]
+    const completedBefore = state.habitLogs.filter(l => l.habitId === habit.id && l.completed && l.date < todayStr).length
+    const offset = habit.cycleStartIndex || 0
+    return habit.cycleSteps[(offset + completedBefore) % habit.cycleSteps.length]
   }
   const handleSave = () => {
     if (!form.name.trim()) return
@@ -70,6 +72,7 @@ export function TodayScreen({ state, onToggle, onUpdateQuant, onAddHabit, onUpda
       color: form.color, xpReward: form.xpReward,
       category: form.category || undefined,
       cycleSteps: form.type === 'cycle' && parsedSteps.length > 0 ? parsedSteps : undefined,
+      cycleStartIndex: form.type === 'cycle' ? form.cycleStartIndex : undefined,
     }
     if (editingId) onUpdateHabit(editingId, data)
     else onAddHabit(data)
@@ -293,14 +296,38 @@ export function TodayScreen({ state, onToggle, onUpdateQuant, onAddHabit, onUpda
                 initial={{ height: 0, opacity: 0 }}
                 animate={{ height: 'auto', opacity: 1 }}
                 exit={{ height: 0, opacity: 0 }}
-                className="overflow-hidden"
+                className="overflow-hidden space-y-3"
               >
                 <FormInput
                   label="Pasos del ciclo (separados por coma)"
                   value={form.cycleSteps}
-                  onChange={v => setForm({ ...form, cycleSteps: v })}
+                  onChange={v => setForm({ ...form, cycleSteps: v, cycleStartIndex: 0 })}
                   placeholder="Upper, Lower, Descanso, Push, Pull, Legs, Descanso"
                 />
+                {(() => {
+                  const steps = form.cycleSteps.split(',').map(s => s.trim()).filter(Boolean)
+                  if (steps.length < 2) return null
+                  return (
+                    <div>
+                      <label className="text-[11px] font-bold text-[#5C7680] uppercase tracking-wider mb-1.5 block">Empezar desde</label>
+                      <div className="flex flex-wrap gap-1.5">
+                        {steps.map((step, i) => (
+                          <button
+                            key={i}
+                            onClick={() => setForm({ ...form, cycleStartIndex: i })}
+                            className={`h-8 px-3 rounded-lg text-[12px] font-bold border-2 transition-all ${
+                              form.cycleStartIndex === i
+                                ? 'bg-duo-green/20 border-duo-green text-white'
+                                : 'bg-surface-700 border-surface-600 text-[#94A7B0]'
+                            }`}
+                          >
+                            {step}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })()}
               </motion.div>
             )}
           </AnimatePresence>
