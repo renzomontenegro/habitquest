@@ -5,13 +5,14 @@ import type { Habit, HabitLog } from '../types'
 interface HabitCardProps {
   habit: Habit
   log?: HabitLog
-  cycleStep?: string  // paso actual del ciclo
+  cycleStep?: string
   onToggle: (id: string) => void
   onUpdateQuant: (id: string, value: number) => void
+  onCycleAdjust?: (delta: number) => void
   onLongPress?: () => void
 }
 
-export function HabitCard({ habit, log, cycleStep, onToggle, onUpdateQuant, onLongPress }: HabitCardProps) {
+export function HabitCard({ habit, log, cycleStep, onToggle, onUpdateQuant, onCycleAdjust, onLongPress }: HabitCardProps) {
   const completed = log?.completed ?? false
   const [showXP, setShowXP] = useState(false)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -67,8 +68,16 @@ export function HabitCard({ habit, log, cycleStep, onToggle, onUpdateQuant, onLo
               {habit.name}
             </span>
             {habit.type === 'cycle' && cycleStep && (
-              <div className="text-[12px] font-bold text-[#5C7680]">
-                Hoy: {cycleStep}
+              <div className="flex items-center gap-1 text-[12px] font-bold text-[#5C7680]">
+                <button
+                  onClick={e => { e.stopPropagation(); onCycleAdjust?.(-1) }}
+                  className="w-5 h-5 flex items-center justify-center rounded text-[10px] active:bg-surface-600"
+                >◀</button>
+                <span>Hoy: {cycleStep}</span>
+                <button
+                  onClick={e => { e.stopPropagation(); onCycleAdjust?.(1) }}
+                  className="w-5 h-5 flex items-center justify-center rounded text-[10px] active:bg-surface-600"
+                >▶</button>
               </div>
             )}
           </div>

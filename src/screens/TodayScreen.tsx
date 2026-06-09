@@ -41,48 +41,26 @@ export function TodayScreen({ state, onToggle, onUpdateQuant, onAddHabit, onUpda
   // --- Form state ---
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [form, setForm] = useState({ name: '', icon: '💪', type: 'binary' as HabitType, target: '', unit: '', color: COLORS[0], xpReward: 10, category: '', cycleSteps: '', cycleStartIndex: 0, cycleRestSteps: [] as number[] })
+  const [form, setForm] = useState({ name: '', icon: '💪', type: 'binary' as HabitType, target: '', unit: '', color: COLORS[0], xpReward: 10, category: '', cycleSteps: '', cycleStartIndex: 0 })
 
   const openNew = () => {
-    setForm({ name: '', icon: '💪', type: 'binary', target: '', unit: '', color: COLORS[0], xpReward: 10, category: '', cycleSteps: '', cycleStartIndex: 0, cycleRestSteps: [] })
+    setForm({ name: '', icon: '💪', type: 'binary', target: '', unit: '', color: COLORS[0], xpReward: 10, category: '', cycleSteps: '', cycleStartIndex: 0 })
     setEditingId(null)
     setShowForm(true)
   }
   const openEdit = (h: Habit) => {
-    setForm({ name: h.name, icon: h.icon, type: h.type, target: h.target?.toString() ?? '', unit: h.unit ?? '', color: h.color, xpReward: h.xpReward, category: h.category ?? '', cycleSteps: h.cycleSteps?.join(', ') ?? '', cycleStartIndex: h.cycleStartIndex ?? 0, cycleRestSteps: h.cycleRestSteps ?? [] })
+    setForm({ name: h.name, icon: h.icon, type: h.type, target: h.target?.toString() ?? '', unit: h.unit ?? '', color: h.color, xpReward: h.xpReward, category: h.category ?? '', cycleSteps: h.cycleSteps?.join(', ') ?? '', cycleStartIndex: h.cycleStartIndex ?? 0 })
     setEditingId(h.id)
     setShowForm(true)
   }
 
-  // Calcula el paso actual del ciclo
-  // - Solo cuenta completions de días anteriores (el paso no cambia al marcar hoy)
-  // - Si hay gap (no completaste ayer), salta pasos de descanso
+  // Paso actual del ciclo: offset + completions anteriores a hoy
+  // Flechas en la card ajustan cycleStartIndex para reposicionar
   const getCycleStep = (habit: Habit): string => {
     if (!habit.cycleSteps || habit.cycleSteps.length === 0) return ''
     const completedBefore = state.habitLogs.filter(l => l.habitId === habit.id && l.completed && l.date < todayStr).length
     const offset = habit.cycleStartIndex || 0
-    let idx = (offset + completedBefore) % habit.cycleSteps.length
-
-    // Detectar gap: ¿el último log completado fue ayer?
-    const restSteps = habit.cycleRestSteps || []
-    if (restSteps.length > 0) {
-      const lastLog = state.habitLogs
-        .filter(l => l.habitId === habit.id && l.completed && l.date < todayStr)
-        .sort((a, b) => b.date.localeCompare(a.date))[0]
-      const yesterday = new Date()
-      yesterday.setDate(yesterday.getDate() - 1)
-      const yesterdayStr = yesterday.toISOString().slice(0, 10)
-      const hasGap = !lastLog || lastLog.date < yesterdayStr
-
-      // Si hay gap y el paso actual es descanso, avanzar al siguiente paso real
-      if (hasGap) {
-        let safety = habit.cycleSteps.length
-        while (restSteps.includes(idx) && safety-- > 0) {
-          idx = (idx + 1) % habit.cycleSteps.length
-        }
-      }
-    }
-
+    const idx = (offset + completedBefore) % habit.cycleSteps.length
     return habit.cycleSteps[idx]
   }
   const handleSave = () => {
@@ -96,7 +74,6 @@ export function TodayScreen({ state, onToggle, onUpdateQuant, onAddHabit, onUpda
       category: form.category || undefined,
       cycleSteps: form.type === 'cycle' && parsedSteps.length > 0 ? parsedSteps : undefined,
       cycleStartIndex: form.type === 'cycle' ? form.cycleStartIndex : undefined,
-      cycleRestSteps: form.type === 'cycle' && form.cycleRestSteps.length > 0 ? form.cycleRestSteps : undefined,
     }
     if (editingId) onUpdateHabit(editingId, data)
     else onAddHabit(data)
@@ -114,7 +91,7 @@ export function TodayScreen({ state, onToggle, onUpdateQuant, onAddHabit, onUpda
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h1 className="text-xl font-black text-white leading-tight">HabitQuest <span className="text-[11px] font-bold text-[#5C7680]">v2.0</span></h1>
+          <h1 className="text-xl font-black text-white leading-tight">HabitQuest <span className="text-[11px] font-bold text-[#5C7680]">v2.1</span></h1>
           <p className="text-[#5C7680] text-[13px] font-bold capitalize">
             {new Date().toLocaleDateString('es', { weekday: 'long', day: 'numeric', month: 'long' })}
           </p>
@@ -222,6 +199,11 @@ export function TodayScreen({ state, onToggle, onUpdateQuant, onAddHabit, onUpda
                         cycleStep={habit.type === 'cycle' ? getCycleStep(habit) : undefined}
                         onToggle={onToggle}
                         onUpdateQuant={onUpdateQuant}
+                        onCycleAdjust={habit.type === 'cycle' ? (delta) => {
+                          const len = habit.cycleSteps?.length || 1
+                          const current = habit.cycleStartIndex || 0
+                          onUpdateHabit(habit.id, { cycleStartIndex: ((current + delta) % len + len) % len })
+                        } : undefined}
                         onLongPress={() => openEdit(habit)}
                       />
                     )
@@ -325,7 +307,7 @@ export function TodayScreen({ state, onToggle, onUpdateQuant, onAddHabit, onUpda
                 <FormInput
                   label="Pasos del ciclo (separados por coma)"
                   value={form.cycleSteps}
-                  onChange={v => setForm({ ...form, cycleSteps: v, cycleStartIndex: 0, cycleRestSteps: [] })}
+                  onChange={v => setForm({ ...form, cycleSteps: v, cycleStartIndex: 0 })}
                   placeholder="Upper, Lower, Descanso, Push, Pull, Legs, Descanso"
                 />
                 {(() => {
@@ -349,33 +331,6 @@ export function TodayScreen({ state, onToggle, onUpdateQuant, onAddHabit, onUpda
                               {step}
                             </button>
                           ))}
-                        </div>
-                      </div>
-                      <div>
-                        <label className="text-[11px] font-bold text-[#5C7680] uppercase tracking-wider mb-1.5 block">Dias de descanso</label>
-                        <p className="text-[10px] font-bold text-[#3C5564] mb-1.5">Si rompes la racha, estos pasos se saltan al retomar.</p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {steps.map((step, i) => {
-                            const isRest = form.cycleRestSteps.includes(i)
-                            return (
-                              <button
-                                key={i}
-                                onClick={() => setForm({
-                                  ...form,
-                                  cycleRestSteps: isRest
-                                    ? form.cycleRestSteps.filter(x => x !== i)
-                                    : [...form.cycleRestSteps, i],
-                                })}
-                                className={`h-8 px-3 rounded-lg text-[12px] font-bold border-2 transition-all ${
-                                  isRest
-                                    ? 'bg-duo-orange/20 border-duo-orange text-duo-orange'
-                                    : 'bg-surface-700 border-surface-600 text-[#94A7B0]'
-                                }`}
-                              >
-                                {isRest ? '😴 ' : ''}{step}
-                              </button>
-                            )
-                          })}
                         </div>
                       </div>
                     </>
