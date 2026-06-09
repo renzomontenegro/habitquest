@@ -41,26 +41,49 @@ export function TodayScreen({ state, onToggle, onUpdateQuant, onAddHabit, onUpda
   // --- Form state ---
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [form, setForm] = useState({ name: '', icon: '💪', type: 'binary' as HabitType, target: '', unit: '', color: COLORS[0], xpReward: 10, category: '', cycleSteps: '', cycleStartIndex: 0 })
+  const [form, setForm] = useState({ name: '', icon: '💪', type: 'binary' as HabitType, target: '', unit: '', color: COLORS[0], xpReward: 10, category: '', cycleSteps: '', cycleStartIndex: 0, cycleRestSteps: [] as number[] })
 
   const openNew = () => {
-    setForm({ name: '', icon: '💪', type: 'binary', target: '', unit: '', color: COLORS[0], xpReward: 10, category: '', cycleSteps: '', cycleStartIndex: 0 })
+    setForm({ name: '', icon: '💪', type: 'binary', target: '', unit: '', color: COLORS[0], xpReward: 10, category: '', cycleSteps: '', cycleStartIndex: 0, cycleRestSteps: [] })
     setEditingId(null)
     setShowForm(true)
   }
   const openEdit = (h: Habit) => {
-    setForm({ name: h.name, icon: h.icon, type: h.type, target: h.target?.toString() ?? '', unit: h.unit ?? '', color: h.color, xpReward: h.xpReward, category: h.category ?? '', cycleSteps: h.cycleSteps?.join(', ') ?? '', cycleStartIndex: h.cycleStartIndex ?? 0 })
+    setForm({ name: h.name, icon: h.icon, type: h.type, target: h.target?.toString() ?? '', unit: h.unit ?? '', color: h.color, xpReward: h.xpReward, category: h.category ?? '', cycleSteps: h.cycleSteps?.join(', ') ?? '', cycleStartIndex: h.cycleStartIndex ?? 0, cycleRestSteps: h.cycleRestSteps ?? [] })
     setEditingId(h.id)
     setShowForm(true)
   }
 
-  // Calcula el paso actual: solo cuenta completions de días anteriores a hoy
-  // Así el paso no cambia al marcar hoy — recién avanza mañana
+  // Calcula el paso actual del ciclo
+  // - Solo cuenta completions de días anteriores (el paso no cambia al marcar hoy)
+  // - Si hay gap (no completaste ayer), salta pasos de descanso
   const getCycleStep = (habit: Habit): string => {
     if (!habit.cycleSteps || habit.cycleSteps.length === 0) return ''
     const completedBefore = state.habitLogs.filter(l => l.habitId === habit.id && l.completed && l.date < todayStr).length
     const offset = habit.cycleStartIndex || 0
-    return habit.cycleSteps[(offset + completedBefore) % habit.cycleSteps.length]
+    let idx = (offset + completedBefore) % habit.cycleSteps.length
+
+    // Detectar gap: ¿el último log completado fue ayer?
+    const restSteps = habit.cycleRestSteps || []
+    if (restSteps.length > 0) {
+      const lastLog = state.habitLogs
+        .filter(l => l.habitId === habit.id && l.completed && l.date < todayStr)
+        .sort((a, b) => b.date.localeCompare(a.date))[0]
+      const yesterday = new Date()
+      yesterday.setDate(yesterday.getDate() - 1)
+      const yesterdayStr = yesterday.toISOString().slice(0, 10)
+      const hasGap = !lastLog || lastLog.date < yesterdayStr
+
+      // Si hay gap y el paso actual es descanso, avanzar al siguiente paso real
+      if (hasGap) {
+        let safety = habit.cycleSteps.length
+        while (restSteps.includes(idx) && safety-- > 0) {
+          idx = (idx + 1) % habit.cycleSteps.length
+        }
+      }
+    }
+
+    return habit.cycleSteps[idx]
   }
   const handleSave = () => {
     if (!form.name.trim()) return
@@ -73,6 +96,7 @@ export function TodayScreen({ state, onToggle, onUpdateQuant, onAddHabit, onUpda
       category: form.category || undefined,
       cycleSteps: form.type === 'cycle' && parsedSteps.length > 0 ? parsedSteps : undefined,
       cycleStartIndex: form.type === 'cycle' ? form.cycleStartIndex : undefined,
+      cycleRestSteps: form.type === 'cycle' && form.cycleRestSteps.length > 0 ? form.cycleRestSteps : undefined,
     }
     if (editingId) onUpdateHabit(editingId, data)
     else onAddHabit(data)
@@ -301,31 +325,60 @@ export function TodayScreen({ state, onToggle, onUpdateQuant, onAddHabit, onUpda
                 <FormInput
                   label="Pasos del ciclo (separados por coma)"
                   value={form.cycleSteps}
-                  onChange={v => setForm({ ...form, cycleSteps: v, cycleStartIndex: 0 })}
+                  onChange={v => setForm({ ...form, cycleSteps: v, cycleStartIndex: 0, cycleRestSteps: [] })}
                   placeholder="Upper, Lower, Descanso, Push, Pull, Legs, Descanso"
                 />
                 {(() => {
                   const steps = form.cycleSteps.split(',').map(s => s.trim()).filter(Boolean)
                   if (steps.length < 2) return null
                   return (
-                    <div>
-                      <label className="text-[11px] font-bold text-[#5C7680] uppercase tracking-wider mb-1.5 block">Empezar desde</label>
-                      <div className="flex flex-wrap gap-1.5">
-                        {steps.map((step, i) => (
-                          <button
-                            key={i}
-                            onClick={() => setForm({ ...form, cycleStartIndex: i })}
-                            className={`h-8 px-3 rounded-lg text-[12px] font-bold border-2 transition-all ${
-                              form.cycleStartIndex === i
-                                ? 'bg-duo-green/20 border-duo-green text-white'
-                                : 'bg-surface-700 border-surface-600 text-[#94A7B0]'
-                            }`}
-                          >
-                            {step}
-                          </button>
-                        ))}
+                    <>
+                      <div>
+                        <label className="text-[11px] font-bold text-[#5C7680] uppercase tracking-wider mb-1.5 block">Empezar desde</label>
+                        <div className="flex flex-wrap gap-1.5">
+                          {steps.map((step, i) => (
+                            <button
+                              key={i}
+                              onClick={() => setForm({ ...form, cycleStartIndex: i })}
+                              className={`h-8 px-3 rounded-lg text-[12px] font-bold border-2 transition-all ${
+                                form.cycleStartIndex === i
+                                  ? 'bg-duo-green/20 border-duo-green text-white'
+                                  : 'bg-surface-700 border-surface-600 text-[#94A7B0]'
+                              }`}
+                            >
+                              {step}
+                            </button>
+                          ))}
+                        </div>
                       </div>
-                    </div>
+                      <div>
+                        <label className="text-[11px] font-bold text-[#5C7680] uppercase tracking-wider mb-1.5 block">Dias de descanso</label>
+                        <p className="text-[10px] font-bold text-[#3C5564] mb-1.5">Si rompes la racha, estos pasos se saltan al retomar.</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {steps.map((step, i) => {
+                            const isRest = form.cycleRestSteps.includes(i)
+                            return (
+                              <button
+                                key={i}
+                                onClick={() => setForm({
+                                  ...form,
+                                  cycleRestSteps: isRest
+                                    ? form.cycleRestSteps.filter(x => x !== i)
+                                    : [...form.cycleRestSteps, i],
+                                })}
+                                className={`h-8 px-3 rounded-lg text-[12px] font-bold border-2 transition-all ${
+                                  isRest
+                                    ? 'bg-duo-orange/20 border-duo-orange text-duo-orange'
+                                    : 'bg-surface-700 border-surface-600 text-[#94A7B0]'
+                                }`}
+                              >
+                                {isRest ? '😴 ' : ''}{step}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    </>
                   )
                 })()}
               </motion.div>

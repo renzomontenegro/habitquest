@@ -14,6 +14,7 @@ export interface Habit {
   category?: string
   cycleSteps?: string[]       // pasos del ciclo, ej: ["Upper", "Lower", "Descanso", "Push", "Pull", "Legs", "Descanso"]
   cycleStartIndex?: number   // desde qué paso empezar (default 0)
+  cycleRestSteps?: number[]  // índices de pasos de descanso (se saltan al retomar tras un gap)
 }
 
 export interface HabitLog {
