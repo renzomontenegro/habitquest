@@ -73,10 +73,18 @@ export function SettingsSheet({ open, onClose, app }: {
         return
       }
       setNotifMsg('Suscribiendo...')
-      const sub = (await getSubscription()) ?? (await subscribeToPush())
+      const existing = await getSubscription()
+      let sub = existing
       if (!sub) {
-        setNotifMsg('No se pudo suscribir. Toca Activar de nuevo; si sigue fallando, cierra y reabre la app.')
-        return
+        const res = await subscribeToPush()
+        sub = res.sub
+        if (!sub) {
+          const standalone = window.matchMedia('(display-mode: standalone)').matches
+          setNotifMsg(standalone
+            ? `No se pudo suscribir: ${res.error ?? 'sin detalle'}. Cierra la app desde el app switcher y vuelve a Activar.`
+            : 'En iPhone el push solo funciona en la app INSTALADA: Compartir → Añadir a pantalla de inicio, y activar desde ahi.')
+          return
+        }
       }
       // Suscribirse no basta: si el servidor no guarda la suscripcion, nadie
       // puede enviar nada. Por eso el estado depende del registro, no del permiso.

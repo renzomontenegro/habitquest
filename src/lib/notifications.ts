@@ -55,17 +55,20 @@ export async function getSubscription(): Promise<PushSubscription | null> {
   return reg.pushManager.getSubscription()
 }
 
-export async function subscribeToPush(): Promise<PushSubscription | null> {
-  if (!isPushSupported() || !VAPID_PUBLIC_KEY) return null
+export async function subscribeToPush(): Promise<{ sub: PushSubscription | null; error: string | null }> {
+  if (!isPushSupported() || !VAPID_PUBLIC_KEY) {
+    return { sub: null, error: 'Push no soportado o falta el VAPID key' }
+  }
   try {
     // Espera al SW ACTIVO, no al que quede "waiting": subscribe se cuelga si no.
     const reg = await withTimeout(navigator.serviceWorker.ready, 8000, 'el service worker')
-    if (!reg) return null
-    return await withTimeout(reg.pushManager.subscribe({
+    if (!reg) return { sub: null, error: 'Sin service worker activo' }
+    const sub = await withTimeout(reg.pushManager.subscribe({
       userVisibleOnly: true,
       applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
     }), 12000, 'la suscripcion push')
-  } catch {
-    return null
+    return { sub, error: null }
+  } catch (e) {
+    return { sub: null, error: e instanceof Error ? e.message : String(e) }
   }
 }
