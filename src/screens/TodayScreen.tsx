@@ -86,45 +86,47 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
         </button>
       )}
 
-      {/* --- Una tarjeta por comida --- */}
-      {SLOTS.map(s => {
-        const logged = mealsInSlot(record, s.id)
-        return (
-          <div key={s.id} className="mx-slot">
-            <div className="mx-slot-h">
-              <div className="mx-eyebrow">{s.label}</div>
-              {logged.length > 0 && (
-                <button className="mx-mini" onClick={() => setPicking(s.id)}>+ Agregar</button>
+      {/* --- Una tarjeta por comida, dos por fila --- */}
+      <div className="mx-slots">
+        {SLOTS.map(s => {
+          const logged = mealsInSlot(record, s.id)
+          return (
+            <div key={s.id} className="mx-slot">
+              <div className="mx-slot-h">
+                <div className="mx-eyebrow">{s.label}</div>
+                {logged.length > 0 && (
+                  <button className="mx-mini" onClick={() => setPicking(s.id)}>+ Agregar</button>
+                )}
+              </div>
+
+              {logged.length === 0 ? (
+                <button className="mx-pick" onClick={() => setPicking(s.id)}>
+                  <span>+</span> Elegir {s.label.toLowerCase()}
+                </button>
+              ) : (
+                logged.map(m => {
+                  const mm = roundMacros(mealMacros(m, options))
+                  return (
+                    <div key={m.id} className="mx-logged">
+                      <button className="mx-logged-b" onClick={() => setEditing(m)}>
+                        <div className="mx-logged-n">
+                          {mealName(m, options)}
+                          {m.portion !== 1 && <i className="mx-logged-p">× {portionLabel(m.portion)}</i>}
+                          {m.custom && <i className="mx-logged-off">fuera del plan</i>}
+                        </div>
+                        <div className="mx-logged-m mx-mono">
+                          <span>{mm.prot}P</span><span>{mm.carb}C</span><span>{mm.grasa}G</span>
+                        </div>
+                      </button>
+                      <button className="mx-entry-x" onClick={() => app.removeMeal(m.id, viewDate)} aria-label="Quitar">✕</button>
+                    </div>
+                  )
+                })
               )}
             </div>
-
-            {logged.length === 0 ? (
-              <button className="mx-pick" onClick={() => setPicking(s.id)}>
-                <span>+</span> Elegir {s.label.toLowerCase()}
-              </button>
-            ) : (
-              logged.map(m => {
-                const mm = roundMacros(mealMacros(m, options))
-                return (
-                  <div key={m.id} className="mx-logged">
-                    <button className="mx-logged-b" onClick={() => setEditing(m)}>
-                      <div className="mx-logged-n">
-                        {mealName(m, options)}
-                        {m.portion !== 1 && <i className="mx-logged-p">× {portionLabel(m.portion)}</i>}
-                        {m.custom && <i className="mx-logged-off">fuera del plan</i>}
-                      </div>
-                      <div className="mx-logged-m mx-mono">
-                        <span>{mm.prot}P</span><span>{mm.carb}C</span><span>{mm.grasa}G</span>
-                      </div>
-                    </button>
-                    <button className="mx-entry-x" onClick={() => app.removeMeal(m.id, viewDate)} aria-label="Quitar">✕</button>
-                  </div>
-                )
-              })
-            )}
-          </div>
-        )
-      })}
+          )
+        })}
+      </div>
 
       <div className="mx-daytotal mx-mono">
         {(() => {

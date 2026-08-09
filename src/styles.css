@@ -256,10 +256,12 @@ button:active { transform: scale(.985); }
 .mx-empty-cta p { font-size: 12.5px; line-height: 1.5; color: var(--mute); margin: 6px 0 12px; }
 .mx-empty-cta .mx-btn { width: 100%; padding: 13px; font-size: 13.5px; }
 
-/* ===== HOY: una tarjeta por comida ===== */
+/* ===== HOY: una tarjeta por comida, dos por fila ===== */
+
+.mx-slots { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 8px; }
 
 .mx-slot { background: var(--card); border: 1px solid var(--line); border-radius: 3px;
-  padding: 13px 14px; margin-bottom: 8px; }
+  padding: 12px 13px; }
 .mx-slot-h { display: flex; justify-content: space-between; align-items: center;
   gap: 10px; min-height: 26px; }
 
