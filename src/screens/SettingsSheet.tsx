@@ -3,7 +3,7 @@ import { BottomSheet, ConfirmButton } from '../components/ui'
 import { APP_VERSION } from '../lib/config'
 import { usePWAUpdate } from '../hooks/usePWAUpdate'
 import { getSubscription, ensurePushPermission, isPushSupported, isVapidConfigured, subscribeToPush } from '../lib/notifications'
-import { registerPushSubscription } from '../lib/sync'
+import { registerPushSubscription, sendTestPush } from '../lib/sync'
 import type { AppController } from '../hooks/useAppState'
 
 function agoLabel(ts: number | null): string {
@@ -24,6 +24,7 @@ export function SettingsSheet({ open, onClose, app }: {
   const [notifMsg, setNotifMsg] = useState<string | null>(null)
   const [updMsg, setUpdMsg] = useState<string | null>(null)
   const [activating, setActivating] = useState(false)
+  const [testing, setTesting] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const pushReady = isPushSupported() && isVapidConfigured()
@@ -57,6 +58,22 @@ export function SettingsSheet({ open, onClose, app }: {
     setMsg(ok
       ? { text: 'Respaldo restaurado. Se subira a la nube en unos segundos.', ok: true }
       : { text: 'Ese archivo no es un respaldo valido.', ok: false })
+  }
+
+  const doTestPush = async () => {
+    setTesting(true)
+    setNotifMsg('Enviando push de prueba...')
+    try {
+      const { ok, error } = await sendTestPush(
+        'Prueba de Traza',
+        'Si ves esto, el push funciona de punta a punta.',
+      )
+      setNotifMsg(ok
+        ? 'Enviado. Deberia llegarte el aviso en unos segundos.'
+        : `No se envio: ${error}`)
+    } finally {
+      setTesting(false)
+    }
   }
 
   const doActivate = async () => {
@@ -170,6 +187,9 @@ export function SettingsSheet({ open, onClose, app }: {
           <div className="mx-acts">
             <button className="mx-btn" data-p="1" onClick={() => void doActivate()} disabled={activating}>
               {activating ? 'Activando...' : 'Activar'}
+            </button>
+            <button className="mx-btn" onClick={() => void doTestPush()} disabled={testing || activating}>
+              {testing ? 'Enviando...' : 'Push de prueba'}
             </button>
           </div>
           {notifMsg && <div className="mx-import-msg" style={{ marginTop: 8 }}>{notifMsg}</div>}

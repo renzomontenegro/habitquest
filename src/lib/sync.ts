@@ -227,6 +227,31 @@ export async function registerPushSubscription(sub: PushSubscription): Promise<{
   }
 }
 
+/**
+ * Envia un push de prueba usando el webhook sistema-push-send del backend
+ * (workflow "Sistema Push"). El payload va anidado en `body` porque asi lo lee
+ * el Code node: title y body custom, o el recordatorio por defecto si no van.
+ */
+export async function sendTestPush(title: string, body: string): Promise<{ ok: boolean; error: string | null }> {
+  const pushBase = getUrl('habitquest-push')
+  if (!pushBase) return { ok: false, error: 'No hay servidor de sincronizacion configurado.' }
+  const url = pushBase.replace(/habitquest-push$/, 'sistema-push-send')
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: buildHeaders(),
+      body: JSON.stringify({ body: { title, body } }),
+    })
+    if (!res.ok) {
+      const text = await res.text().catch(() => '')
+      return { ok: false, error: `El servidor respondio ${res.status}. ${text.slice(0, 120)}` }
+    }
+    return { ok: true, error: null }
+  } catch (e) {
+    return { ok: false, error: friendlyError(e) }
+  }
+}
+
 /** Guardado inmediato y esperable (reset, import) */
 export async function saveNow(state: AppState): Promise<boolean> {
   const { ok, error } = await post(state)
