@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { BottomSheet, ConfirmButton } from '../components/ui'
 import { APP_VERSION } from '../lib/config'
 import { usePWAUpdate } from '../hooks/usePWAUpdate'
-import { getSubscription, isPushSupported, isVapidConfigured, subscribeToPush } from '../lib/notifications'
+import { getSubscription, ensurePushPermission, isPushSupported, isVapidConfigured, subscribeToPush } from '../lib/notifications'
 import { registerPushSubscription } from '../lib/sync'
 import type { AppController } from '../hooks/useAppState'
 
@@ -67,9 +67,15 @@ export function SettingsSheet({ open, onClose, app }: {
     setActivating(true)
     setNotifMsg('Pidiendo permiso...')
     try {
+      const granted = await ensurePushPermission()
+      if (!granted) {
+        setNotifMsg('Sin permiso no se puede. Si lo bloqueaste, activa las notificaciones de Traza en Ajustes del sistema.')
+        return
+      }
+      setNotifMsg('Suscribiendo...')
       const sub = (await getSubscription()) ?? (await subscribeToPush())
       if (!sub) {
-        setNotifMsg('No se pudo suscribir. Revisa el permiso de notificaciones.')
+        setNotifMsg('No se pudo suscribir. Toca Activar de nuevo; si sigue fallando, cierra y reabre la app.')
         return
       }
       // Suscribirse no basta: si el servidor no guarda la suscripcion, nadie
