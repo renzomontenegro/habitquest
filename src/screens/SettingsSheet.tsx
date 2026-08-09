@@ -36,6 +36,11 @@ export function SettingsSheet({ open, onClose, app }: {
     setUpdMsg('Revisado. Si hay una version nueva, aparece el aviso "Actualizar" arriba.')
   }
 
+  const forceUpdate = () => {
+    setUpdMsg('Borrando cache y recargando a la ultima version...')
+    pwa.force()
+  }
+
   const doExport = () => {
     const blob = new Blob([app.exportState()], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
@@ -101,6 +106,19 @@ export function SettingsSheet({ open, onClose, app }: {
             )}
           </div>
           {updMsg && <div className="mx-import-msg" style={{ marginTop: 8 }}>{updMsg}</div>}
+
+          <div className="mx-row" style={{ marginTop: 8 }}>
+            <div style={{ flex: 1 }}>
+              <div className="mx-lbl">¿Quedaste en una version vieja?</div>
+              <div className="mx-sub" style={{ lineHeight: 1.5 }}>
+                Borra la cache del service worker y recarga a la ultima version. No toca tus datos
+                (estan en la nube). Sirve aun si nunca aparece el aviso de actualizacion.
+              </div>
+            </div>
+          </div>
+          <div className="mx-acts">
+            <button className="mx-btn" data-tone="warn" onClick={forceUpdate}>Forzar actualizacion</button>
+          </div>
         </div>
 
         <div>

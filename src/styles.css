@@ -184,6 +184,8 @@ button:active { transform: scale(.985); }
   padding: 11px 6px; border-radius: 2px; cursor: pointer; font-size: 12px; font-weight: 500; }
 .mx-btn[data-p="1"] { background: var(--signal); border-color: var(--signal); color: #fff; font-weight: 600; }
 .mx-btn-danger { color: var(--bad); border-color: rgba(155, 50, 38, .35); }
+.mx-btn[data-tone="warn"] { color: #7A4E0E; border-color: rgba(181, 118, 26, .4); }
+.mx-btn[data-tone="warn"]:active { background: rgba(181, 118, 26, .14); color: #7A4E0E; border-color: rgba(181, 118, 26, .4); }
 .mx-mini { border: 1px solid var(--line); background: var(--paper); color: var(--mute);
   padding: 7px 12px; border-radius: 2px; cursor: pointer; font-size: 11px; font-family: 'Inter', sans-serif; }
 .mx-mini:hover { color: var(--ink); border-color: var(--mute); }

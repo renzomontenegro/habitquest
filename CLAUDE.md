@@ -205,8 +205,10 @@ frontend, hay que actualizar AMBAS claves en ese Code node.
   se soltaba (faltaba el handler de `SKIP_WAITING`), por eso la app quedaba en la version
   cacheada. Ahora `usePWAUpdate()` registra el SW con modo prompt: cuando hay una version nueva
   aparece el banner "Actualizar" y al tocarlo aplica y recarga. Tambien hay "Buscar
-  actualizaciones" en Ajustes. Si aun asi aparece pantalla blanca tras un deploy, limpiar
-  datos del sitio en Safari.
+  actualizaciones" en Ajustes, y "Forzar actualizacion" (`pwa.force()`) que borra las caches del
+  SW, activa la version nueva y recarga: sirve desde cualquier version, incluso una vieja sin el
+  banner. La app ademas revisa por versiones nuevas en cada apertura. Si aun asi aparece pantalla
+  blanca tras un deploy, limpiar datos del sitio en Safari.
 - **DataTable acumula filas**: cada save inserta una fila nueva (la API no soporta PATCH/DELETE).
   El load toma la mas reciente (`sortBy=updatedAt:desc&limit=1`). Limpiar periodicamente via MCP
   (`n8n_manage_datatable` action `deleteRows`).
