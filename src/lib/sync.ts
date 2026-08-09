@@ -229,8 +229,8 @@ export async function registerPushSubscription(sub: PushSubscription): Promise<{
 
 /**
  * Envia un push de prueba usando el webhook sistema-push-send del backend
- * (workflow "Sistema Push"). El payload va anidado en `body` porque asi lo lee
- * el Code node: title y body custom, o el recordatorio por defecto si no van.
+ * (workflow "Sistema Push"). n8n ya entrega el body parseado en `$json.body`,
+ * asi que el payload va plano: { title, body }.
  */
 export async function sendTestPush(title: string, body: string): Promise<{ ok: boolean; error: string | null }> {
   const pushBase = getUrl('habitquest-push')
@@ -240,7 +240,7 @@ export async function sendTestPush(title: string, body: string): Promise<{ ok: b
     const res = await fetch(url, {
       method: 'POST',
       headers: buildHeaders(),
-      body: JSON.stringify({ body: { title, body } }),
+      body: JSON.stringify({ title, body }),
     })
     if (!res.ok) {
       const text = await res.text().catch(() => '')
