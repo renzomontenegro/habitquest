@@ -117,7 +117,7 @@ export default function App() {
                     <button className="mx-mini mx-go-today" onClick={goToday}>Hoy</button>
                   )}
                 </div>
-                <h1>Sistema</h1>
+                <h1>Traza</h1>
                 <SaveDot
                   status={app.saveStatus}
                   offline={app.offline}

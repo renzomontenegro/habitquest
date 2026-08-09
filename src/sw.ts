@@ -9,7 +9,7 @@ cleanupOutdatedCaches()
 precacheAndRoute(self.__WB_MANIFEST)
 
 self.addEventListener('push', (event) => {
-  let title = 'Sistema'
+  let title = 'Traza'
   let body = ''
   try {
     const data = event.data ? JSON.parse(event.data.text()) : {}

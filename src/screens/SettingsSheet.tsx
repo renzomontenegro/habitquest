@@ -157,7 +157,7 @@ export function SettingsSheet({ open, onClose, app }: {
         </div>
 
         <div className="mx-mono" style={{ fontSize: 10, color: 'var(--mute)', textAlign: 'center', paddingTop: 4 }}>
-          Sistema v{APP_VERSION}
+          Traza v{APP_VERSION}
         </div>
       </div>
     </BottomSheet>

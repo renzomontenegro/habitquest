@@ -23,9 +23,9 @@ export default defineConfig({
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
       },
       manifest: {
-        name: 'Sistema - Control metabolico',
-        short_name: 'Sistema',
-        description: 'Sistema de control metabolico: peso, comidas, sueno y entrenamiento',
+        name: 'Traza - Control metabolico',
+        short_name: 'Traza',
+        description: 'Traza: registra comida por macros, peso, pasos, sueno y entrenamiento',
         theme_color: '#E9EBE4',
         background_color: '#E9EBE4',
         display: 'standalone',
