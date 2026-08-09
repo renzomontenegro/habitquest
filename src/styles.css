@@ -457,6 +457,16 @@ button:active { transform: scale(.985); }
   font-size: 11.5px; font-weight: 500; color: var(--bad); line-height: 1.45; }
 .mx-banner[data-tone="warn"] { background: rgba(181, 118, 26, .1);
   border-color: rgba(181, 118, 26, .4); color: #7A4E0E; }
+.mx-banner[data-tone="info"] { background: rgba(64, 106, 173, .08);
+  border-color: rgba(64, 106, 173, .35); color: #2C4A77; }
+
+.mx-banner-btn { flex: none; background: transparent; border: 1px solid currentColor;
+  border-radius: 3px; color: inherit; font-family: 'Archivo', sans-serif; font-size: 11px;
+  font-weight: 700; letter-spacing: .02em; padding: 3px 10px; }
+.mx-banner-btn:active { background: rgba(0, 0, 0, .06); }
+
+.mx-ver { font-family: 'IBM Plex Mono', monospace; font-size: 9px; font-weight: 500;
+  color: var(--mute); letter-spacing: .05em; margin-left: 4px; vertical-align: 2px; }
 
 .mx-save { display: inline-flex; align-items: center; gap: 5px; margin-top: 5px; padding: 0;
   border: 0; background: transparent; font-family: 'IBM Plex Mono', monospace; font-size: 9.5px;

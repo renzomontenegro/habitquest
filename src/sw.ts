@@ -8,6 +8,13 @@ declare const self: ServiceWorkerGlobalScope & {
 cleanupOutdatedCaches()
 precacheAndRoute(self.__WB_MANIFEST)
 
+self.addEventListener('message', (event) => {
+  const data = (event as ExtendableMessageEvent).data
+  if (data && typeof data === 'object' && (data as { type?: string }).type === 'SKIP_WAITING') {
+    self.skipWaiting()
+  }
+})
+
 self.addEventListener('push', (event) => {
   let title = 'Traza'
   let body = ''

@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { BottomSheet, ConfirmButton } from '../components/ui'
 import { APP_VERSION } from '../lib/config'
+import { usePWAUpdate } from '../hooks/usePWAUpdate'
 import { getSubscription, isPushSupported, isVapidConfigured, subscribeToPush } from '../lib/notifications'
 import { registerPushSubscription } from '../lib/sync'
 import type { AppController } from '../hooks/useAppState'
@@ -21,10 +22,19 @@ export function SettingsSheet({ open, onClose, app }: {
 }) {
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null)
   const [notifMsg, setNotifMsg] = useState<string | null>(null)
+  const [updMsg, setUpdMsg] = useState<string | null>(null)
   const [activating, setActivating] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const pushReady = isPushSupported() && isVapidConfigured()
+  const pwa = usePWAUpdate()
+
+  const checkUpdate = async () => {
+    setUpdMsg(null)
+    const ok = await pwa.check()
+    if (!ok) { setUpdMsg('No hay un service worker registrado para revisar.') ; return }
+    setUpdMsg('Revisado. Si hay una version nueva, aparece el aviso "Actualizar" arriba.')
+  }
 
   const doExport = () => {
     const blob = new Blob([app.exportState()], { type: 'application/json' })
@@ -85,10 +95,12 @@ export function SettingsSheet({ open, onClose, app }: {
             <button className="mx-btn" data-p="1" onClick={() => void app.refreshFromCloud()} disabled={app.refreshing}>
               {app.refreshing ? 'Sincronizando...' : 'Sincronizar ahora'}
             </button>
+            <button className="mx-btn" onClick={checkUpdate}>Buscar actualizaciones</button>
             {app.saveStatus === 'error' && (
               <button className="mx-btn" onClick={app.retrySave}>Reintentar guardado</button>
             )}
           </div>
+          {updMsg && <div className="mx-import-msg" style={{ marginTop: 8 }}>{updMsg}</div>}
         </div>
 
         <div>

@@ -5,7 +5,9 @@ import { PlanScreen } from './screens/PlanScreen'
 import { SettingsSheet } from './screens/SettingsSheet'
 import { SetupScreen } from './screens/SetupScreen'
 import { useAppState } from './hooks/useAppState'
+import { usePWAUpdate } from './hooks/usePWAUpdate'
 import { headerDate, isoWeek, parseDate, weightAvg, addDays } from './lib/logic'
+import { APP_VERSION } from './lib/config'
 import { SaveDot } from './components/ui'
 
 type Tab = 'hoy' | 'semana' | 'plan'
@@ -16,6 +18,7 @@ export default function App() {
   const [tab, setTab] = useState<Tab>('hoy')
   const [settingsOpen, setSettingsOpen] = useState(false)
   const app = useAppState()
+  const update = usePWAUpdate()
 
   // Dia visible en Hoy. Arranca en hoy; el calendario navega hacia atras.
   const [viewDate, setViewDate] = useState(app.today)
@@ -107,6 +110,17 @@ export default function App() {
           </div>
         )}
 
+        {/* Version nueva lista: el SW viejo no se soltaba y por eso la app se
+            quedaba en la version guardada en cache hasta borrar los datos del
+            sitio. Ahora se avisa y se aplica con un tap. */}
+        {update.needRefresh && (
+          <div className="mx-banner" data-tone="info">
+            <span>⬆</span>
+            <span style={{ flex: 1 }}>Hay una version nueva de Traza. Actualiza para verla.</span>
+            <button className="mx-banner-btn" onClick={update.apply}>Actualizar</button>
+          </div>
+        )}
+
         <div className="mx-root">
           <div className="mx-shell">
             <div className="mx-head">
@@ -117,7 +131,7 @@ export default function App() {
                     <button className="mx-mini mx-go-today" onClick={goToday}>Hoy</button>
                   )}
                 </div>
-                <h1>Traza</h1>
+                <h1>Traza <span className="mx-ver">v{APP_VERSION}</span></h1>
                 <SaveDot
                   status={app.saveStatus}
                   offline={app.offline}

@@ -201,8 +201,12 @@ frontend, hay que actualizar AMBAS claves en ese Code node.
 - **UI en espanol** (sin tildes en el codigo por consistencia).
 
 ## Problemas conocidos
-- **Service Worker en iOS**: se actualiza lento en Safari/PWA standalone (hasta 24 h). Si la app
-  muestra pantalla blanca despues de un deploy, limpiar datos del sitio en Safari.
+- **Service Worker en iOS**: se actualiza lento en Safari/PWA standalone (hasta 24 h) y antes no
+  se soltaba (faltaba el handler de `SKIP_WAITING`), por eso la app quedaba en la version
+  cacheada. Ahora `usePWAUpdate()` registra el SW con modo prompt: cuando hay una version nueva
+  aparece el banner "Actualizar" y al tocarlo aplica y recarga. Tambien hay "Buscar
+  actualizaciones" en Ajustes. Si aun asi aparece pantalla blanca tras un deploy, limpiar
+  datos del sitio en Safari.
 - **DataTable acumula filas**: cada save inserta una fila nueva (la API no soporta PATCH/DELETE).
   El load toma la mas reciente (`sortBy=updatedAt:desc&limit=1`). Limpiar periodicamente via MCP
   (`n8n_manage_datatable` action `deleteRows`).
