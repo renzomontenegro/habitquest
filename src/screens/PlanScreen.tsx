@@ -260,14 +260,14 @@ export function PlanScreen({ app }: { app: AppController }) {
           <div className="mx-empty-cta">
             <div className="mx-lbl">Todavia no tienes rutina</div>
             <p>
-              Puedes cargar la ULPPL de siempre (Upper / Lower / Push / Pull / Legs, 23
-              ejercicios) y editar lo que quieras, o armar la tuya desde cero.
+              Puedes cargar la rutina Upper/Lower (Upper A, Lower A, Upper B,
+              Lower B) y editar lo que quieras, o armar la tuya desde cero.
             </p>
             <button
               className="mx-btn" data-p="1"
               onClick={() => { app.loadRoutineTemplate(); setToast('Rutina cargada') }}
             >
-              Cargar rutina ULPPL
+              Cargar rutina Upper/Lower
             </button>
           </div>
         ) : (
@@ -302,7 +302,7 @@ export function PlanScreen({ app }: { app: AppController }) {
         {split.length > 0 && (
           <div className="mx-total">
             <div className="mx-sub" style={{ lineHeight: 1.5 }}>
-              Tambien puedes cargar la rutina ULPPL. Se agrega a lo que ya tengas: los dias que
+              Tambien puedes cargar la rutina Upper/Lower. Se agrega a lo que ya tengas: los dias que
               ya existan se saltan.
             </div>
             <button
@@ -310,7 +310,7 @@ export function PlanScreen({ app }: { app: AppController }) {
               style={{ marginTop: 10 }}
               onClick={() => { app.loadRoutineTemplate(); setToast('Rutina cargada') }}
             >
-              Cargar rutina ULPPL
+              Cargar rutina Upper/Lower
             </button>
           </div>
         )}

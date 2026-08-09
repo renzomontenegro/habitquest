@@ -82,9 +82,10 @@ Lo que queda en `config.ts` es de dos tipos, separados a proposito:
   preferencias; viven juntas para que no haya numeros magicos sueltos en la logica.
 
 No hay nombres de comidas en el codigo. La unica excepcion es `ROUTINE_TEMPLATE`: la rutina
-ULPPL del usuario, que **no se siembra** y solo se materializa cuando toca "Cargar rutina
-ULPPL" en Mi plan → Entrenamiento (`loadRoutineTemplate()`). Se agrega a lo que ya exista,
-saltando los dias cuyo nombre ya este, asi que tocarlo dos veces no duplica.
+Upper/Lower del usuario (4 dias: Upper A, Lower A, Upper B, Lower B), que **no se siembra** y
+solo se materializa cuando toca "Cargar rutina" en Mi plan → Entrenamiento
+(`loadRoutineTemplate()`). Se agrega a lo que ya exista, saltando los dias cuyo nombre ya este,
+asi que tocarlo dos veces no duplica.
 
 Los ejercicios de la plantilla usan **el nombre como id** a proposito: el historial de series
 del modelo viejo estaba indexado por nombre, asi que cargarla reconecta esos pesos. El efecto

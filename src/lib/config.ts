@@ -1,6 +1,6 @@
 import type { Macros, MealSlot } from '../types'
 
-export const APP_VERSION = '2.9'
+export const APP_VERSION = '3.0'
 
 // ---------------------------------------------------------------------------
 // Valores iniciales
@@ -68,9 +68,9 @@ export const RULES = {
 } as const
 
 /**
- * Plantilla de rutina ULPPL. **No se siembra nunca**: solo existe detras del
- * boton "Cargar rutina" de Mi plan, y a partir de ahi es data del usuario que
- * puede editar o borrar.
+ * Plantilla de rutina Upper/Lower (4 dias). **No se siembra nunca**: solo
+ * existe detras del boton "Cargar rutina" de Mi plan, y a partir de ahi es
+ * data del usuario que puede editar o borrar.
  *
  * Los ejercicios se guardan con el NOMBRE como id a proposito: el historial de
  * series del modelo viejo estaba indexado por nombre, asi que cargarla vuelve a
@@ -78,50 +78,40 @@ export const RULES = {
  */
 export const ROUTINE_TEMPLATE: { name: string; weekday: number; exercises: { name: string; sets: number; reps: string }[] }[] = [
   {
-    name: 'Upper', weekday: 1,
+    name: 'Upper A', weekday: 1,
     exercises: [
-      { name: 'Bench Press', sets: 4, reps: '5-6' },
-      { name: 'Cable Row', sets: 4, reps: '6-8' },
-      { name: 'OHP mancuernas', sets: 3, reps: '6-8' },
-      { name: 'Lat Pulldown', sets: 3, reps: '8-10' },
-      { name: 'Incline DB Curl', sets: 3, reps: '10-12' },
-    ],
-  },
-  {
-    name: 'Lower', weekday: 2,
-    exercises: [
-      { name: 'Leg Press', sets: 4, reps: '6-8' },
-      { name: 'Romanian Deadlift', sets: 4, reps: '6-8' },
-      { name: 'Leg Curl', sets: 3, reps: '8-10' },
-      { name: 'Bulgarian Split Squat', sets: 3, reps: '8-10' },
-      { name: 'Overhead Tricep Ext.', sets: 3, reps: '10-12' },
-    ],
-  },
-  {
-    name: 'Push', weekday: 4,
-    exercises: [
-      { name: 'Chest Press', sets: 4, reps: '10-12' },
-      { name: 'OHP mancuernas', sets: 3, reps: '10-12' },
+      { name: 'Bench Press', sets: 3, reps: '6-8' },
+      { name: 'Cable Row', sets: 3, reps: '8-10' },
+      { name: 'OHP mancuernas', sets: 3, reps: '8-10' },
+      { name: 'Lat Pulldown', sets: 3, reps: '10-12' },
       { name: 'Lateral Raise', sets: 3, reps: '12-15' },
+    ],
+  },
+  {
+    name: 'Lower A', weekday: 3,
+    exercises: [
+      { name: 'Leg Press', sets: 3, reps: '8-10' },
+      { name: 'Romanian Deadlift', sets: 3, reps: '8-10' },
+      { name: 'Leg Curl', sets: 3, reps: '10-12' },
+      { name: 'Hip Thrust', sets: 3, reps: '10-12' },
+    ],
+  },
+  {
+    name: 'Upper B', weekday: 5,
+    exercises: [
+      { name: 'Lat Pulldown', sets: 3, reps: '8-10' },
+      { name: 'Chest Press', sets: 3, reps: '8-10' },
+      { name: 'Cable Row', sets: 3, reps: '10-12' },
+      { name: 'Incline DB Curl', sets: 3, reps: '10-12' },
       { name: 'Tricep Pushdown', sets: 3, reps: '10-12' },
     ],
   },
   {
-    name: 'Pull', weekday: 5,
+    name: 'Lower B', weekday: 6,
     exercises: [
-      { name: 'Cable Row', sets: 4, reps: '8-10' },
-      { name: 'Lat Pulldown', sets: 3, reps: '10-12' },
-      { name: 'Face Pull', sets: 3, reps: '12-15' },
-      { name: 'Dumbbell Curl', sets: 3, reps: '10-12' },
-    ],
-  },
-  {
-    name: 'Legs', weekday: 6,
-    exercises: [
-      { name: 'Leg Press', sets: 4, reps: '10-12' },
-      { name: 'Leg Extension', sets: 3, reps: '10-12' },
-      { name: 'Leg Curl', sets: 3, reps: '10-12' },
-      { name: 'Hip Thrust', sets: 4, reps: '10-12' },
+      { name: 'Leg Press', sets: 3, reps: '10-12' },
+      { name: 'Bulgarian Split Squat', sets: 3, reps: '8-10' },
+      { name: 'Leg Extension', sets: 3, reps: '12-15' },
       { name: 'Cable Crunch', sets: 3, reps: '12-15' },
     ],
   },

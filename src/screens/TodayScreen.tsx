@@ -190,8 +190,8 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
 
         {split.length === 0 ? (
           <div className="mx-empty">
-            Todavia no tienes rutina. En <b>Mi plan → Entrenamiento</b> puedes cargar la ULPPL
-            o armar la tuya.
+            Todavia no tienes rutina. En <b>Mi plan → Entrenamiento</b> puedes cargar la
+            Upper/Lower o armar la tuya.
           </div>
         ) : !workout ? (
           <div className="mx-empty">Dia de descanso.</div>
