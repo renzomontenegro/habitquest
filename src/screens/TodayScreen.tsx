@@ -1,437 +1,322 @@
 import { useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { XPRing } from '../components/XPRing'
-import { LevelBar } from '../components/LevelBar'
-import { HabitCard } from '../components/HabitCard'
-import { BottomSheet, FormInput } from '../components/FormModal'
-import type { AppState, Habit, HabitType } from '../types'
-import { dailyXP, today, isPerfectDay } from '../lib/streaks'
-import { currentWeekXP, getWeeklyTier, bestWeekXP } from '../lib/streaks'
-import { LEAGUE_NAMES, LEAGUE_COLORS, CATEGORIES, getCategoryById } from '../lib/gameConfig'
-import { getNextAchievement, getRecentUnlocks } from '../lib/achievementProgress'
+import type { AppController } from '../hooks/useAppState'
+import type { MealLog, MealSlot } from '../types'
+import {
+  addDays, dayMacros, getRecord, headerDate, kcal, makeEmptySets, mealMacros, mealName,
+  mealsInSlot, parseDate, roundMacros, shortDate, sleepHours, slotReference, workoutForDate,
+} from '../lib/logic'
+import { MACRO_LABEL, PORTIONS, SLOTS, SLOT_LABEL } from '../lib/config'
+import { MealPicker } from '../components/MealPicker'
+import { BottomSheet, ConfirmButton, Field, MacroBar, Seg, Toast } from '../components/ui'
 
-const SUGGESTED_ICONS = ['💪', '🏃', '🥗', '💧', '📚', '🧘', '💤', '✍️', '🏋️', '🚴', '🧠', '❤️', '🌱', '🎵', '🧹', '💊', '🎨', '🐕']
-const COLORS = ['#58CC02', '#1CB0F6', '#FF9600', '#FF4B4B', '#CE82FF', '#FFC800']
-
-interface TodayScreenProps {
-  state: AppState
-  onToggle: (id: string) => void
-  onUpdateQuant: (id: string, value: number) => void
-  onAddHabit: (h: Omit<Habit, 'id' | 'createdAt'>) => void
-  onUpdateHabit: (id: string, data: Partial<Habit>) => void
-  onDeleteHabit: (id: string) => void
+function portionLabel(p: number): string {
+  if (p === 0.5) return '½'
+  if (p === 1.5) return '1½'
+  return String(p)
 }
 
-export function TodayScreen({ state, onToggle, onUpdateQuant, onAddHabit, onUpdateHabit, onDeleteHabit }: TodayScreenProps) {
-  const todayStr = today()
-  const todayXP = dailyXP(state.habitLogs, state.habits, todayStr)
-  const streak = state.profile.currentStreak
-  const perfectDay = isPerfectDay(state.habitLogs, state.habits, todayStr)
-  const weekXP = currentWeekXP(state.habitLogs, state.habits)
-  const tier = getWeeklyTier(weekXP)
-  const best = bestWeekXP(state.weeklyLeagues)
+export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
+  app: AppController
+  viewDate: string
+  setViewDate: (d: string) => void
+  goToday: () => void
+}) {
+  const { state, today } = app
+  const { options, split, targets } = state.settings
 
-  const completedCount = state.habits.filter(h =>
-    state.habitLogs.some(l => l.habitId === h.id && l.date === todayStr && l.completed)
-  ).length
+  const record = getRecord(state.records, viewDate)
+  const eaten = dayMacros(record, options)
 
-  const nextAchievement = getNextAchievement(state)
-  const recentUnlocks = getRecentUnlocks(state)
+  const [picking, setPicking] = useState<MealSlot | null>(null)
+  const [editing, setEditing] = useState<MealLog | null>(null)
+  const [toast, setToast] = useState<string | null>(null)
 
-  // --- Form state ---
-  const [showForm, setShowForm] = useState(false)
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [form, setForm] = useState({ name: '', icon: '💪', type: 'binary' as HabitType, target: '', unit: '', color: COLORS[0], xpReward: 10, category: '', cycleSteps: '', cycleStartIndex: 0 })
+  const yesterday = addDays(viewDate, -1)
+  const canRepeat = !record?.meals?.length && !!getRecord(state.records, yesterday)?.meals?.length
 
-  const openNew = () => {
-    setForm({ name: '', icon: '💪', type: 'binary', target: '', unit: '', color: COLORS[0], xpReward: 10, category: '', cycleSteps: '', cycleStartIndex: 0 })
-    setEditingId(null)
-    setShowForm(true)
-  }
-  const openEdit = (h: Habit) => {
-    setForm({ name: h.name, icon: h.icon, type: h.type, target: h.target?.toString() ?? '', unit: h.unit ?? '', color: h.color, xpReward: h.xpReward, category: h.category ?? '', cycleSteps: h.cycleSteps?.join(', ') ?? '', cycleStartIndex: h.cycleStartIndex ?? 0 })
-    setEditingId(h.id)
-    setShowForm(true)
-  }
-
-  // Paso actual del ciclo: offset + completions anteriores a hoy
-  // Flechas en la card ajustan cycleStartIndex para reposicionar
-  const getCycleStep = (habit: Habit): string => {
-    if (!habit.cycleSteps || habit.cycleSteps.length === 0) return ''
-    const completedBefore = state.habitLogs.filter(l => l.habitId === habit.id && l.completed && l.date < todayStr).length
-    const offset = habit.cycleStartIndex || 0
-    const idx = (offset + completedBefore) % habit.cycleSteps.length
-    return habit.cycleSteps[idx]
-  }
-  const handleSave = () => {
-    if (!form.name.trim()) return
-    const parsedSteps = form.cycleSteps.split(',').map(s => s.trim()).filter(Boolean)
-    const data = {
-      name: form.name.trim(), icon: form.icon, type: form.type,
-      target: form.type === 'quant' ? parseFloat(form.target) || 0 : undefined,
-      unit: form.type === 'quant' ? form.unit : undefined,
-      color: form.color, xpReward: form.xpReward,
-      category: form.category || undefined,
-      cycleSteps: form.type === 'cycle' && parsedSteps.length > 0 ? parsedSteps : undefined,
-      cycleStartIndex: form.type === 'cycle' ? form.cycleStartIndex : undefined,
-    }
-    if (editingId) onUpdateHabit(editingId, data)
-    else onAddHabit(data)
-    setShowForm(false)
-  }
-  const handleDelete = () => {
-    if (editingId && confirm('Eliminar este habito y todo su historial?')) {
-      onDeleteHabit(editingId)
-      setShowForm(false)
-    }
-  }
+  const workout = workoutForDate(record, split, viewDate)
+  const hours = sleepHours(record?.bedTime, record?.wakeTime)
 
   return (
-    <div className="px-4 pt-2 pb-8">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h1 className="text-xl font-black text-white leading-tight">HabitQuest <span className="text-[11px] font-bold text-[#5C7680]">v2.1</span></h1>
-          <p className="text-[#5C7680] text-[13px] font-bold capitalize">
-            {new Date().toLocaleDateString('es', { weekday: 'long', day: 'numeric', month: 'long' })}
+    <>
+      {/* --- Navegacion de dias --- */}
+      <div className="mx-days">
+        <button
+          className="mx-day-arrow"
+          onClick={() => setViewDate(addDays(viewDate, -1))}
+          aria-label="Dia anterior"
+        >‹</button>
+        <div className="mx-day-c">
+          <div className="mx-eyebrow">{viewDate === today ? 'Hoy' : headerDate(parseDate(viewDate) ?? new Date())}</div>
+          <div className="mx-day-v mx-mono">{shortDate(viewDate)}</div>
+        </div>
+        <button
+          className="mx-day-arrow"
+          onClick={() => setViewDate(addDays(viewDate, 1))}
+          disabled={viewDate === today}
+          aria-label="Dia siguiente"
+        >›</button>
+        {viewDate !== today && (
+          <button className="mx-mini" onClick={goToday}>Hoy</button>
+        )}
+      </div>
+
+      <div className="mx-mbs">
+        <MacroBar label={MACRO_LABEL.prot} eaten={eaten.prot} target={targets.prot} tone="prot" />
+        <MacroBar label={MACRO_LABEL.carb} eaten={eaten.carb} target={targets.carb} tone="carb" />
+        <MacroBar label={MACRO_LABEL.grasa} eaten={eaten.grasa} target={targets.grasa} tone="grasa" />
+      </div>
+
+      {options.length === 0 && (
+        <div className="mx-nudge">
+          <div className="mx-eyebrow">Falta lo tuyo</div>
+          <p>
+            Todavia no tienes comidas creadas. En <b>Mi plan</b> defines cada una con sus macros
+            una sola vez; despues registrar es elegirla y nada mas.
           </p>
         </div>
-        <div
-          className="px-2.5 py-1 rounded-full text-[11px] font-black uppercase tracking-wider border-2"
-          style={{
-            backgroundColor: LEAGUE_COLORS[tier] + '20',
-            color: LEAGUE_COLORS[tier],
-            borderColor: LEAGUE_COLORS[tier] + '50',
-          }}
+      )}
+
+      {canRepeat && (
+        <button
+          className="mx-repeat"
+          onClick={() => { app.copyDay(yesterday, viewDate); setToast('Copiado de ayer') }}
         >
-          {LEAGUE_NAMES[tier]}
-        </div>
-      </div>
-
-      {/* XP Ring + Stats */}
-      <div className="flex flex-col items-center gap-3 mb-5">
-        <XPRing current={todayXP} target={state.profile.dailyXPGoal} size={160} strokeWidth={14} />
-
-        <div className="flex items-center gap-2.5">
-          <div className={`badge-streak ${streak === 0 ? 'opacity-40' : ''}`}>
-            <span>🔥</span><span>{streak}</span>
-          </div>
-          <div className="badge-xp">
-            <span>💎</span><span>{state.profile.totalXP}</span>
-          </div>
-        </div>
-
-        <p className="text-[11px] font-bold text-[#5C7680]">
-          Semana: {weekXP} XP{best > 0 && ` · Mejor: ${best} XP`}
-        </p>
-
-        {perfectDay && state.habits.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="px-3 py-1.5 rounded-full bg-[rgba(88,204,2,0.12)] border-2 border-duo-green text-duo-green text-[12px] font-black uppercase tracking-wider"
-          >
-            Dia Perfecto
-          </motion.div>
-        )}
-      </div>
-
-      {/* Level bar */}
-      <div className="mb-5">
-        <LevelBar totalXP={state.profile.totalXP} />
-      </div>
-
-      {/* --- Hábitos del día --- */}
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="text-[14px] font-extrabold text-[#94A7B0] uppercase tracking-wider">
-          Habitos de hoy
-        </h2>
-        {state.habits.length > 0 && (
-          <span className="text-[13px] font-bold text-[#5C7680]">
-            {completedCount}/{state.habits.length}
-          </span>
-        )}
-      </div>
-
-      {state.habits.length === 0 ? (
-        <div className="card-3d text-center py-8 px-5 mb-5">
-          <div className="text-4xl mb-3">⚡</div>
-          <h3 className="text-[17px] font-black text-white mb-2">Crea tu primer habito</h3>
-          <p className="text-[13px] font-bold text-[#94A7B0] leading-relaxed mb-1">
-            Los habitos son acciones que repites cada dia.
-          </p>
-          <p className="text-[13px] font-bold text-[#5C7680] leading-relaxed mb-5">
-            Pueden ser de tipo Si/No (como "fui al gym") o cuantitativos (como "beber 2L de agua"). Cada uno que completes te da XP.
-          </p>
-          <button onClick={openNew} className="btn-3d w-full !text-[14px]">
-            + Crear habito
-          </button>
-        </div>
-      ) : (
-        <div className="space-y-2.5 mb-5">
-          {(() => {
-            const grouped = new Map<string, typeof state.habits>()
-            for (const h of state.habits) {
-              const key = h.category || ''
-              if (!grouped.has(key)) grouped.set(key, [])
-              grouped.get(key)!.push(h)
-            }
-            const hasCategories = state.habits.some(h => h.category)
-            return Array.from(grouped.entries()).map(([catId, habits]) => {
-              const cat = catId ? getCategoryById(catId) : null
-              return (
-                <div key={catId || '_none'} className={hasCategories ? 'space-y-2' : 'space-y-2.5'}>
-                  {hasCategories && (
-                    <div className="flex items-center gap-1.5 mt-1">
-                      <span className="text-[13px]">{cat?.icon || '📋'}</span>
-                      <span className="text-[11px] font-extrabold text-[#5C7680] uppercase tracking-wider">
-                        {cat?.name || 'Sin categoria'}
-                      </span>
-                    </div>
-                  )}
-                  {habits.map(habit => {
-                    const log = state.habitLogs.find(l => l.habitId === habit.id && l.date === todayStr)
-                    return (
-                      <HabitCard
-                        key={habit.id}
-                        habit={habit}
-                        log={log}
-                        cycleStep={habit.type === 'cycle' ? getCycleStep(habit) : undefined}
-                        onToggle={onToggle}
-                        onUpdateQuant={onUpdateQuant}
-                        onCycleAdjust={habit.type === 'cycle' ? (delta) => {
-                          const len = habit.cycleSteps?.length || 1
-                          const current = habit.cycleStartIndex || 0
-                          onUpdateHabit(habit.id, { cycleStartIndex: ((current + delta) % len + len) % len })
-                        } : undefined}
-                        onLongPress={() => openEdit(habit)}
-                      />
-                    )
-                  })}
-                </div>
-              )
-            })
-          })()}
-          <button
-            onClick={openNew}
-            className="w-full h-12 rounded-2xl border-2 border-dashed border-surface-500 text-[#5C7680] font-bold text-[14px] flex items-center justify-center gap-2 active:bg-surface-700 transition-colors"
-          >
-            + Agregar habito
-          </button>
-        </div>
+          Comi lo mismo que ayer
+        </button>
       )}
 
-      {/* --- Próximo logro --- */}
-      {nextAchievement && (
-        <div className="mb-5">
-          <h2 className="text-[14px] font-extrabold text-[#94A7B0] uppercase tracking-wider mb-3">
-            Proximo logro
-          </h2>
-          <div className="card-3d flex items-center gap-3">
-            <div className="text-3xl flex-shrink-0">{nextAchievement.icon}</div>
-            <div className="flex-1 min-w-0">
-              <div className="text-[14px] font-black text-white mb-0.5">{nextAchievement.name}</div>
-              <div className="text-[11px] font-bold text-[#5C7680] mb-2">{nextAchievement.description}</div>
-              <div className="progress-bar-track !h-2.5">
-                <motion.div
-                  className="progress-bar-fill bg-gradient-to-r from-duo-yellow to-duo-orange"
-                  animate={{ width: `${Math.max(nextAchievement.percent, 2)}%` }}
-                  transition={{ duration: 0.5 }}
-                />
-              </div>
-              <div className="text-[10px] font-bold text-[#5C7680] mt-1">
-                {nextAchievement.current} / {nextAchievement.target} — {Math.round(nextAchievement.percent)}%
-              </div>
+      {/* --- Una tarjeta por comida --- */}
+      {SLOTS.map(s => {
+        const logged = mealsInSlot(record, s.id)
+        return (
+          <div key={s.id} className="mx-slot">
+            <div className="mx-slot-h">
+              <div className="mx-eyebrow">{s.label}</div>
+              {logged.length > 0 && (
+                <button className="mx-mini" onClick={() => setPicking(s.id)}>+ Agregar</button>
+              )}
             </div>
-          </div>
-        </div>
-      )}
 
-      {/* --- Logros recientes --- */}
-      {recentUnlocks.length > 0 && (
-        <div>
-          <h2 className="text-[14px] font-extrabold text-[#94A7B0] uppercase tracking-wider mb-3">
-            Desbloqueados
-          </h2>
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            {recentUnlocks.map(a => (
-              <div key={a.id} className="flex-shrink-0 card-3d !border-duo-yellow !shadow-[0_2px_0_#E58700] !py-3 !px-4 text-center min-w-[100px]">
-                <div className="text-2xl mb-1">{a.icon}</div>
-                <div className="text-[11px] font-black text-white">{a.name}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* --- Form modal --- */}
-      <BottomSheet open={showForm} onClose={() => setShowForm(false)} title={editingId ? 'Editar habito' : 'Nuevo habito'}>
-        <div className="space-y-4">
-          <FormInput label="Nombre" value={form.name} onChange={v => setForm({ ...form, name: v })} placeholder="Ej: Ir al gym" autoFocus />
-
-          <div>
-            <label className="text-[11px] font-bold text-[#5C7680] uppercase tracking-wider mb-1.5 block">Tipo</label>
-            <div className="flex gap-2">
-              {([['binary', 'Si / No'], ['quant', 'Cuantitativo'], ['cycle', 'Ciclico']] as [HabitType, string][]).map(([type, label]) => (
-                <button
-                  key={type}
-                  onClick={() => setForm({ ...form, type })}
-                  className={`flex-1 py-2.5 rounded-xl text-[13px] font-black border-2 transition-all duration-100 ${
-                    form.type === type
-                      ? 'bg-duo-green border-duo-green-dark shadow-[0_3px_0_#43C000] text-white'
-                      : 'bg-surface-700 border-surface-500 shadow-[0_3px_0_var(--color-surface-600)] text-[#94A7B0]'
-                  } active:shadow-none active:translate-y-[3px]`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            <p className="text-[11px] font-bold text-[#5C7680] mt-1.5">
-              {form.type === 'binary'
-                ? 'Un tap para marcar como hecho. Ej: "Fui al gym", "Comi sano".'
-                : form.type === 'quant'
-                  ? 'Registras un numero y tiene un objetivo. Ej: "10,000 pasos", "2L de agua".'
-                  : 'Rota entre pasos al completar. Ej: "Upper, Lower, Descanso, Push, Pull, Legs, Descanso".'
-              }
-            </p>
-          </div>
-
-          <AnimatePresence>
-            {form.type === 'cycle' && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                className="overflow-hidden space-y-3"
-              >
-                <FormInput
-                  label="Pasos del ciclo (separados por coma)"
-                  value={form.cycleSteps}
-                  onChange={v => setForm({ ...form, cycleSteps: v, cycleStartIndex: 0 })}
-                  placeholder="Upper, Lower, Descanso, Push, Pull, Legs, Descanso"
-                />
-                {(() => {
-                  const steps = form.cycleSteps.split(',').map(s => s.trim()).filter(Boolean)
-                  if (steps.length < 2) return null
-                  return (
-                    <>
-                      <div>
-                        <label className="text-[11px] font-bold text-[#5C7680] uppercase tracking-wider mb-1.5 block">Empezar desde</label>
-                        <div className="flex flex-wrap gap-1.5">
-                          {steps.map((step, i) => (
-                            <button
-                              key={i}
-                              onClick={() => setForm({ ...form, cycleStartIndex: i })}
-                              className={`h-8 px-3 rounded-lg text-[12px] font-bold border-2 transition-all ${
-                                form.cycleStartIndex === i
-                                  ? 'bg-duo-green/20 border-duo-green text-white'
-                                  : 'bg-surface-700 border-surface-600 text-[#94A7B0]'
-                              }`}
-                            >
-                              {step}
-                            </button>
-                          ))}
-                        </div>
+            {logged.length === 0 ? (
+              <button className="mx-pick" onClick={() => setPicking(s.id)}>
+                <span>+</span> Elegir {s.label.toLowerCase()}
+              </button>
+            ) : (
+              logged.map(m => {
+                const mm = roundMacros(mealMacros(m, options))
+                return (
+                  <div key={m.id} className="mx-logged">
+                    <button className="mx-logged-b" onClick={() => setEditing(m)}>
+                      <div className="mx-logged-n">
+                        {mealName(m, options)}
+                        {m.portion !== 1 && <i className="mx-logged-p">× {portionLabel(m.portion)}</i>}
+                        {m.custom && <i className="mx-logged-off">fuera del plan</i>}
                       </div>
-                    </>
-                  )
-                })()}
-              </motion.div>
+                      <div className="mx-logged-m mx-mono">
+                        <span>{mm.prot}P</span><span>{mm.carb}C</span><span>{mm.grasa}G</span>
+                      </div>
+                    </button>
+                    <button className="mx-entry-x" onClick={() => app.removeMeal(m.id, viewDate)} aria-label="Quitar">✕</button>
+                  </div>
+                )
+              })
             )}
-          </AnimatePresence>
+          </div>
+        )
+      })}
 
-          <AnimatePresence>
-            {form.type === 'quant' && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                className="overflow-hidden"
-              >
-                <div className="flex gap-2">
-                  <FormInput label="Meta diaria" value={form.target} onChange={v => setForm({ ...form, target: v })} placeholder="10000" type="number" className="flex-1" />
-                  <FormInput label="Unidad" value={form.unit} onChange={v => setForm({ ...form, unit: v })} placeholder="pasos" className="w-24" />
+      <div className="mx-daytotal mx-mono">
+        {(() => {
+          const n = record?.meals?.length ?? 0
+          return `${kcal(eaten)} kcal hoy · ${n} ${n === 1 ? 'comida registrada' : 'comidas registradas'}`
+        })()}
+      </div>
+
+      {/* --- Cuerpo --- */}
+      <div className="mx-card">
+        <div className="mx-card-t"><div className="mx-eyebrow">Cuerpo</div></div>
+        <Field label="Peso en ayunas" sub="Un valor al dia. El sistema usa la media de 7 dias.">
+          <input
+            className="mx-in"
+            value={record?.weight != null ? String(record.weight) : ''}
+            onChange={e => {
+              const v = e.target.value
+              app.updateRecord({ weight: v === '' ? undefined : parseFloat(v) }, viewDate)
+            }}
+            inputMode="decimal"
+            placeholder="—"
+          />
+        </Field>
+        <Field label="Pasos" sub="Lo copias de tu celular.">
+          <input
+            className="mx-in"
+            value={record?.steps != null ? String(record.steps) : ''}
+            onChange={e => {
+              const v = e.target.value
+              app.updateRecord({ steps: v === '' ? undefined : parseInt(v, 10) }, viewDate)
+            }}
+            inputMode="numeric"
+            placeholder="—"
+          />
+        </Field>
+        <Field label="Cintura" sub="Al ombligo. Con una vez por semana basta.">
+          <input
+            className="mx-in"
+            value={record?.waist != null ? String(record.waist) : ''}
+            onChange={e => {
+              const v = e.target.value
+              app.updateRecord({ waist: v === '' ? undefined : parseFloat(v) }, viewDate)
+            }}
+            inputMode="decimal"
+            placeholder="—"
+          />
+        </Field>
+      </div>
+
+      {/* --- Entrenamiento --- */}
+      <div className="mx-card">
+        <div className="mx-card-t">
+          <div className="mx-eyebrow">Entrenamiento</div>
+          <select
+            className="mx-sel"
+            value={workout?.id ?? ''}
+            onChange={e => app.setWorkout(e.target.value || null, viewDate)}
+          >
+            <option value="">Descanso</option>
+            {split.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+          </select>
+        </div>
+
+        {split.length === 0 ? (
+          <div className="mx-empty">
+            Todavia no tienes rutina. En <b>Mi plan → Entrenamiento</b> puedes cargar la ULPPL
+            o armar la tuya.
+          </div>
+        ) : !workout ? (
+          <div className="mx-empty">Dia de descanso.</div>
+        ) : workout.exercises.length === 0 ? (
+          <div className="mx-empty">Este dia no tiene ejercicios. Agregalos en Mi plan.</div>
+        ) : (
+          workout.exercises.map(ex => {
+            const stored = record?.sets?.[ex.id] ?? []
+            const sets = makeEmptySets(ex.sets).map((empty, i) => stored[i] ?? empty)
+            return (
+              <div key={ex.id} className="mx-ex">
+                <div className="mx-ex-h">
+                  <div className="mx-ex-n">{ex.name}</div>
+                  <div className="mx-ex-o">{ex.sets} × {ex.reps}</div>
                 </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          <div>
-            <label className="text-[11px] font-bold text-[#5C7680] uppercase tracking-wider mb-1.5 block">Icono</label>
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-12 h-12 rounded-xl bg-surface-700 border-2 border-surface-500 flex items-center justify-center text-2xl">
-                {form.icon || '❓'}
+                <div className="mx-set">
+                  <div />
+                  <div className="mx-sethd">Peso kg</div>
+                  <div className="mx-sethd">Reps</div>
+                </div>
+                {sets.map((set, i) => (
+                  <div key={i} className="mx-set">
+                    <div className="mx-setn">Serie {i + 1}</div>
+                    <input
+                      className="mx-in"
+                      value={set.weight}
+                      onChange={e => app.setSet(ex.id, i, 'weight', e.target.value, viewDate)}
+                      inputMode="decimal"
+                      placeholder="—"
+                    />
+                    <input
+                      className="mx-in"
+                      value={set.reps}
+                      onChange={e => app.setSet(ex.id, i, 'reps', e.target.value, viewDate)}
+                      inputMode="numeric"
+                      placeholder="—"
+                    />
+                  </div>
+                ))}
               </div>
-              <input
-                type="text"
-                value={form.icon}
-                onChange={e => setForm({ ...form, icon: e.target.value })}
-                placeholder="Escribe o pega un emoji"
-                className="flex-1 h-11 bg-surface-700 text-white rounded-xl px-3 font-bold text-[15px] border-2 border-surface-500 outline-none focus:border-duo-blue transition-colors"
+            )
+          })
+        )}
+      </div>
+
+      {/* --- Sueno --- */}
+      <div className="mx-card">
+        <div className="mx-card-t">
+          <div className="mx-eyebrow">Sueno</div>
+          <div className="mx-mono mx-sleep" >
+            {hours !== null ? `${hours} h` : '—'}
+          </div>
+        </div>
+        <Field label="Me acoste" sub="Si fue despues de medianoche, cuenta para ayer">
+          <input
+            className="mx-in"
+            type="time"
+            value={record?.bedTime ?? ''}
+            onChange={e => app.updateRecord({ bedTime: e.target.value || undefined }, viewDate)}
+          />
+        </Field>
+        <Field label="Me desperte">
+          <input
+            className="mx-in"
+            type="time"
+            value={record?.wakeTime ?? ''}
+            onChange={e => app.updateRecord({ wakeTime: e.target.value || undefined }, viewDate)}
+          />
+        </Field>
+      </div>
+
+      {picking && (
+        <MealPicker
+          open
+          slot={picking}
+          options={options}
+          reference={slotReference(state.settings, picking)}
+          onClose={() => setPicking(null)}
+          onPick={(optionId, portion) => {
+            app.logMeal(picking, optionId, portion, viewDate)
+            setToast(`${SLOT_LABEL[picking]} registrado`)
+            setPicking(null)
+          }}
+          onCustom={(custom, portion) => {
+            app.logCustomMeal(picking, custom, portion, viewDate)
+            setToast(`${SLOT_LABEL[picking]} registrado`)
+            setPicking(null)
+          }}
+        />
+      )}
+
+      <BottomSheet open={!!editing} onClose={() => setEditing(null)} title="Ajustar comida">
+        {editing && (
+          <>
+            <div className="mx-lbl">{mealName(editing, options)}</div>
+            <div className="mx-sub" style={{ marginBottom: 14 }}>
+              {(() => {
+                const m = roundMacros(mealMacros(editing, options))
+                return `${m.prot} g proteina · ${m.carb} g carbo · ${m.grasa} g grasa`
+              })()}
+            </div>
+            <Field label="Porcion" sub="Cuanto comiste respecto a la porcion normal">
+              <Seg
+                opts={PORTIONS.map(portionLabel)}
+                value={portionLabel(editing.portion)}
+                onChange={v => {
+                  const p = PORTIONS.find(x => portionLabel(x) === v) ?? 1
+                  app.setPortion(editing.id, p, viewDate)
+                  setEditing({ ...editing, portion: p })
+                }}
+              />
+            </Field>
+            <div className="mx-acts">
+              <button className="mx-btn" data-p="1" onClick={() => setEditing(null)}>Listo</button>
+              <ConfirmButton
+                label="Quitar"
+                confirmLabel="Confirmar"
+                onConfirm={() => { app.removeMeal(editing.id, viewDate); setEditing(null) }}
               />
             </div>
-            <div className="flex flex-wrap gap-1.5">
-              {SUGGESTED_ICONS.map(icon => (
-                <button key={icon} onClick={() => setForm({ ...form, icon })}
-                  className={`w-9 h-9 rounded-lg flex items-center justify-center text-base border-2 transition-all ${
-                    form.icon === icon ? 'bg-duo-blue/20 border-duo-blue' : 'bg-surface-700 border-surface-600'
-                  }`}
-                >{icon}</button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <label className="text-[11px] font-bold text-[#5C7680] uppercase tracking-wider mb-1.5 block">Color</label>
-            <div className="flex gap-2">
-              {COLORS.map(color => (
-                <button key={color} onClick={() => setForm({ ...form, color })}
-                  className={`w-8 h-8 rounded-full border-2 transition-all ${form.color === color ? 'scale-110 border-white' : 'border-transparent'}`}
-                  style={{ backgroundColor: color }}
-                />
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <label className="text-[11px] font-bold text-[#5C7680] uppercase tracking-wider mb-1.5 block">Categoria (opcional)</label>
-            <div className="flex flex-wrap gap-1.5">
-              <button
-                onClick={() => setForm({ ...form, category: '' })}
-                className={`h-8 px-3 rounded-lg text-[12px] font-bold border-2 transition-all ${
-                  !form.category ? 'bg-duo-blue/20 border-duo-blue text-white' : 'bg-surface-700 border-surface-600 text-[#5C7680]'
-                }`}
-              >
-                Ninguna
-              </button>
-              {CATEGORIES.map(cat => (
-                <button
-                  key={cat.id}
-                  onClick={() => setForm({ ...form, category: cat.id })}
-                  className={`h-8 px-3 rounded-lg text-[12px] font-bold border-2 transition-all ${
-                    form.category === cat.id
-                      ? 'border-white text-white'
-                      : 'bg-surface-700 border-surface-600 text-[#94A7B0]'
-                  }`}
-                  style={form.category === cat.id ? { backgroundColor: cat.color + '30', borderColor: cat.color } : undefined}
-                >
-                  {cat.icon} {cat.name}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <button onClick={handleSave} className="btn-3d w-full !h-12 !text-[14px]">
-            {editingId ? 'Guardar cambios' : 'Crear habito'}
-          </button>
-
-          {editingId && (
-            <button onClick={handleDelete} className="w-full h-10 text-duo-red font-bold text-[13px]">
-              Eliminar habito
-            </button>
-          )}
-        </div>
+          </>
+        )}
       </BottomSheet>
-    </div>
+
+      <Toast message={toast} onDone={() => setToast(null)} />
+    </>
   )
 }

@@ -1,428 +1,382 @@
-import { useState, useCallback, useEffect } from 'react'
-import type { AppState, Habit, HabitLog, Goal, GoalContribution, DailyXPGoal } from '../types'
+import { useState, useCallback, useEffect, useRef } from 'react'
+import type { AppSettings, AppState, DayLog, Macros, MealLog, MealOption, MealSlot, SplitDay } from '../types'
 import { storage } from '../lib/storage'
-import { addXP } from '../lib/xp'
-import { GAME_CONFIG } from '../lib/gameConfig'
-import { today, updateStreak, isPerfectDay, checkEarlyBird, perfectDayStreak, currentWeekXP, getWeeklyTier, getWeekStart } from '../lib/streaks'
-import { playComplete, playLevelUp, playAchievement } from '../lib/sounds'
-import { debouncedSave, loadFromBackend, saveToBackend, isSyncEnabled, getSyncError } from '../lib/sync'
-import confetti from 'canvas-confetti'
+import { ROUTINE_TEMPLATE } from '../lib/config'
+import { todayStr, uid } from '../lib/logic'
+import {
+  queueSave, flushSave, retryNow, saveNow, loadFromBackend, isSyncEnabled,
+  subscribeSync, getSyncSnapshot, hasPendingChanges,
+  type SyncSnapshot,
+} from '../lib/sync'
 
-const DUO_COLORS = ['#58CC02', '#FFC800', '#1CB0F6', '#CE82FF', '#FF9600']
+const PENDING_KEY = 'sistema_pending'
+
+/** Fechas y ajustes tocados sin confirmacion de la nube (para no perderlos al reconectar). */
+interface PendingMarks { dates: string[]; settings: boolean }
+
+function readMarks(): PendingMarks {
+  try {
+    const raw = localStorage.getItem(PENDING_KEY)
+    if (!raw) return { dates: [], settings: false }
+    const v = JSON.parse(raw) as Partial<PendingMarks>
+    return { dates: Array.isArray(v.dates) ? v.dates.filter(d => typeof d === 'string') : [], settings: v.settings === true }
+  } catch {
+    return { dates: [], settings: false }
+  }
+}
+
+function writeMarks(m: PendingMarks): void {
+  try { localStorage.setItem(PENDING_KEY, JSON.stringify(m)) } catch { /* sin espacio, se ignora */ }
+}
+
+/**
+ * Une lo que vino de la nube con lo que se edito sin conexion. Gana lo local
+ * solo en las fechas marcadas como pendientes; el resto viene de la nube.
+ */
+function mergeStates(remote: AppState, local: AppState, marks: PendingMarks): AppState {
+  const byDate = new Map(remote.records.map(r => [r.date, r]))
+  for (const date of marks.dates) {
+    const localRec = local.records.find(r => r.date === date)
+    if (localRec) byDate.set(date, localRec)
+    else byDate.delete(date)
+  }
+  const records = [...byDate.values()].sort((a, b) => (a.date < b.date ? -1 : 1))
+  return { records, settings: marks.settings ? local.settings : remote.settings }
+}
+
+/** Fecha de hoy, con rollover a medianoche sin necesidad de recargar. */
+function useToday(): string {
+  const [today, setToday] = useState(todayStr)
+  useEffect(() => {
+    const tick = () => setToday(prev => {
+      const now = todayStr()
+      return now === prev ? prev : now
+    })
+    const id = setInterval(tick, 60_000)
+    document.addEventListener('visibilitychange', tick)
+    return () => { clearInterval(id); document.removeEventListener('visibilitychange', tick) }
+  }, [])
+  return today
+}
+
+export type AppController = ReturnType<typeof useAppState>
 
 export function useAppState() {
   const [state, setState] = useState<AppState>(() => storage.load())
-  const [celebration, setCelebration] = useState<{ type: string; message: string } | null>(null)
-  const [syncError, setSyncError] = useState<string | null>(null)
+  const [sync, setSync] = useState<SyncSnapshot>(getSyncSnapshot)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
+  const today = useToday()
 
-  // Persistir en cada cambio (solo backend, localStorage es cache)
+  // Sin sync configurado todo es local, asi que ya esta "listo" desde el arranque.
+  const [cloudReady, setCloudReady] = useState(!isSyncEnabled())
+  // Evita mostrar el onboarding a alguien que si tiene plan guardado en la nube.
+  const [loadingInitial, setLoadingInitial] = useState(isSyncEnabled())
+  const marks = useRef<PendingMarks>(readMarks())
+  const cloudReadyRef = useRef(cloudReady)
+  const stateRef = useRef(state)
+
+  // Espejos para leer el valor actual desde callbacks y timers sin recrearlos.
+  useEffect(() => { cloudReadyRef.current = cloudReady }, [cloudReady])
+  useEffect(() => { stateRef.current = state }, [state])
+
+  const mark = useCallback((date?: string) => {
+    const m = marks.current
+    if (date) { if (!m.dates.includes(date)) m.dates.push(date) }
+    else m.settings = true
+    writeMarks(m)
+  }, [])
+
+  // --- Suscripcion al estado de sync ---
+  useEffect(() => subscribeSync(setSync), [])
+
+  // Cuando la nube confirma, ya no hay nada pendiente que proteger.
   useEffect(() => {
-    storage.save(state) // cache local para carga inicial rápida
-    if (!syncError) debouncedSave(state, setSyncError)
-  }, [state, syncError])
+    if (sync.status === 'saved' && !hasPendingChanges()) {
+      marks.current = { dates: [], settings: false }
+      writeMarks(marks.current)
+    }
+  }, [sync.status])
 
-  const genId = () => crypto.randomUUID()
+  // --- Persistencia: local siempre, nube cuando ya sabemos que hay en ella ---
+  useEffect(() => {
+    storage.save(state)
+    if (cloudReady) queueSave(state)
+  }, [state, cloudReady])
 
-  // Cargar estado desde la nube
+  const pullFromCloud = useCallback(async (): Promise<void> => {
+    if (!isSyncEnabled()) return
+    const { state: remote, error } = await loadFromBackend()
+    setLoadError(error)
+    setLoadingInitial(false)
+    if (error) return // sin datos frescos no se sube nada: se evita pisar la nube
+    if (remote) {
+      const clean = storage.sanitize(remote)
+      const merged = mergeStates(clean, stateRef.current, marks.current)
+      setState(merged)
+      storage.save(merged)
+    }
+    setCloudReady(true)
+    // Si quedaban cambios offline, ahora si se suben.
+    if (marks.current.dates.length > 0 || marks.current.settings) queueSave(stateRef.current)
+  }, [])
+
+  // Carga inicial. La regla no ve que los setState ocurren despues del await:
+  // esto es exactamente sincronizar con un sistema externo.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { void pullFromCloud() }, [pullFromCloud])
+
+  // Reintento de carga cuando vuelve la red o la app al frente
+  useEffect(() => {
+    const retry = () => {
+      if (!cloudReadyRef.current && document.visibilityState === 'visible') void pullFromCloud()
+    }
+    window.addEventListener('online', retry)
+    document.addEventListener('visibilitychange', retry)
+    const id = setInterval(retry, 20_000)
+    return () => {
+      window.removeEventListener('online', retry)
+      document.removeEventListener('visibilitychange', retry)
+      clearInterval(id)
+    }
+  }, [pullFromCloud])
+
+  // iOS mata los timers al mandar la PWA a segundo plano: hay que forzar el envio.
+  useEffect(() => {
+    const onHide = () => { if (document.visibilityState === 'hidden') flushSave() }
+    document.addEventListener('visibilitychange', onHide)
+    window.addEventListener('pagehide', flushSave)
+    return () => {
+      document.removeEventListener('visibilitychange', onHide)
+      window.removeEventListener('pagehide', flushSave)
+    }
+  }, [])
+
   const refreshFromCloud = useCallback(async () => {
     setRefreshing(true)
-    if (isSyncEnabled()) {
-      const remote = await loadFromBackend()
-      const error = getSyncError()
-      setSyncError(error)
-      if (remote) {
-        // Actualizar racha con datos de la nube
-        const streakUpdate = updateStreak(remote.habitLogs, remote.habits, remote.profile)
-        const updated = {
-          ...remote,
-          profile: {
-            ...remote.profile,
-            currentStreak: streakUpdate.currentStreak,
-            streakDate: streakUpdate.streakDate,
-            streakFreezes: streakUpdate.streakFreezes,
-          },
-        }
-        setState(updated)
-        storage.save(updated)
-      }
-      // Si falla, syncError ya está seteado y la UI se bloquea
-    }
+    flushSave()
+    await pullFromCloud()
     setRefreshing(false)
-  }, [])
+  }, [pullFromCloud])
 
-  // Al abrir la app
-  useEffect(() => {
-    refreshFromCloud()
-  }, [refreshFromCloud])
-
-  const celebrate = useCallback((type: string, message: string) => {
-    setCelebration({ type, message })
-    confetti({
-      particleCount: 60,
-      spread: 55,
-      origin: { y: 0.6 },
-      colors: DUO_COLORS,
-      disableForReducedMotion: true,
-    })
-    setTimeout(() => setCelebration(null), 3500)
-  }, [])
-
-  // --- Verificar logros ---
-  const checkAchievements = useCallback((newState: AppState): AppState => {
-    const { habitLogs, habits, profile, goals, achievements } = newState
-    const todayStr = today()
-    const streak = profile.currentStreak
-    const updated = [...achievements]
-    let changed = false
-
-    const unlock = (id: string) => {
-      const a = updated.find(x => x.id === id)
-      if (a && !a.unlockedAt) {
-        a.unlockedAt = new Date().toISOString()
-        changed = true
-        setTimeout(() => {
-          if (newState.settings.soundEnabled) playAchievement()
-          celebrate('achievement', `${a.name} ${a.icon}`)
-        }, 500)
-      }
-    }
-
-    if (streak >= 7) unlock('streak_7')
-    if (streak >= 30) unlock('streak_30')
-    if (streak >= 100) unlock('streak_100')
-    if (isPerfectDay(habitLogs, habits, todayStr)) unlock('perfect_day')
-    if (perfectDayStreak(habitLogs, habits) >= 7) unlock('perfect_week')
-    if (goals.some(g => g.currentAmount >= g.targetAmount)) unlock('first_goal_100')
-    if (profile.totalXP >= 1000) unlock('xp_1000')
-    if (profile.level >= 10) unlock('level_10')
-    if (checkEarlyBird(habitLogs, habits, todayStr)) unlock('early_bird')
-
-    // Logros de categoría
-    const catSet = new Set(habits.filter(h => h.category).map(h => h.category!))
-    if (catSet.size >= 3) unlock('cat_3')
-
-    // Categoría perfecta: todos los hábitos de al menos una categoría completados hoy
-    for (const cat of catSet) {
-      const catHabits = habits.filter(h => h.category === cat)
-      if (catHabits.length >= 2 && catHabits.every(h => habitLogs.some(l => l.habitId === h.id && l.date === todayStr && l.completed))) {
-        unlock('cat_perfect')
-        break
-      }
-    }
-
-    // Especialista: 5+ hábitos en una categoría
-    for (const cat of catSet) {
-      if (habits.filter(h => h.category === cat).length >= 5) {
-        unlock('cat_5_habits')
-        break
-      }
-    }
-
-    return changed ? { ...newState, achievements: updated } : newState
-  }, [celebrate])
-
-  // --- Hábitos ---
-  const toggleHabit = useCallback((habitId: string) => {
+  // --- Registro diario ---
+  const patchRecord = useCallback((date: string, fn: (r: DayLog) => DayLog) => {
+    mark(date)
     setState(prev => {
-      const todayStr = today()
-      const habit = prev.habits.find(h => h.id === habitId)
-      if (!habit || (habit.type !== 'binary' && habit.type !== 'cycle')) return prev
-
-      const existingLog = prev.habitLogs.find(l => l.habitId === habitId && l.date === todayStr)
-      let newLogs: HabitLog[]
-      let xpDelta = 0
-
-      if (existingLog) {
-        if (existingLog.completed) {
-          newLogs = prev.habitLogs.map(l =>
-            l.id === existingLog.id ? { ...l, value: false, completed: false } : l
-          )
-          xpDelta = -habit.xpReward
-          if (isPerfectDay(prev.habitLogs, prev.habits, todayStr)) {
-            xpDelta -= GAME_CONFIG.xp.perfectDayBonus
-          }
-        } else {
-          newLogs = prev.habitLogs.map(l =>
-            l.id === existingLog.id ? { ...l, value: true, completed: true } : l
-          )
-          xpDelta = habit.xpReward
-        }
-      } else {
-        newLogs = [...prev.habitLogs, {
-          id: genId(), habitId, date: todayStr, value: true, completed: true,
-        }]
-        xpDelta = habit.xpReward
-      }
-
-      if (xpDelta > 0 && isPerfectDay(newLogs, prev.habits, todayStr)) {
-        xpDelta += GAME_CONFIG.xp.perfectDayBonus
-      }
-
-      const { profile, leveledUp, newLevel } = addXP(prev.profile, xpDelta)
-
-      if (xpDelta > 0) {
-        if (prev.settings.soundEnabled) playComplete()
-        confetti({ particleCount: 25, spread: 45, origin: { y: 0.7 }, colors: DUO_COLORS, disableForReducedMotion: true })
-      }
-      if (leveledUp) {
-        setTimeout(() => {
-          if (prev.settings.soundEnabled) playLevelUp()
-          celebrate('levelup', `Subiste al nivel ${newLevel}!`)
-        }, 300)
-      }
-
-      // Actualizar racha hacia adelante
-      const streakUpdate = updateStreak(newLogs, prev.habits, profile)
-
-      const newState: AppState = {
-        ...prev,
-        habitLogs: newLogs,
-        profile: {
-          ...profile,
-          lastActiveDate: todayStr,
-          currentStreak: streakUpdate.currentStreak,
-          streakDate: streakUpdate.streakDate,
-          streakFreezes: streakUpdate.streakFreezes,
-        },
-      }
-      return checkAchievements(newState)
+      const idx = prev.records.findIndex(r => r.date === date)
+      const current = idx >= 0 ? prev.records[idx] : { date }
+      const next = fn(current)
+      const records = [...prev.records]
+      if (idx >= 0) records[idx] = next
+      else { records.push(next); records.sort((a, b) => (a.date < b.date ? -1 : 1)) }
+      return { ...prev, records }
     })
-  }, [celebrate, checkAchievements])
+  }, [mark])
 
-  const updateQuantHabit = useCallback((habitId: string, value: number) => {
+  const updateRecord = useCallback((patch: Partial<DayLog>, date = todayStr()) => {
+    patchRecord(date, r => ({ ...r, ...patch }))
+  }, [patchRecord])
+
+  // --- Comidas ---
+  const addMeals = useCallback((meals: MealLog[], date = todayStr()) => {
+    if (meals.length === 0) return
+    patchRecord(date, r => ({ ...r, meals: [...(r.meals ?? []), ...meals] }))
+  }, [patchRecord])
+
+  /** Registra una opcion del plan en una comida del dia. */
+  const logMeal = useCallback((slot: MealSlot, optionId: string, portion = 1, date = todayStr()) => {
+    addMeals([{ id: uid('m'), slot, optionId, portion, at: Date.now() }], date)
+  }, [addMeals])
+
+  /** Registra algo fuera del plan, con sus macros a mano. */
+  const logCustomMeal = useCallback((slot: MealSlot, custom: NonNullable<MealLog['custom']>, portion = 1, date = todayStr()) => {
+    addMeals([{ id: uid('m'), slot, optionId: null, portion, at: Date.now(), custom }], date)
+  }, [addMeals])
+
+  const setPortion = useCallback((mealId: string, portion: number, date = todayStr()) => {
+    patchRecord(date, r => ({
+      ...r,
+      meals: (r.meals ?? []).map(m => (m.id === mealId ? { ...m, portion } : m)),
+    }))
+  }, [patchRecord])
+
+  /** Cambia la opcion registrada sin perder el sitio en el dia. */
+  const replaceMeal = useCallback((mealId: string, optionId: string, date = todayStr()) => {
+    patchRecord(date, r => ({
+      ...r,
+      meals: (r.meals ?? []).map(m => (m.id === mealId ? { ...m, optionId, custom: undefined } : m)),
+    }))
+  }, [patchRecord])
+
+  const removeMeal = useCallback((mealId: string, date = todayStr()) => {
+    patchRecord(date, r => ({ ...r, meals: (r.meals ?? []).filter(m => m.id !== mealId) }))
+  }, [patchRecord])
+
+  /** Copia todo lo comido en otra fecha al dia indicado. */
+  const copyDay = useCallback((from: string, to = todayStr()) => {
+    const source = stateRef.current.records.find(r => r.date === from)
+    if (!source?.meals?.length) return
+    const now = Date.now()
+    addMeals(source.meals.map((m, i) => ({ ...m, id: uid('m'), at: now + i })), to)
+  }, [addMeals])
+
+  // --- Entrenamiento ---
+  const setWorkout = useCallback((workoutId: string | null, date = todayStr()) => {
+    patchRecord(date, r => ({ ...r, workoutId }))
+  }, [patchRecord])
+
+  const setSet = useCallback((exerciseId: string, index: number, field: 'weight' | 'reps', value: string, date = todayStr()) => {
+    patchRecord(date, r => {
+      const sets = { ...(r.sets ?? {}) }
+      const list = [...(sets[exerciseId] ?? [])]
+      while (list.length <= index) list.push({ weight: '', reps: '' })
+      list[index] = { ...list[index], [field]: value }
+      sets[exerciseId] = list
+      return { ...r, sets }
+    })
+  }, [patchRecord])
+
+  // --- Ajustes ---
+  const updateSettings = useCallback((patch: Partial<AppSettings>) => {
+    mark()
+    setState(prev => ({ ...prev, settings: { ...prev.settings, ...patch } }))
+  }, [mark])
+
+  const setTargets = useCallback((targets: Macros) => updateSettings({ targets }), [updateSettings])
+
+  const upsertOption = useCallback((option: MealOption) => {
+    mark()
     setState(prev => {
-      const todayStr = today()
-      const habit = prev.habits.find(h => h.id === habitId)
-      if (!habit || habit.type !== 'quant') return prev
-
-      const existingLog = prev.habitLogs.find(l => l.habitId === habitId && l.date === todayStr)
-      const wasCompleted = existingLog?.completed ?? false
-      const isNowCompleted = value >= (habit.target ?? 0)
-
-      let newLogs: HabitLog[]
-      if (existingLog) {
-        newLogs = prev.habitLogs.map(l =>
-          l.id === existingLog.id ? { ...l, value, completed: isNowCompleted } : l
-        )
-      } else {
-        newLogs = [...prev.habitLogs, {
-          id: genId(), habitId, date: todayStr, value, completed: isNowCompleted,
-        }]
-      }
-
-      let xpDelta = 0
-      if (isNowCompleted && !wasCompleted) {
-        xpDelta = habit.xpReward
-        if (isPerfectDay(newLogs, prev.habits, todayStr)) {
-          xpDelta += GAME_CONFIG.xp.perfectDayBonus
-        }
-        if (prev.settings.soundEnabled) playComplete()
-        confetti({ particleCount: 25, spread: 45, origin: { y: 0.7 }, colors: DUO_COLORS, disableForReducedMotion: true })
-      } else if (!isNowCompleted && wasCompleted) {
-        xpDelta = -habit.xpReward
-        if (isPerfectDay(prev.habitLogs, prev.habits, todayStr)) {
-          xpDelta -= GAME_CONFIG.xp.perfectDayBonus
-        }
-      }
-
-      const { profile, leveledUp, newLevel } = addXP(prev.profile, xpDelta)
-      if (leveledUp) {
-        setTimeout(() => {
-          if (prev.settings.soundEnabled) playLevelUp()
-          celebrate('levelup', `Subiste al nivel ${newLevel}!`)
-        }, 300)
-      }
-
-      const streakUpdate = updateStreak(newLogs, prev.habits, profile)
-
-      const newState: AppState = {
-        ...prev,
-        habitLogs: newLogs,
-        profile: {
-          ...profile,
-          lastActiveDate: todayStr,
-          currentStreak: streakUpdate.currentStreak,
-          streakDate: streakUpdate.streakDate,
-          streakFreezes: streakUpdate.streakFreezes,
-        },
-      }
-      return checkAchievements(newState)
+      const exists = prev.settings.options.some(o => o.id === option.id)
+      const options = exists
+        ? prev.settings.options.map(o => (o.id === option.id ? option : o))
+        : [...prev.settings.options, option]
+      return { ...prev, settings: { ...prev.settings, options } }
     })
-  }, [celebrate, checkAchievements])
+  }, [mark])
 
-  // --- Metas ---
-  const addGoalContribution = useCallback((goalId: string, amount: number, note?: string) => {
+  const removeOption = useCallback((optionId: string) => {
+    mark()
+    setState(prev => ({
+      ...prev,
+      settings: { ...prev.settings, options: prev.settings.options.filter(o => o.id !== optionId) },
+    }))
+  }, [mark])
+
+  const toggleFav = useCallback((optionId: string) => {
+    mark()
+    setState(prev => ({
+      ...prev,
+      settings: {
+        ...prev.settings,
+        options: prev.settings.options.map(o => (o.id === optionId ? { ...o, fav: !o.fav } : o)),
+      },
+    }))
+  }, [mark])
+
+  const upsertSplitDay = useCallback((day: SplitDay) => {
+    mark()
     setState(prev => {
-      const goal = prev.goals.find(g => g.id === goalId)
-      if (!goal) return prev
-
-      const newAmount = goal.currentAmount + amount
-      const prevPercent = Math.floor((goal.currentAmount / goal.targetAmount) * 100)
-      const newPercent = Math.floor((newAmount / goal.targetAmount) * 100)
-
-      const contribution: GoalContribution = {
-        id: genId(), goalId, date: today(), amount, note,
-      }
-
-      const { profile, leveledUp, newLevel } = addXP(prev.profile, GAME_CONFIG.xp.goalContribution)
-
-      if (prev.settings.soundEnabled) playComplete()
-      confetti({ particleCount: 20, spread: 40, origin: { y: 0.7 }, colors: DUO_COLORS, disableForReducedMotion: true })
-
-      for (const milestone of GAME_CONFIG.goalMilestones) {
-        if (prevPercent < milestone && newPercent >= milestone) {
-          setTimeout(() => celebrate('milestone', `"${goal.name}" al ${milestone}%!`), 300)
-          break
-        }
-      }
-
-      if (leveledUp) {
-        setTimeout(() => {
-          if (prev.settings.soundEnabled) playLevelUp()
-          celebrate('levelup', `Subiste al nivel ${newLevel}!`)
-        }, 600)
-      }
-
-      const newState: AppState = {
-        ...prev,
-        goals: prev.goals.map(g => g.id === goalId ? { ...g, currentAmount: newAmount } : g),
-        goalContributions: [...prev.goalContributions, contribution],
-        profile: { ...profile, lastActiveDate: today() },
-      }
-      return checkAchievements(newState)
+      const exists = prev.settings.split.some(d => d.id === day.id)
+      const split = exists
+        ? prev.settings.split.map(d => (d.id === day.id ? day : d))
+        : [...prev.settings.split, day]
+      return { ...prev, settings: { ...prev.settings, split } }
     })
-  }, [celebrate, checkAchievements])
+  }, [mark])
 
-  // --- CRUD ---
-  const addHabit = useCallback((habit: Omit<Habit, 'id' | 'createdAt'>) => {
+  const removeSplitDay = useCallback((dayId: string) => {
+    mark()
     setState(prev => ({
       ...prev,
-      habits: [...prev.habits, { ...habit, id: genId(), createdAt: today() }],
+      settings: { ...prev.settings, split: prev.settings.split.filter(d => d.id !== dayId) },
     }))
-  }, [])
+  }, [mark])
 
-  const updateHabit = useCallback((id: string, data: Partial<Habit>) => {
-    setState(prev => ({
-      ...prev,
-      habits: prev.habits.map(h => h.id === id ? { ...h, ...data } : h),
-    }))
-  }, [])
-
-  const deleteHabit = useCallback((id: string) => {
-    // Los logs se conservan como huérfanos para preservar el historial de XP/racha
-    setState(prev => ({
-      ...prev,
-      habits: prev.habits.filter(h => h.id !== id),
-    }))
-  }, [])
-
-  const addGoal = useCallback((goal: Omit<Goal, 'id' | 'currentAmount'>) => {
-    setState(prev => ({
-      ...prev,
-      goals: [...prev.goals, { ...goal, id: genId(), currentAmount: 0 }],
-    }))
-  }, [])
-
-  const updateGoal = useCallback((id: string, data: Partial<Goal>) => {
-    setState(prev => ({
-      ...prev,
-      goals: prev.goals.map(g => g.id === id ? { ...g, ...data } : g),
-    }))
-  }, [])
-
-  const deleteGoal = useCallback((id: string) => {
-    setState(prev => ({
-      ...prev,
-      goals: prev.goals.filter(g => g.id !== id),
-      goalContributions: prev.goalContributions.filter(c => c.goalId !== id),
-    }))
-  }, [])
-
-  // --- Settings ---
-  const updateSettings = useCallback((settings: Partial<AppState['settings']>) => {
-    setState(prev => ({
-      ...prev,
-      settings: { ...prev.settings, ...settings },
-    }))
-  }, [])
-
-  const updateDailyGoal = useCallback((goal: DailyXPGoal) => {
-    setState(prev => ({
-      ...prev,
-      profile: { ...prev.profile, dailyXPGoal: goal },
-    }))
-  }, [])
-
-  // --- Liga semanal ---
-  const updateWeeklyLeague = useCallback(() => {
+  /**
+   * Materializa la plantilla de rutina como dias del usuario. Se AGREGA a lo
+   * que ya exista, nunca lo reemplaza. Los ejercicios toman el nombre como id
+   * para reconectar el historial de series del modelo viejo.
+   */
+  const loadRoutineTemplate = useCallback(() => {
+    mark()
     setState(prev => {
-      const weekStart = getWeekStart()
-      const weekXP = currentWeekXP(prev.habitLogs, prev.habits)
-      const tier = getWeeklyTier(weekXP)
-
-      const existingIdx = prev.weeklyLeagues.findIndex(l => l.weekStart === weekStart)
-      let leagues = [...prev.weeklyLeagues]
-
-      if (existingIdx >= 0) {
-        leagues[existingIdx] = { weekStart, xp: weekXP, tier }
-      } else {
-        leagues.push({ weekStart, xp: weekXP, tier })
-      }
-
-      if (leagues.length > 52) leagues = leagues.slice(-52)
-      return { ...prev, weeklyLeagues: leagues }
+      const existing = new Set(prev.settings.split.map(d => d.name.toLowerCase()))
+      const nuevos: SplitDay[] = ROUTINE_TEMPLATE
+        .filter(d => !existing.has(d.name.toLowerCase()))
+        .map(d => ({
+          id: uid('s'),
+          name: d.name,
+          weekday: d.weekday,
+          exercises: d.exercises.map(e => ({ id: e.name, name: e.name, sets: e.sets, reps: e.reps })),
+        }))
+      if (nuevos.length === 0) return prev
+      return { ...prev, settings: { ...prev.settings, split: [...prev.settings.split, ...nuevos] } }
     })
-  }, [])
+  }, [mark])
 
-  useEffect(() => {
-    updateWeeklyLeague()
-  }, [updateWeeklyLeague])
+  /** Deja el plan en blanco sin tocar el historial de registros. */
+  const clearPlan = useCallback(() => {
+    mark()
+    setState(prev => ({ ...prev, settings: { ...prev.settings, options: [], split: [] } }))
+  }, [mark])
 
-  // --- Import/Export ---
+  // --- Import / Export / Reset ---
   const importState = useCallback((json: string): boolean => {
     const imported = storage.importJSON(json)
-    if (imported) {
-      setState(imported)
-      return true
-    }
-    return false
-  }, [])
+    if (!imported) return false
+    mark()
+    for (const r of imported.records) mark(r.date)
+    setState(imported)
+    return true
+  }, [mark])
 
-  const exportState = useCallback((): string => {
-    return storage.exportJSON(state)
-  }, [state])
+  const exportState = useCallback((): string => storage.exportJSON(state), [state])
 
   const resetState = useCallback(async () => {
-    // Limpiar localStorage para obtener estado por defecto
-    localStorage.removeItem('habitquest_state')
-    const fresh = storage.load() // devuelve defaultState
-    // Subir estado limpio a la nube antes de recargar
-    if (isSyncEnabled()) {
-      await saveToBackend(fresh)
-    }
+    storage.clear()
+    marks.current = { dates: [], settings: false }
+    writeMarks(marks.current)
+    const fresh = storage.load()
+    if (isSyncEnabled()) await saveNow(fresh)
     window.location.reload()
   }, [])
 
   return {
     state,
-    syncError,
+    today,
+    // sync
+    saveStatus: sync.status,
+    saveError: sync.error,
+    lastSavedAt: sync.lastSavedAt,
+    loadError,
+    loadingInitial,
+    offline: !cloudReady && isSyncEnabled(),
     syncEnabled: isSyncEnabled(),
     refreshing,
     refreshFromCloud,
-    celebration,
-    setCelebration,
-    toggleHabit,
-    updateQuantHabit,
-    addGoalContribution,
-    addHabit,
-    updateHabit,
-    deleteHabit,
-    addGoal,
-    updateGoal,
-    deleteGoal,
+    retrySave: retryNow,
+    // registro
+    updateRecord,
+    logMeal,
+    logCustomMeal,
+    setPortion,
+    replaceMeal,
+    removeMeal,
+    copyDay,
+    setWorkout,
+    setSet,
+    // ajustes
     updateSettings,
-    updateDailyGoal,
+    setTargets,
+    upsertOption,
+    removeOption,
+    toggleFav,
+    upsertSplitDay,
+    removeSplitDay,
+    loadRoutineTemplate,
+    clearPlan,
+    // datos
     importState,
     exportState,
     resetState,

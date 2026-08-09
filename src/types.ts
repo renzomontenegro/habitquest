@@ -1,95 +1,95 @@
-// --- Hábitos ---
-export type HabitType = 'binary' | 'quant' | 'cycle'
+// --- Macros ---
+export interface Macros {
+  prot: number
+  carb: number
+  grasa: number
+}
 
-export interface Habit {
+export type MacroKey = keyof Macros
+
+// --- Comidas ---
+export type MealSlot = 'desayuno' | 'almuerzo' | 'cena' | 'extra'
+
+/**
+ * Una opcion de comida con sus propios macros. La unidad de registro es la
+ * COMIDA completa ("Seco de res"), no sus ingredientes.
+ */
+export interface MealOption {
   id: string
   name: string
-  icon: string
-  type: HabitType
-  target?: number
-  unit?: string
-  xpReward: number
-  color: string
-  createdAt: string
-  category?: string
-  cycleSteps?: string[]       // pasos del ciclo, ej: ["Upper", "Lower", "Descanso", "Push", "Pull", "Legs", "Descanso"]
-  cycleStartIndex?: number   // desde qué paso empezar (default 0)
+  slots: MealSlot[] // en que comidas del dia aparece
+  prot: number
+  carb: number
+  grasa: number
+  fav?: boolean
 }
 
-export interface HabitLog {
+/** Una comida registrada en el dia. */
+export interface MealLog {
   id: string
-  habitId: string
-  date: string       // YYYY-MM-DD
-  value: number | boolean
-  completed: boolean
+  slot: MealSlot
+  optionId: string | null // null si fue algo fuera del plan
+  portion: number // 1 = porcion normal
+  at: number
+  /** Para "comi otra cosa": macros sueltos, sin opcion detras. */
+  custom?: { name: string; prot: number; carb: number; grasa: number }
 }
 
-// --- Metas ---
-export interface Goal {
+// --- Entrenamiento ---
+export interface Exercise {
   id: string
   name: string
-  icon: string
-  targetAmount: number
-  currentAmount: number
-  unit: string
-  deadline?: string
-  category?: string
+  sets: number
+  reps: string
 }
 
-export interface GoalContribution {
-  id: string
-  goalId: string
-  date: string
-  amount: number
-  note?: string
-}
-
-// --- Perfil ---
-export type DailyXPGoal = 10 | 20 | 30 | 50
-
-export interface UserProfile {
-  totalXP: number
-  level: number
-  dailyXPGoal: DailyXPGoal
-  streakFreezes: number
-  lastActiveDate: string
-  // Racha almacenada — se actualiza hacia adelante, nunca se recalcula retroactivamente
-  currentStreak: number
-  streakDate: string // último día que contó para la racha (YYYY-MM-DD)
-}
-
-// --- Logros ---
-export interface Achievement {
+/** Un dia del split. `weekday` 0-6 (dom-sab), null si no tiene dia fijo. */
+export interface SplitDay {
   id: string
   name: string
-  description: string
-  icon: string
-  condition: string
-  unlockedAt?: string
+  weekday: number | null
+  exercises: Exercise[]
 }
 
-// --- Liga ---
-export type LeagueTier = 'bronce' | 'plata' | 'oro' | 'platino' | 'diamante'
-
-export interface WeeklyLeague {
-  weekStart: string
-  xp: number
-  tier: LeagueTier
+export interface SetEntry {
+  weight: string
+  reps: string
 }
 
-// --- Settings ---
+// --- Registro diario ---
+export interface DayLog {
+  date: string // YYYY-MM-DD
+  weight?: number // peso en ayunas
+  steps?: number
+  waist?: number // cintura, semanal
+  bedTime?: string // HH:MM
+  wakeTime?: string // HH:MM
+  meals?: MealLog[]
+  workoutId?: string | null // id de SplitDay; null = descanso
+  sets?: Record<string, SetEntry[]> // por id de ejercicio
+}
+
+// --- Ajustes ---
 export interface AppSettings {
-  soundEnabled: boolean
+  targets: Macros // objetivo diario
+  /** Que fraccion del objetivo diario va en cada comida (0-1). */
+  slotShare: Record<MealSlot, number>
+  options: MealOption[]
+  split: SplitDay[]
+  /** Horas de sueno objetivo, para la linea de referencia del grafico. */
+  sleepTarget: number
+  /** Margen para dar un dia por cumplido (0.12 = ±12%). */
+  tolerance: number
+  /** Meta de peso: hacia donde va la tendencia. Sin estos no hay proyeccion. */
+  targetWeight?: number
+  targetDate?: string
+  startDate: string
+  /** false hasta que el usuario define sus objetivos por primera vez. */
+  setupDone: boolean
 }
 
 // --- Estado global ---
 export interface AppState {
-  profile: UserProfile
-  habits: Habit[]
-  habitLogs: HabitLog[]
-  goals: Goal[]
-  goalContributions: GoalContribution[]
-  achievements: Achievement[]
-  weeklyLeagues: WeeklyLeague[]
+  records: DayLog[]
   settings: AppSettings
 }

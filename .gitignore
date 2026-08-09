@@ -26,3 +26,20 @@ src/assets/hero.png
 src/assets/react.svg
 src/assets/vite.svg
 public/icons.svg
+
+# Env vars locales (VITE_ de build)
+.env
+.env.*
+!.env.example
+
+# Config local de opencode (contiene la API key de n8n)
+opencode.json
+opencode.json.bak*
+
+# Artefactos transitorios de herramientas y pruebas
+.playwright-mcp/
+dev-dist/
+*.bak
+hoy-initial.png
+semana.png
+after-tokens.png

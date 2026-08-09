@@ -1,33 +1,42 @@
 import { useState, useCallback, useRef } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
-import { BottomNav, type Tab } from './components/BottomNav'
-import { CelebrationModal } from './components/CelebrationModal'
 import { TodayScreen } from './screens/TodayScreen'
-import { GoalsScreen } from './screens/GoalsScreen'
-import { StatsScreen } from './screens/StatsScreen'
-import { SettingsScreen } from './screens/SettingsScreen'
+import { WeekScreen } from './screens/WeekScreen'
+import { PlanScreen } from './screens/PlanScreen'
+import { SettingsSheet } from './screens/SettingsSheet'
+import { SetupScreen } from './screens/SetupScreen'
 import { useAppState } from './hooks/useAppState'
+import { headerDate, isoWeek, parseDate, weightAvg, addDays } from './lib/logic'
+import { SaveDot } from './components/ui'
+
+type Tab = 'hoy' | 'semana' | 'plan'
+
+const TABS: [Tab, string][] = [['hoy', 'Hoy'], ['semana', 'La semana'], ['plan', 'Mi plan']]
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('hoy')
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const app = useAppState()
 
-  const handleTabChange = useCallback((newTab: Tab) => {
-    if (newTab === tab && newTab === 'hoy') {
-      app.refreshFromCloud()
-    }
-    setTab(newTab)
-  }, [tab, app.refreshFromCloud])
+  // Dia visible en Hoy. Arranca en hoy; el calendario navega hacia atras.
+  const [viewDate, setViewDate] = useState(app.today)
+  // Si pasan las 0:00, lo que era hoy pasa a ser ayer: no se mueve nada, el
+  // usuario sigue viendo el mismo dia real hasta que toque "Hoy".
+  const goToday = useCallback(() => setViewDate(app.today), [app.today])
 
-  // Pull-to-refresh
+  const handleTabChange = useCallback((newTab: Tab) => {
+    if (newTab === tab) void app.refreshFromCloud()
+    setTab(newTab)
+  }, [tab, app])
+
+  // Pull-to-refresh: sincroniza, no recarga la app (recargar perdia el scroll
+  // y en iOS forzaba una revalidacion completa del service worker).
   const [pullDistance, setPullDistance] = useState(0)
   const touchStartY = useRef(0)
   const pulling = useRef(false)
   const threshold = 80
 
   const onTouchStart = useCallback((e: React.TouchEvent) => {
-    const scrollTop = (e.currentTarget as HTMLElement).scrollTop
-    if (scrollTop <= 0) {
+    if ((e.currentTarget as HTMLElement).scrollTop <= 0) {
       touchStartY.current = e.touches[0].clientY
       pulling.current = true
     }
@@ -41,12 +50,32 @@ export default function App() {
   }, [])
 
   const onTouchEnd = useCallback(() => {
-    if (pulling.current && pullDistance >= threshold && !app.refreshing) {
-      window.location.reload()
-    }
+    if (pulling.current && pullDistance >= threshold) void app.refreshFromCloud()
     pulling.current = false
     setPullDistance(0)
-  }, [pullDistance])
+  }, [pullDistance, app])
+
+  const todayDate = parseDate(app.today) ?? new Date()
+  const viewDateObj = parseDate(viewDate) ?? todayDate
+  const trend7 = weightAvg(app.state.records, addDays(viewDate, -6), viewDate)
+  const viewingToday = viewDate === app.today
+
+  // Primer arranque: no se muestra nada mas hasta tener objetivos. Se espera a
+  // la nube para no pedirselos a alguien que ya los tiene guardados.
+  if (!app.state.settings.setupDone && !app.loadingInitial) {
+    return (
+      <div className="app-shell">
+        <div className="app-header-safe" />
+        <main className="app-content">
+          <div className="mx-root">
+            <div className="mx-shell">
+              <SetupScreen onDone={targets => app.updateSettings({ targets, setupDone: true })} />
+            </div>
+          </div>
+        </main>
+      </div>
+    )
+  }
 
   return (
     <div className="app-shell">
@@ -58,94 +87,79 @@ export default function App() {
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
       >
-        {/* Pull-to-refresh indicator */}
-        <div
-          className="flex items-center justify-center overflow-hidden transition-[height] duration-200"
-          style={{ height: app.refreshing ? 36 : pullDistance > 10 ? pullDistance : 0 }}
-        >
-          {app.refreshing ? (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="flex items-center gap-2 text-[12px] font-bold text-duo-green"
-            >
-              <motion.span
-                animate={{ rotate: 360 }}
-                transition={{ repeat: Infinity, duration: 0.8, ease: 'linear' }}
-                className="inline-block"
-              >
-                ~
-              </motion.span>
-              Sincronizando...
-            </motion.div>
-          ) : pullDistance > 10 && (
-            <span
-              className="text-[12px] font-bold transition-colors"
-              style={{ color: pullDistance >= threshold ? '#58CC02' : '#5C7680' }}
-            >
-              {pullDistance >= threshold ? 'Soltar para refrescar' : 'Tirar para refrescar'}
+        <div className="pull-indicator" style={{ height: pullDistance > 10 ? pullDistance : 0 }}>
+          {pullDistance > 10 && (
+            <span style={{ color: pullDistance >= threshold ? 'var(--good)' : 'var(--mute)' }}>
+              {app.refreshing ? 'Sincronizando' : pullDistance >= threshold ? 'Soltar para sincronizar' : 'Tirar para sincronizar'}
             </span>
           )}
         </div>
-        {/* Sync error alert */}
-        <AnimatePresence>
-          {app.syncError && !app.refreshing && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="mx-4 mb-2 px-3 py-2.5 rounded-xl bg-red-900/30 border border-red-500/30 flex items-center gap-2"
-            >
-              <span className="text-[16px]">&#x26A0;</span>
-              <p className="text-[12px] font-bold text-red-400">{app.syncError}</p>
-            </motion.div>
-          )}
-        </AnimatePresence>
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={tab}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.1 }}
-            className={app.syncError ? 'pointer-events-none opacity-40' : ''}
-          >
-            {tab === 'hoy' && (
-              <TodayScreen
-                state={app.state}
-                onToggle={app.toggleHabit}
-                onUpdateQuant={app.updateQuantHabit}
-                onAddHabit={app.addHabit}
-                onUpdateHabit={app.updateHabit}
-                onDeleteHabit={app.deleteHabit}
-              />
-            )}
-            {tab === 'metas' && (
-              <GoalsScreen
-                state={app.state}
-                onAddContribution={app.addGoalContribution}
-                onAddGoal={app.addGoal}
-                onUpdateGoal={app.updateGoal}
-                onDeleteGoal={app.deleteGoal}
-              />
-            )}
-            {tab === 'stats' && <StatsScreen state={app.state} />}
-            {tab === 'ajustes' && (
-              <SettingsScreen
-                state={app.state}
-                syncEnabled={app.syncEnabled}
-                syncError={app.syncError}
-                onUpdateSettings={app.updateSettings}
-                onUpdateDailyGoal={app.updateDailyGoal}
-                onReset={app.resetState}
-              />
-            )}
-          </motion.div>
-        </AnimatePresence>
+
+        {/* La app NUNCA se bloquea por un fallo de red: se registra igual y se
+            sube al reconectar. El banner solo informa. */}
+        {app.offline && (
+          <div className="mx-banner" data-tone="warn">
+            <span>⚠</span>
+            <span>
+              {app.loadError ?? 'Sin conexion con tu nube.'} Puedes seguir registrando: se guarda
+              en el telefono y se sube solo al reconectar.
+            </span>
+          </div>
+        )}
+
+        <div className="mx-root">
+          <div className="mx-shell">
+            <div className="mx-head">
+              <div>
+                <div className="mx-eyebrow">
+                  {headerDate(viewDateObj)} · semana {String(isoWeek(viewDateObj)).padStart(2, '0')}
+                  {!viewingToday && (
+                    <button className="mx-mini mx-go-today" onClick={goToday}>Hoy</button>
+                  )}
+                </div>
+                <h1>Sistema</h1>
+                <SaveDot
+                  status={app.saveStatus}
+                  offline={app.offline}
+                  onRetry={app.retrySave}
+                />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ textAlign: 'right' }}>
+                  <div className="mx-eyebrow">Tendencia 7d</div>
+                  <div className="mx-mono" style={{ fontSize: 15, fontWeight: 600 }}>
+                    {trend7 !== null ? `${trend7.toFixed(1)} kg` : '—'}
+                  </div>
+                </div>
+                <button className="mx-gear" onClick={() => setSettingsOpen(true)} aria-label="Ajustes">⚙</button>
+              </div>
+            </div>
+
+            <div className="mx-tabs">
+              {TABS.map(([k, l]) => (
+                <button
+                  key={k}
+                  className="mx-tab"
+                  data-on={tab === k ? '1' : '0'}
+                  onClick={() => handleTabChange(k)}
+                >
+                  {l}
+                </button>
+              ))}
+            </div>
+
+            {tab === 'hoy' && <TodayScreen app={app} viewDate={viewDate} setViewDate={setViewDate} goToday={goToday} />}
+            {tab === 'semana' && <WeekScreen app={app} />}
+            {tab === 'plan' && <PlanScreen app={app} />}
+          </div>
+        </div>
       </main>
 
-      <BottomNav active={tab} onChange={handleTabChange} />
-      <CelebrationModal celebration={app.celebration} onClose={() => app.setCelebration(null)} />
+      <SettingsSheet
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        app={app}
+      />
     </div>
   )
 }
