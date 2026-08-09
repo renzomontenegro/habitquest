@@ -248,20 +248,38 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
           </div>
         </div>
         <Field label="Me acoste" sub="Si fue despues de medianoche, cuenta para ayer">
-          <input
-            className="mx-in"
-            type="time"
-            value={record?.bedTime ?? ''}
-            onChange={e => app.updateRecord({ bedTime: e.target.value || undefined }, viewDate)}
-          />
+          <div className="mx-time">
+            <input
+              className="mx-in mx-time-in"
+              type="time"
+              value={record?.bedTime ?? ''}
+              onChange={e => app.updateRecord({ bedTime: e.target.value || undefined }, viewDate)}
+            />
+            {record?.bedTime && (
+              <button
+                className="mx-time-x"
+                onClick={() => app.updateRecord({ bedTime: undefined }, viewDate)}
+                aria-label="Borrar hora de acostarse"
+              >✕</button>
+            )}
+          </div>
         </Field>
         <Field label="Me desperte">
-          <input
-            className="mx-in"
-            type="time"
-            value={record?.wakeTime ?? ''}
-            onChange={e => app.updateRecord({ wakeTime: e.target.value || undefined }, viewDate)}
-          />
+          <div className="mx-time">
+            <input
+              className="mx-in mx-time-in"
+              type="time"
+              value={record?.wakeTime ?? ''}
+              onChange={e => app.updateRecord({ wakeTime: e.target.value || undefined }, viewDate)}
+            />
+            {record?.wakeTime && (
+              <button
+                className="mx-time-x"
+                onClick={() => app.updateRecord({ wakeTime: undefined }, viewDate)}
+                aria-label="Borrar hora de despertar"
+              >✕</button>
+            )}
+          </div>
         </Field>
       </div>
 

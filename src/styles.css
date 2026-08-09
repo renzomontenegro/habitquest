@@ -179,6 +179,13 @@ button:active { transform: scale(.985); }
 
 .mx-sleep { font-size: 13px; font-weight: 600; }
 
+.mx-time { display: flex; align-items: center; gap: 6px; }
+.mx-time-in { width: 128px; }
+.mx-time-x { width: 28px; height: 28px; flex-shrink: 0; border: 1px solid var(--line);
+  background: var(--paper); border-radius: 2px; color: var(--mute); cursor: pointer; font-size: 10px;
+  display: flex; align-items: center; justify-content: center; }
+.mx-time-x:hover { color: var(--bad); border-color: rgba(155, 50, 38, .4); }
+
 .mx-acts { display: flex; gap: 6px; margin-top: 14px; flex-wrap: wrap; }
 .mx-btn { flex: 1; min-width: 92px; border: 1px solid var(--line); background: var(--paper); color: var(--ink);
   padding: 11px 6px; border-radius: 2px; cursor: pointer; font-size: 12px; font-weight: 500; }
