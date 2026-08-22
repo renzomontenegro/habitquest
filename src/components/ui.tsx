@@ -488,6 +488,7 @@ function WeightBody({ initialKg, hasValue, minKg, maxKg, onChange, onClose }: {
 }) {
   const [unit, setUnit] = useState<'kg' | 'lb'>('kg')
   const [draftKg, setDraftKg] = useState(round1(initialKg))
+  const [editing, setEditing] = useState(false)
 
   // Unica fuente de verdad: kg. El lb es solo como se ve/edita la rueda.
   const inUnit = unit === 'kg' ? draftKg : draftKg * KG_TO_LB
@@ -507,28 +508,58 @@ function WeightBody({ initialKg, hasValue, minKg, maxKg, onChange, onClose }: {
   }
 
   return (
-    <>
-      <div className="mx-wv mx-mono">{String(rounded).replace('.', ',')} <span className="mx-u">{unit}</span></div>
-      <div className="mx-wv-seg">
-        <Seg opts={['kg', 'lb']} value={unit} onChange={v => setUnit(v as 'kg' | 'lb')} />
-      </div>
-      <div className="mx-wheel">
-        <WheelCol
-          label="Enteros"
-          count={wholeCount}
-          selected={wholeIndex}
-          onSelect={i => setInUnit(wholeMin + i)}
-          fmt={i => String(wholeMin + i)}
-        />
-        <div className="mx-wheel-sep mx-mono">,</div>
-        <WheelCol
-          label="Decimales"
-          count={DEC_COUNT}
-          selected={dec}
-          onSelect={d => setInUnit(whole + d * 0.1)}
-          fmt={String}
-        />
-      </div>
+    <div style={{ position: 'relative' }}>
+      {editing ? (
+        <>
+          <div className="mx-wv mx-wv-edit">
+            <input
+              className="mx-in mx-wv-in mx-mono"
+              value={String(draftKg).replace('.', ',')}
+              autoFocus
+              inputMode="decimal"
+              onChange={e => {
+                const n = parseFloat(e.target.value.replace(',', '.'))
+                if (Number.isFinite(n) && n > 0) setDraftKg(Math.min(999, round1(n)))
+              }}
+            />
+            <span className="mx-u">{unit}</span>
+          </div>
+          <div className="mx-sub" style={{ textAlign: 'center', marginTop: 6 }}>
+            Escribi el peso directo (en {unit})
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="mx-wv mx-mono">{String(rounded).replace('.', ',')} <span className="mx-u">{unit}</span></div>
+          <div className="mx-wv-seg">
+            <Seg opts={['kg', 'lb']} value={unit} onChange={v => setUnit(v as 'kg' | 'lb')} />
+          </div>
+          <div className="mx-wheel">
+            <WheelCol
+              label="Enteros"
+              count={wholeCount}
+              selected={wholeIndex}
+              onSelect={i => setInUnit(wholeMin + i)}
+              fmt={i => String(wholeMin + i)}
+            />
+            <div className="mx-wheel-sep mx-mono">,</div>
+            <WheelCol
+              label="Decimales"
+              count={DEC_COUNT}
+              selected={dec}
+              onSelect={d => setInUnit(whole + d * 0.1)}
+              fmt={String}
+            />
+          </div>
+        </>
+      )}
+      <button
+        className="mx-edit-corner"
+        onClick={() => setEditing(e => !e)}
+        aria-label={editing ? 'Volver a la rueda' : 'Editar con teclado'}
+      >
+        {editing ? '↩' : '✎'}
+      </button>
       <div className="mx-acts">
         {hasValue && (
           <button
@@ -542,6 +573,6 @@ function WeightBody({ initialKg, hasValue, minKg, maxKg, onChange, onClose }: {
           Listo
         </button>
       </div>
-    </>
+    </div>
   )
 }
