@@ -508,21 +508,28 @@ function WeightBody({ initialKg, hasValue, minKg, maxKg, onChange, onClose }: {
   }
 
   return (
-    <div style={{ position: 'relative' }}>
+    <div>
       {editing ? (
         <>
-          <div className="mx-wv mx-wv-edit">
-            <input
-              className="mx-in mx-wv-in mx-mono"
-              value={String(draftKg).replace('.', ',')}
-              autoFocus
-              inputMode="decimal"
-              onChange={e => {
-                const n = parseFloat(e.target.value.replace(',', '.'))
-                if (Number.isFinite(n) && n > 0) setDraftKg(Math.min(999, round1(n)))
-              }}
-            />
-            <span className="mx-u">{unit}</span>
+          <div className="mx-wv-row">
+            <div className="mx-wv-num mx-mono">
+              <input
+                className="mx-in mx-wv-in mx-mono"
+                value={String(draftKg).replace('.', ',')}
+                autoFocus
+                inputMode="decimal"
+                onChange={e => {
+                  const n = parseFloat(e.target.value.replace(',', '.'))
+                  if (Number.isFinite(n) && n > 0) setDraftKg(Math.min(999, round1(n)))
+                }}
+              />
+              <i className="mx-wv-u">{unit}</i>
+            </div>
+            <button
+              className="mx-edit-circle"
+              onClick={() => setEditing(e => !e)}
+              aria-label="Volver a la rueda"
+            >↩</button>
           </div>
           <div className="mx-sub" style={{ textAlign: 'center', marginTop: 6 }}>
             Escribi el peso directo (en {unit})
@@ -530,7 +537,17 @@ function WeightBody({ initialKg, hasValue, minKg, maxKg, onChange, onClose }: {
         </>
       ) : (
         <>
-          <div className="mx-wv mx-mono">{String(rounded).replace('.', ',')} <span className="mx-u">{unit}</span></div>
+          <div className="mx-wv-row">
+            <div className="mx-wv-num mx-mono">
+              <span>{String(rounded).replace('.', ',')}</span>
+              <i className="mx-wv-u">{unit}</i>
+            </div>
+            <button
+              className="mx-edit-circle"
+              onClick={() => setEditing(e => !e)}
+              aria-label="Editar con teclado"
+            >✎</button>
+          </div>
           <div className="mx-wv-seg">
             <Seg opts={['kg', 'lb']} value={unit} onChange={v => setUnit(v as 'kg' | 'lb')} />
           </div>
@@ -553,13 +570,6 @@ function WeightBody({ initialKg, hasValue, minKg, maxKg, onChange, onClose }: {
           </div>
         </>
       )}
-      <button
-        className="mx-edit-corner"
-        onClick={() => setEditing(e => !e)}
-        aria-label={editing ? 'Volver a la rueda' : 'Editar con teclado'}
-      >
-        {editing ? '↩' : '✎'}
-      </button>
       <div className="mx-acts">
         {hasValue && (
           <button
