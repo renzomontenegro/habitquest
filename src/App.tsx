@@ -66,6 +66,10 @@ export default function App() {
   }, [])
 
   const onTouchStart = useCallback((e: React.TouchEvent) => {
+    // El pull no aplica dentro del anillo (ruleta) ni en los modales/sheets:
+    // sus gestos son propios y el evento bullea hasta el main.
+    const t = e.target as HTMLElement
+    if (t.closest?.('.mx-ring') || t.closest?.('.mx-sheet')) return
     if ((e.currentTarget as HTMLElement).scrollTop <= 0) {
       touchStartY.current = e.touches[0].clientY
       pulling.current = true
