@@ -1,8 +1,8 @@
-import type { AppSettings, AppState, DayLog, Macros, MealLog, MealOption, MealSlot, SetEntry, SplitDay } from '../types'
+import type { AppSettings, AppState, DayLog, Macros, MealLog, MealSlot, SetEntry, SplitDay } from '../types'
 import {
   DEFAULT_SLEEP_TARGET, DEFAULT_SLOT_SHARE, DEFAULT_TARGETS, DEFAULT_TOLERANCE,
 } from './config'
-import { todayStr, uid } from './logic'
+import { normTime, todayStr, uid } from './logic'
 
 const STORAGE_KEY = 'sistema_state'
 
@@ -14,7 +14,6 @@ const STORAGE_KEY = 'sistema_state'
 const defaultSettings = (): AppSettings => ({
   targets: { ...DEFAULT_TARGETS },
   slotShare: { ...DEFAULT_SLOT_SHARE },
-  options: [],
   split: [],
   sleepTarget: DEFAULT_SLEEP_TARGET,
   tolerance: DEFAULT_TOLERANCE,
@@ -47,28 +46,13 @@ function optStr(v: unknown): string | undefined {
   return typeof v === 'string' && v ? v : undefined
 }
 
-function cleanOption(v: unknown): MealOption | null {
-  if (!isObj(v)) return null
-  const name = str(v.name).trim()
-  if (!name) return null
-  const rawSlots = Array.isArray(v.slots) ? v.slots : []
-  const slots = SLOT_IDS.filter(s => rawSlots.includes(s))
-  return {
-    id: str(v.id) || uid('o'),
-    name,
-    slots: slots.length > 0 ? slots : ['almuerzo'],
-    prot: Math.max(0, num(v.prot, 0)),
-    carb: Math.max(0, num(v.carb, 0)),
-    grasa: Math.max(0, num(v.grasa, 0)),
-    ...(v.fav === true ? { fav: true } : {}),
-  }
-}
-
 function cleanMealLog(v: unknown): MealLog | null {
   if (!isObj(v)) return null
   const slot = SLOT_IDS.includes(v.slot as MealSlot) ? (v.slot as MealSlot) : null
   if (!slot) return null
 
+  // Sin custom no hay macros que sumar: la comida desaparece. (Los registros
+  // del modelo con catalogo quedaban sin macros una vez eliminado el catalogo.)
   let custom: MealLog['custom']
   if (isObj(v.custom)) {
     const name = str(v.custom.name).trim()
@@ -81,17 +65,17 @@ function cleanMealLog(v: unknown): MealLog | null {
       }
     }
   }
+  if (!custom) return null
 
-  const optionId = optStr(v.optionId) ?? null
-  if (!optionId && !custom) return null
-
+  const note = optStr(v.note)
   return {
     id: str(v.id) || uid('m'),
     slot,
-    optionId,
     portion: Math.max(0, num(v.portion, 1)) || 1,
     at: num(v.at, 0),
-    ...(custom ? { custom } : {}),
+    custom,
+    ...(note ? { note } : {}),
+    ...(v.ai === true ? { ai: true } : {}),
   }
 }
 
@@ -154,8 +138,12 @@ function cleanRecord(v: unknown): DayLog | null {
   if (optNum(v.weight) != null) rec.weight = optNum(v.weight)
   if (optNum(v.steps) != null) rec.steps = optNum(v.steps)
   if (optNum(v.waist) != null) rec.waist = optNum(v.waist)
-  if (optStr(v.bedTime)) rec.bedTime = optStr(v.bedTime)
-  if (optStr(v.wakeTime)) rec.wakeTime = optStr(v.wakeTime)
+  // Hora normalizada: un valor no-conformante haria que el input la muestre
+  // como invalida (tooltip nativo) y que el sueno no calcule.
+  const bed = normTime(optStr(v.bedTime) ?? '')
+  if (bed) rec.bedTime = bed
+  const wake = normTime(optStr(v.wakeTime) ?? '')
+  if (wake) rec.wakeTime = wake
 
   if (Array.isArray(v.meals)) {
     const meals = v.meals.map(cleanMealLog).filter((m): m is MealLog => m !== null)
@@ -178,6 +166,7 @@ function cleanRecord(v: unknown): DayLog | null {
  * para hacerlas desaparecer. Se reconocen por el id, que la app escribia a mano
  * con guion bajo (`o_muffins`, `s_upper`). Los ids que genera `uid()` nunca
  * llevan guion bajo, asi que nada creado por el usuario cae en este filtro.
+ * (Hoy solo aplica a la rutina: el catalogo de comidas ya no existe.)
  */
 function isSeededId(id: string): boolean {
   return /^[a-z]+_/.test(id)
@@ -199,12 +188,8 @@ function sanitize(value: unknown): AppState {
 
   const s = isObj(value.settings) ? value.settings : {}
 
-  // Comidas y rutina son SIEMPRE del usuario. Si el estado guardado no las
-  // trae, la app arranca vacia: no se siembra nada, ni siquiera al migrar.
-  const options = (Array.isArray(s.options) ? s.options : [])
-    .map(cleanOption)
-    .filter((o): o is MealOption => o !== null && !isSeededId(o.id))
-
+  // La rutina es SIEMPRE del usuario. Si el estado guardado no la trae, la
+  // app arranca sin ella: no se siembra nada, ni siquiera al migrar.
   const split = (Array.isArray(s.split) ? s.split : [])
     .map(cleanSplit)
     .filter((d): d is SplitDay => d !== null && !isSeededId(d.id))
@@ -212,7 +197,6 @@ function sanitize(value: unknown): AppState {
   const settings: AppSettings = {
     targets: cleanTargets(s.targets, DEFAULT_TARGETS),
     slotShare: cleanShare(s.slotShare),
-    options,
     split,
     sleepTarget: Math.min(14, Math.max(1, num(s.sleepTarget, DEFAULT_SLEEP_TARGET))),
     tolerance: Math.min(0.5, Math.max(0.01, num(s.tolerance, DEFAULT_TOLERANCE))),

@@ -198,20 +198,20 @@ export function SettingsSheet({ open, onClose, app }: {
         <div>
           <div className="mx-lbl" style={{ marginBottom: 4 }}>Vaciar mi plan</div>
           <div className="mx-sub" style={{ marginBottom: 10, lineHeight: 1.5 }}>
-            Borra tus comidas y tu rutina para empezar el plan de cero.
-            Tus registros de peso, pasos, sueno y series NO se tocan.
+            Borra tu rutina para empezar de cero. Tus registros de peso, pasos, sueno,
+            comidas y series NO se tocan.
           </div>
           <ConfirmButton
             label="Vaciar plan"
             confirmLabel="Toca otra vez para vaciar"
-            onConfirm={() => { app.clearPlan(); setMsg({ text: 'Plan vaciado. Crea tus comidas en Mi plan.', ok: true }) }}
+            onConfirm={() => { app.clearPlan(); setMsg({ text: 'Rutina vaciada.', ok: true }) }}
           />
         </div>
 
         <div>
           <div className="mx-lbl" style={{ marginBottom: 4 }}>Zona peligrosa</div>
           <div className="mx-sub" style={{ marginBottom: 10 }}>
-            Borra registros, objetivos, alimentos y rutina. No se puede deshacer.
+            Borra registros, objetivos y rutina. No se puede deshacer.
           </div>
           <ConfirmButton
             label="Resetear todo"

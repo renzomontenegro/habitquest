@@ -67,12 +67,78 @@ function buildHeaders(): Record<string, string> {
   return headers
 }
 
-function getUrl(endpoint: 'habitquest-save' | 'habitquest-load' | 'habitquest-push'): string | null {
+function getUrl(endpoint: 'habitquest-save' | 'habitquest-load' | 'habitquest-push' | 'habitquest-estimate'): string | null {
   if (!SYNC_URL) return null
   const base = SYNC_URL.replace(/\/$/, '')
   // Si la URL ya apunta a un endpoint especifico, reemplazar; si no, concatenar
-  const cleaned = base.replace(/habitquest-(save|load)$/, endpoint)
+  const cleaned = base.replace(/habitquest-(save|load|estimate)$/, endpoint)
   return cleaned.endsWith(endpoint) ? cleaned : `${cleaned}/${endpoint}`
+}
+
+// --- Estimacion de comida (foto + texto -> IA) ---
+
+export interface MealEstimate {
+  prot: number
+  carb: number
+  grasa: number
+  kcal: number
+  nombre: string
+}
+
+/**
+ * Manda las fotos (base64, ya comprimidas) + la nota al webhook de estimacion.
+ * La IA corre en n8n con su propia key: el frontend nunca la ve. Puede tardar
+ * ~30 s del lado del servidor.
+ */
+export async function estimateMeal(
+  slot: string,
+  note: string,
+  imagesB64: string[],
+): Promise<{ ok: boolean; data?: MealEstimate; error?: string }> {
+  const url = getUrl('habitquest-estimate')
+  if (!url) return { ok: false, error: 'Sin servidor de estimacion configurado.' }
+  try {
+    const ctrl = new AbortController()
+    const timer = setTimeout(() => ctrl.abort(), 60_000)
+    let res: Response
+    try {
+      res = await fetch(url, {
+        method: 'POST',
+        headers: buildHeaders(),
+        body: JSON.stringify({ slot, note, images: imagesB64 }),
+        signal: ctrl.signal,
+      })
+    } finally {
+      clearTimeout(timer)
+    }
+    const data = (await res.json().catch(() => ({}))) as {
+      prot?: number
+      carb?: number
+      grasa?: number
+      kcal?: number
+      nombre?: string
+      error?: string
+    }
+    if (!res.ok) return { ok: false, error: data.error ?? `El servidor respondio ${res.status}.` }
+    if (typeof data.prot !== 'number' || typeof data.carb !== 'number' || typeof data.grasa !== 'number') {
+      return { ok: false, error: 'La estimacion no trajo macros validos.' }
+    }
+    return {
+      ok: true,
+      data: {
+        prot: data.prot,
+        carb: data.carb,
+        grasa: data.grasa,
+        kcal: typeof data.kcal === 'number' ? data.kcal : 0,
+        nombre: typeof data.nombre === 'string' ? data.nombre : '',
+      },
+    }
+  } catch (e) {
+    if (e instanceof DOMException && e.name === 'AbortError') {
+      return { ok: false, error: 'La estimacion tardo demasiado. Revisa que el VPN (Tailscale) este activo.' }
+    }
+    return { ok: false, error: friendlyError(e) }
+  }
 }
 
 // --- Carga ---

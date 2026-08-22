@@ -10,7 +10,7 @@ import { DayBars, LineChart, PaceBar, Stat } from '../components/charts'
 
 export function WeekScreen({ app }: { app: AppController }) {
   const { state, today } = app
-  const { options, targets, split } = state.settings
+  const { targets, split } = state.settings
   const records = state.records
 
   const week = useMemo(() => weekDates(today), [today])
@@ -19,14 +19,14 @@ export function WeekScreen({ app }: { app: AppController }) {
   const verdict = getVerdict(records, state.settings)
   const V = VERDICT_TEXT[verdict] ?? VERDICT_TEXT.ok
 
-  const weekTotals = useMemo(() => sumMacrosOver(records, week, options), [records, week, options])
+  const weekTotals = useMemo(() => sumMacrosOver(records, week), [records, week])
   const weekTarget = { prot: targets.prot * 7, carb: targets.carb * 7, grasa: targets.grasa * 7 }
 
   const adh = useMemo(() => adherence(records, week, state.settings), [records, week, state.settings])
 
   const macroByDay = useMemo(
-    () => week.map(d => (hasFoodLog(getRecord(records, d)) ? macrosForDate(records, d, options) : null)),
-    [records, week, options],
+    () => week.map(d => (hasFoodLog(getRecord(records, d)) ? macrosForDate(records, d) : null)),
+    [records, week],
   )
 
   // Peso: 30 dias con hueco explicito donde no hubo registro.

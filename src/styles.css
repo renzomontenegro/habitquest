@@ -178,6 +178,7 @@ button:active { transform: scale(.985); }
 .mx-date { width: 128px; font-family: 'Inter', sans-serif; font-size: 12.5px; }
 
 .mx-sleep { font-size: 13px; font-weight: 600; }
+.mx-sleep[data-wait='true'] { font-weight: 500; color: var(--mute); }
 
 .mx-time { display: flex; align-items: center; gap: 6px; }
 .mx-time-in { width: 128px; }
@@ -185,6 +186,49 @@ button:active { transform: scale(.985); }
   background: var(--paper); border-radius: 2px; color: var(--mute); cursor: pointer; font-size: 10px;
   display: flex; align-items: center; justify-content: center; }
 .mx-time-x:hover { color: var(--bad); border-color: rgba(155, 50, 38, .4); }
+
+.mx-time-trigger { min-width: 92px; text-align: right; padding: 7px 10px; background: var(--paper);
+  border: 1px solid var(--line); border-radius: 2px; color: var(--ink); cursor: pointer; font-size: 13px; }
+.mx-time-trigger[data-empty='1'] { color: var(--mute); }
+
+/* Peso y reps de serie: triggers como boton; vacio muestra el placeholder en
+   gris bien tenue (el peso del ultimo entreno, 50 si es primera vez; reps:
+   el limite inferior del rango) */
+.mx-weight-trigger { cursor: pointer; text-align: right; width: 64px; }
+.mx-reps-trigger { cursor: pointer; text-align: center; width: 64px; }
+.mx-weight-trigger[data-empty='1'],
+.mx-reps-trigger[data-empty='1'] { color: rgba(90, 104, 107, .38); font-weight: 400; }
+
+/* Foto de comida en el sheet de estimacion */
+.mx-photos { display: flex; flex-wrap: wrap; gap: 8px; }
+.mx-photo-th { position: relative; width: 92px; height: 92px; }
+.mx-photo-th img { width: 100%; height: 100%; object-fit: cover; border: 1px solid var(--line);
+  border-radius: 3px; background: var(--paper); }
+.mx-photo-th .mx-time-x { position: absolute; top: 3px; right: 3px; width: 22px; height: 22px; }
+.mx-photo-add { width: 92px; height: 92px; flex-shrink: 0; border: 1px dashed var(--line);
+  background: transparent; color: var(--mute); font-size: 22px; border-radius: 3px; cursor: pointer; }
+.mx-photo-add:hover { color: var(--ink); border-color: var(--mute); }
+
+/* Rueda de hora estilo iOS: dos columnas que siempre entregan "HH:MM" valido */
+.mx-wheel { display: flex; align-items: stretch; justify-content: center; gap: 3px; padding: 6px 0 10px; }
+.mx-wheel-col { position: relative; width: 104px; overflow: hidden; border: 1px solid var(--line);
+  border-radius: 3px; background: var(--paper); }
+.mx-wheel-scroll { overflow-y: scroll; scroll-snap-type: y mandatory; scrollbar-width: none;
+  -webkit-overflow-scrolling: touch; }
+.mx-wheel-scroll::-webkit-scrollbar { display: none; }
+.mx-wheel-item { display: block; height: 44px; width: 100%; border: 0; background: transparent;
+  color: var(--mute); font-size: 18px; scroll-snap-align: center; }
+.mx-wheel-item[data-on='1'] { color: var(--ink); font-weight: 600; }
+.mx-wheel-sep { align-self: center; font-size: 22px; color: var(--mute); padding: 0 2px; }
+.mx-wheel-hl { position: absolute; left: 0; right: 0; top: calc(50% - 22px); height: 44px;
+  border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); pointer-events: none; }
+.mx-wheel-fade { position: absolute; left: 0; right: 0; height: 44px; pointer-events: none; }
+.mx-wheel-fade[data-t='top'] { top: 0; background: linear-gradient(to bottom, var(--paper) 25%, transparent); }
+.mx-wheel-fade[data-t='bottom'] { bottom: 0; background: linear-gradient(to top, var(--paper) 25%, transparent); }
+
+/* Previo grande del pesaje (rueda kg/lb) */
+.mx-wv { font-size: 32px; text-align: center; margin: 4px 0 16px; font-weight: 600; }
+.mx-wv-seg { display: flex; justify-content: center; margin-bottom: 4px; }
 
 .mx-acts { display: flex; gap: 6px; margin-top: 14px; flex-wrap: wrap; }
 .mx-btn { flex: 1; min-width: 92px; border: 1px solid var(--line); background: var(--paper); color: var(--ink);
@@ -202,6 +246,36 @@ button:active { transform: scale(.985); }
 .mx-add:hover { color: var(--ink); border-color: var(--mute); }
 .mx-fold { width: 100%; text-align: left; border: 0; background: transparent; cursor: pointer;
   padding: 0; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+
+/* Seccion colapsable de Hoy: cabecera chica en una linea */
+.mx-fold { width: 100%; text-align: left; border: 0; background: transparent; cursor: pointer;
+  padding: 0; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.mx-fold-emo { font-size: 13px; line-height: 1; flex-shrink: 0; }
+.mx-fold-title { display: flex; align-items: baseline; gap: 7px; min-width: 0; flex: 1; }
+.mx-fold-hint { font-style: normal; font-size: 11px; color: var(--mute);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mx-fold-x { width: 22px; height: 22px; flex-shrink: 0; display: flex; align-items: center;
+  justify-content: center; border: 1px solid var(--line); border-radius: 2px;
+  color: var(--mute); font-size: 12px; }
+.mx-fold-body { margin-top: 14px; }
+
+/* Anillo de categorias (circulos RELLENOS tipo pie que se pintan por porcion) */
+.mx-ring { position: relative; margin: 4px auto 0; touch-action: none; user-select: none; }
+.mx-ring-wheel { position: absolute; inset: 0; will-change: transform; }
+.mx-ring-b { position: absolute; width: 64px; height: 64px; border: 0; background: transparent;
+  cursor: pointer; padding: 0; }
+.mx-ring-b > svg { display: block; }
+.mx-ring-b[data-on='1'] { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: 999px; }
+.mx-ring-emo { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  font-size: 20px; line-height: 1; pointer-events: none; filter: grayscale(1) opacity(.45);
+  transition: filter .25s ease; }
+.mx-ring-b[data-done='1'] .mx-ring-emo { filter: none; }
+.mx-ring-c { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: 74px; height: 74px; border: 1px solid var(--line); border-radius: 999px;
+  background: var(--card); display: flex; align-items: center; justify-content: center;
+  font-size: 17px; font-weight: 600; color: var(--ink); }
+.mx-ring-hint { text-align: center; margin-top: 2px; }
+.mx-sec { margin-top: 12px; }
 
 /* ===== HOY: macros restantes ===== */
 
@@ -236,6 +310,23 @@ button:active { transform: scale(.985); }
 .mx-mb[data-tone="carb"] .mx-mb-track i { background: var(--warn); }
 .mx-mb[data-tone="grasa"] .mx-mb-v { color: var(--good); }
 .mx-mb[data-tone="grasa"] .mx-mb-track i { background: var(--good); }
+
+/* Pies de macros: circulo relleno tipo pie, se llena segun lo comido */
+.mx-bp { display: flex; justify-content: space-between; gap: 6px; margin-bottom: 12px; }
+.mx-pie { flex: 1; display: flex; flex-direction: column; align-items: center; text-align: center; }
+.mx-pie-d { position: relative; width: 72px; height: 72px; }
+.mx-pie-d svg { display: block; }
+.mx-pie-arc { fill: var(--signal); }
+.mx-pie[data-tone="carb"] .mx-pie-arc { fill: var(--warn); }
+.mx-pie[data-tone="grasa"] .mx-pie-arc { fill: var(--good); }
+.mx-pie[data-over="1"] .mx-pie-arc { fill: var(--bad); }
+.mx-pie-v { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font-size: 15px; font-weight: 600; color: var(--ink); gap: 1px; }
+.mx-pie-v i { font-style: normal; font-size: 10px; color: var(--mute); }
+.mx-pie[data-over="1"] .mx-pie-v { color: var(--bad); }
+.mx-pie-l { font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--mute); margin-top: 5px; }
+.mx-pie-s { font-size: 9.5px; color: var(--mute); margin-top: 2px; }
 /* Pasado el objetivo, el color de macro deja de importar: manda el exceso. */
 .mx-mb[data-over="1"] .mx-mb-v { color: var(--bad); }
 .mx-mb[data-over="1"] .mx-mb-track i { background: var(--bad); }
@@ -505,6 +596,8 @@ button:active { transform: scale(.985); }
   padding: 10px 18px 30px; max-height: 82vh; overflow-y: auto;
   padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 30px); }
 .mx-sheet[data-wide="1"] { max-height: 90vh; }
+.mx-sheet[data-center="1"] { margin: 16px; border-radius: 10px; border-bottom: 1px solid var(--line);
+  max-height: 86vh; padding-bottom: 26px; }
 .mx-sheet-grab { width: 36px; height: 4px; border-radius: 2px; background: var(--line); margin: 0 auto 12px; }
 .mx-sheet-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
 .mx-sheet-x { width: 28px; height: 28px; border: 1px solid var(--line); background: var(--paper);

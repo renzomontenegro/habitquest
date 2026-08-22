@@ -6,7 +6,7 @@ import { SettingsSheet } from './screens/SettingsSheet'
 import { SetupScreen } from './screens/SetupScreen'
 import { useAppState } from './hooks/useAppState'
 import { usePWAUpdate } from './hooks/usePWAUpdate'
-import { headerDate, isoWeek, parseDate, weightAvg, addDays } from './lib/logic'
+import { headerDate, isoWeek, parseDate, weightTrendAt } from './lib/logic'
 import { APP_VERSION } from './lib/config'
 import { SaveDot } from './components/ui'
 
@@ -60,7 +60,12 @@ export default function App() {
 
   const todayDate = parseDate(app.today) ?? new Date()
   const viewDateObj = parseDate(viewDate) ?? todayDate
-  const trend7 = weightAvg(app.state.records, addDays(viewDate, -6), viewDate)
+  // "Si sigues asi, en 7d": promedio de la semana que termina en el dia visible
+  // + la tasa semanal del promedio anterior. Sin dos ventanas no hay ritmo.
+  const trendAt = weightTrendAt(app.state.records, viewDate)
+  const en7d = trendAt
+    ? { kg: Math.round((trendAt.recent + trendAt.delta) * 10) / 10 }
+    : null
   const viewingToday = viewDate === app.today
 
   // Primer arranque: no se muestra nada mas hasta tener objetivos. Se espera a
@@ -140,9 +145,9 @@ export default function App() {
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{ textAlign: 'right' }}>
-                  <div className="mx-eyebrow">Tendencia 7d</div>
+                  <div className="mx-eyebrow">Si sigues asi, en 7d:</div>
                   <div className="mx-mono" style={{ fontSize: 15, fontWeight: 600 }}>
-                    {trend7 !== null ? `${trend7.toFixed(1)} kg` : '—'}
+                    {en7d ? `${en7d.kg} kg` : 'Pesate unos dias'}
                   </div>
                 </div>
                 <button className="mx-gear" onClick={() => setSettingsOpen(true)} aria-label="Ajustes">⚙</button>

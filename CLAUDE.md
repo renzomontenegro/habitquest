@@ -4,9 +4,9 @@
 PWA personal (un solo usuario) para registrar comida por macros, peso, pasos, sueno y
 entrenamiento de fuerza. Stack: React + TypeScript + Vite + Tailwind CSS + Framer Motion.
 
-El objetivo de producto es **friccion minima al registrar**: agregar una comida debe costar
-un tap. Todo lo que se le pide al usuario tiene que alimentar alguna decision o grafico; si un
-campo no se lee en ningun lado, se elimina.
+El objetivo de producto es **friccion minima al registrar**: agregar una comida es una foto
+(opcional un texto) y un tap: la IA estima los macros. Todo lo que se le pide al usuario tiene
+que alimentar alguna decision o grafico; si un campo no se lee en ningun lado, se elimina.
 
 > Nota: el repo y la URL siguen llamandose "habitquest" por historia. La app ya no tiene XP,
 > niveles, rachas, logros ni ligas: eso se elimino por completo.
@@ -41,8 +41,23 @@ campo no se lee en ningun lado, se elimina.
 - **n8n API Key credential**: "n8n API Key (internal)" (id: `mFap4LinpRbFmxIY`), header `X-N8N-API-KEY`
 - **API path correcto**: `/api/v1/data-tables/{id}/rows` (con guion, NO `/api/v1/datatable/`)
 
+### Workflow: Estimar Comida (IA)
+- **ID**: `5lwcNn83WTAqecLh` (activo)
+- **Webhook**: POST `/webhook/habitquest-estimate` — recibe `{ slot, note, image }` (image en
+  base64, ya comprimida en el browser) y devuelve `{ prot, carb, grasa, kcal, nombre }`.
+- **Auth**: mismo Bearer "Header Auth PWA" (`AQKgx9XV1nvU6bv0`).
+- **Flujo**: validacion de entrada (Code) -> HTTP Request a `https://opencode.ai/zen/go/v1/chat/completions`
+  con el modelo **`mimo-v2.5`** (vision, barato, ~0.14 USD/M token) -> parse del JSON ->
+  responder 200 / 400 / 502. El parse busca `choices[0].message.content` y cae a
+  `reasoning_content` si el JSON corto.
+- **La key de Opencode GO vive SOLO en n8n**: credential `httpHeaderAuth` "Opencode GO API"
+  (id: `Ik3mnm12LdnGwAcv`, restringida al dominio `opencode.ai`). Nunca en el bundle ni en el repo.
+- Endpoint base de GO: `https://opencode.ai/zen/go/v1` (NO `opencode.go`: ese dominio no existe).
+- La foto NO se almacena en ningun lado: viaja a la IA y se descarta.
+
 ### Credenciales n8n
 - `AQKgx9XV1nvU6bv0` — Header Auth PWA (Bearer token para webhooks)
+- `Ik3mnm12LdnGwAcv` — Opencode GO API (httpHeaderAuth, key de la IA, solo en n8n)
 - `mFap4LinpRbFmxIY` — n8n API Key (internal, para acceso a DataTable API)
 - `egCycENJkHFji6p8` — Google Sheets OAuth2 (legacy, ya no se usa)
 
@@ -51,29 +66,26 @@ El archivo `.mcp.json` en la raiz configura el MCP de n8n con la API key y URL.
 
 ## Modelo de datos (`src/types.ts`)
 
-**La unidad de registro es la COMIDA, no el ingrediente.** Esto es una decision de producto
-explicita: pesar arroz y pollo por separado es mas friccion, no menos. El usuario elige "Seco
-de res" y esa opcion ya trae sus macros. No hay catalogo de alimentos ni composicion por
-ingredientes; si alguna vez se reintroduce, tiene que ser *encima* de este modelo, nunca
-reemplazandolo.
+**Las comidas se registran con FOTO + TEXTO y la IA estima los macros.** No hay catalogo de
+alimentos ni opciones con macros escritos a mano ("Seco de res" con 40P fue un experimento que
+no funciono para este usuario). La foto viaja a la IA (n8n -> Opencode GO) y NO se guarda; lo
+que queda en el registro es el resultado estimado.
 
-- `MealOption` — una opcion de comida con **sus propios macros** (`prot`/`carb`/`grasa` por
-  porcion). `slots` dice en que comidas del dia aparece (puede estar en varias). `fav` la pone
-  primero en el selector.
-- `MealLog` — una comida registrada: `slot`, `optionId`, `portion` (1 = porcion normal) y
-  `at`. Si fue algo fuera del plan, `optionId` es `null` y los macros van en `custom`.
+- `MealLog` — una comida registrada: `slot`, `portion` (1 = porcion normal), `at`,
+  `custom` = `{ name, prot, carb, grasa }` (siempre presente), `note` (comentario del usuario
+  que le dio contexto a la IA) y `ai` (true si los macros los estimo la IA).
 - `DayLog` — `weight`, `steps`, `waist`, `bedTime`, `wakeTime`, `meals[]`,
   `workoutId` (id de `SplitDay`, `null` = descanso), `sets` (por **id** de ejercicio).
 - `SplitDay` / `Exercise` — el split es **data editable por el usuario**, no constantes.
   `weekday` 0-6 fija el dia; `null` = solo aparece si se elige a mano.
-- `AppSettings` — `targets`, `slotShare`, `options`, `split`, `sleepTarget`, `tolerance`,
-  `startDate`, `setupDone`.
+- `AppSettings` — `targets`, `slotShare`, `split`, `sleepTarget`, `tolerance`,
+  `startDate`, `setupDone`. (Ya no hay `options`.)
 
 ### El plan NO vive en el codigo
 `config.ts` no contiene comidas ni rutina del usuario. Una instalacion nueva arranca con
-`options: []` y `split: []`, y pasa por `SetupScreen` (solo objetivos). Todo lo demas se crea
-desde Mi plan. Si algun dia hace falta un valor de plan nuevo, va a `AppSettings`, no a una
-constante.
+`split: []` (las comidas se registran por foto, no hay catalogo que sembrar), y pasa por
+`SetupScreen` (solo objetivos). Todo lo demas se crea desde Mi plan. Si algun dia hace falta un
+valor de plan nuevo, va a `AppSettings`, no a una constante.
 
 Lo que queda en `config.ts` es de dos tipos, separados a proposito:
 - **Arranques neutros** (`DEFAULT_*`): el punto de partida antes del onboarding. No son un
@@ -93,8 +105,8 @@ secundario es que un ejercicio repetido en dos dias (Cable Row en Upper y Pull) 
 historial; `strengthDrops()` lo deduplica.
 
 `slotReference(settings, slot)` deriva los macros de referencia de una comida como
-`targets × slotShare[slot]`. Es lo que precarga una opcion nueva y un "comi otra cosa", asi
-que sale de los numeros del usuario. `slotShare` es editable en Mi plan → Objetivo diario.
+`targets × slotShare[slot]`. Es lo que muestra el registro con foto como guia, asi que sale de
+los numeros del usuario. `slotShare` es editable en Mi plan → Objetivo diario.
 
 Cuando un texto de la UI menciona un umbral (p. ej. "±12%"), debe leerlo del ajuste, nunca
 repetirlo escrito: si no, se desincroniza en cuanto el usuario lo cambia.
@@ -108,7 +120,8 @@ eran numeros reales escritos por el usuario:
   el codigo, no las eligio el usuario), `meals` en formato `'sí'/'otra'/'no'` (no tenian macros
   detras), `mealSeverity`, `carbSources`, `walkAfterLunch`, `sugaryOrAlcohol` y `lastMealTime`.
 - `setupDone` solo es true si se definio en esta version, asi que un estado viejo pasa por el
-  onboarding y arranca con Mis comidas y Entrenamiento vacios.
+  onboarding y arranca con Entrenamiento vacio (las comidas nunca tuvieron catalogo: se
+  registran por foto).
 - Las series viejas quedan indexadas por **nombre** de ejercicio. Vuelven a aparecer en cuanto
   se cree un ejercicio con ese mismo nombre; hasta entonces siguen guardadas sin mostrarse.
 
@@ -125,13 +138,17 @@ La regla es el id: la app los escribia a mano con guion bajo (`o_muffins`, `s_up
 creado por el usuario cae en el filtro. **Si algun dia se generan ids con guion bajo, esta
 purga empezaria a borrar datos reales.**
 
-Ajustes tiene ademas "Vaciar mi plan" (`clearPlan()`), que limpia `options` y `split` sin
-tocar `records`.
+Ajustes tiene ademas "Vaciar mi plan" (`clearPlan()`), que limpia el `split` sin tocar
+`records`.
 
 ## Arquitectura de Sync (`src/lib/sync.ts`)
 La app **nunca se bloquea** por un fallo de red. Reglas:
 
 - Debounce de 1.5 s con techo de 8 s: escribir sin parar igual guarda.
+- Reconciliacion periodica (30 s, al volver a la app y al reconectar): trae la nube y la mezcla
+  respetando las fechas en edicion (`sistema_pending`). Sin esto, dos dispositivos abiertos se
+  pisaban enteros al guardar (el ultimo ganaba y podia borrar campos del mismo dia). Un guard
+  de igualdad evita re-guardar cuando no cambio nada.
 - Un fallo **no descarta el cambio**: queda en cola y se reintenta con backoff (4/10/30/60 s).
 - `flushSave()` con `keepalive: true` en `pagehide` y `visibilitychange` — iOS mata los timers
   al mandar la PWA a segundo plano y sin esto se perdia el ultimo dato escrito.
@@ -167,13 +184,13 @@ frontend, hay que actualizar AMBAS claves en ese Code node.
 
 ## Archivos clave
 - `src/types.ts` — modelo de datos
-- `src/lib/config.ts` — `APP_VERSION`, slots, `SLOT_REFERENCE` + semillas (opciones, split, targets)
+- `src/lib/config.ts` — `APP_VERSION`, slots, `SLOT_REFERENCE` + semillas (split, targets), `ROUTINE_TEMPLATE`
 - `src/lib/logic.ts` — fechas, sumas de macros, adherencia, veredicto, helpers de split
 - `src/lib/storage.ts` — localStorage, `sanitize` y la migracion del modelo viejo
-- `src/lib/sync.ts` — cola de guardado, reintentos, flush
+- `src/lib/sync.ts` — cola de guardado, reintentos, flush, `estimateMeal()` (foto -> IA)
 - `src/hooks/useAppState.ts` — estado global, acciones, merge offline (`AppController`)
-- `src/components/ui.tsx` — BottomSheet, Stepper, MacroBar, SaveDot, Toast, ConfirmButton
-- `src/components/MealPicker.tsx` — el selector: un tap registra la comida
+- `src/components/ui.tsx` — BottomSheet, Stepper, MacroBar, SaveDot, Toast, ConfirmButton, TimeWheel, WeightWheel
+- `src/components/MealEstimateSheet.tsx` — registra comida con foto + texto: la IA estima los macros
 - `src/components/charts.tsx` — LineChart, DayBars, PaceBar, Stat (SVG a mano)
 - `src/screens/` — SetupScreen (primer arranque), TodayScreen, WeekScreen, PlanScreen, SettingsSheet
 - `src/styles.css` — tema, app shell, safe areas iOS
@@ -192,9 +209,9 @@ frontend, hay que actualizar AMBAS claves en ese Code node.
 - **Errores inline y no bloqueantes**: mostrar el problema donde ocurre, sin deshabilitar la UI.
 - **Cada campo que se pide debe usarse**: si un dato del registro diario no alimenta un calculo
   ni un grafico, se elimina. Es la regla que mata la friccion.
-- **Registrar una comida = un tap.** Cualquier cambio que agregue pasos (elegir ingredientes,
-  pesar, confirmar) va en contra del objetivo del producto. La porcion y "comi otra cosa" son
-  atajos opcionales, nunca pasos obligatorios.
+- **Registrar una comida = foto + texto, y la IA estima los macros.** El sheet muestra el
+  resultado antes de guardar; la porcion se ajusta despues desde la tarjeta. Un dia sin registro
+  no cuenta. Cualquier paso extra obligatorio (pesar, elegir ingredientes) va contra el producto.
 - **Nada del plan del usuario se escribe en el codigo.** Si aparece la tentacion de poner una
   comida, una rutina o un objetivo "por defecto" en `config.ts`, va en `AppSettings` y se
   edita desde la app. Sin excepciones: tampoco "de ejemplo" ni "para migrar".

@@ -1,14 +1,15 @@
-import { useId, useEffect, useState, cloneElement, type ReactElement } from 'react'
+import { useId, useEffect, useState, useRef, cloneElement, type ReactElement } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { SaveStatus } from '../lib/sync'
 
-// --- Bottom sheet ---
-export function BottomSheet({ open, onClose, title, children, wide }: {
+// --- Bottom sheet (modal centrado con `center`) ---
+export function BottomSheet({ open, onClose, title, children, wide, center }: {
   open: boolean
   onClose: () => void
   title: string
   children: React.ReactNode
   wide?: boolean
+  center?: boolean
 }) {
   // El teclado de iOS no debe dejar el sheet detras del contenido de la pagina.
   useEffect(() => {
@@ -25,19 +26,20 @@ export function BottomSheet({ open, onClose, title, children, wide }: {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40"
+          className={`fixed inset-0 z-50 flex justify-center bg-black/40 ${center ? 'items-center' : 'items-end'}`}
           onClick={onClose}
         >
           <motion.div
-            initial={{ y: 420 }}
-            animate={{ y: 0 }}
-            exit={{ y: 420 }}
+            initial={center ? { y: 40, opacity: 0.6 } : { y: 420 }}
+            animate={center ? { y: 0, opacity: 1 } : { y: 0 }}
+            exit={center ? { y: 40, opacity: 0.6 } : { y: 420 }}
             transition={{ type: 'spring', damping: 30, stiffness: 320 }}
             className="mx-sheet"
             data-wide={wide ? '1' : '0'}
+            data-center={center ? '1' : '0'}
             onClick={e => e.stopPropagation()}
           >
-            <div className="mx-sheet-grab" />
+            {!center && <div className="mx-sheet-grab" />}
             <div className="mx-sheet-head">
               <div className="mx-eyebrow">{title}</div>
               <button className="mx-sheet-x" onClick={onClose} aria-label="Cerrar">✕</button>
@@ -245,5 +247,301 @@ export function ConfirmButton({ label, confirmLabel, onConfirm, className }: {
     >
       {armed ? confirmLabel : label}
     </button>
+  )
+}
+
+// --- Rueda de repeticiones: 0-20, arranca en el limite inferior del rango ---
+const REPS_COUNT = 21
+
+export function RepsWheel({ open, onClose, title, initial, hasValue, onChange }: {
+  open: boolean
+  onClose: () => void
+  title: string
+  initial: number
+  hasValue: boolean
+  onChange: (v: number | undefined) => void
+}) {
+  return (
+    <BottomSheet open={open} onClose={onClose} title={title}>
+      {open && (
+        <RepsBody initial={initial} hasValue={hasValue} onChange={onChange} onClose={onClose} />
+      )}
+    </BottomSheet>
+  )
+}
+
+function RepsBody({ initial, hasValue, onChange, onClose }: {
+  initial: number
+  hasValue: boolean
+  onChange: (v: number | undefined) => void
+  onClose: () => void
+}) {
+  const [v, setV] = useState(Math.max(0, Math.min(REPS_COUNT - 1, Math.round(initial))))
+
+  return (
+    <>
+      <div className="mx-wv mx-mono">{v} <span className="mx-u">reps</span></div>
+      <div className="mx-wheel">
+        <WheelCol label="Repeticiones" count={REPS_COUNT} selected={v} onSelect={setV} fmt={String} />
+      </div>
+      <div className="mx-acts">
+        {hasValue && (
+          <button
+            className="mx-btn mx-btn-danger"
+            onClick={() => { onChange(undefined); onClose() }}
+          >
+            Borrar
+          </button>
+        )}
+        <button className="mx-btn" data-p="1" onClick={() => { onChange(v); onClose() }}>
+          Listo
+        </button>
+      </div>
+    </>
+  )
+}
+
+// --- Rueda de hora estilo iOS (alarma) ---
+// Dos columnas con scroll-snap siempre producen "HH:MM" valido: imposible que
+// el record reciba un string que el input marque como invalido.
+const WHEEL_ITEM = 44
+const WHEEL_VISIBLE = 5
+const WHEEL_PAD = Math.floor(WHEEL_VISIBLE / 2)
+
+const pad2 = (n: number): string => String(n).padStart(2, '0')
+
+// Pesaje con rueda: el entero se edita sobre un rango por unidad (kg o lb),
+// en indices (count) y se traduce al valor al pintar y al elegir.
+const DEC_COUNT = 10
+
+function WheelCol({ label, count, selected, onSelect, fmt = pad2 }: {
+  label: string
+  count: number
+  selected: number
+  onSelect: (index: number) => void
+  fmt?: (index: number) => string
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+  const lastScrollIdx = useRef(-1)
+
+  // Con solo saber si el cambio de `selected` vino del propio scroll no basta:
+  // llegan varios eventos scroll entre renders y el flag queda "pegado", lo que
+  // hacia que un cambio EXTERNO (cambiar kg/lb rapido) se salteara el scroll.
+  // Aqui eso es imposible: si el ultimo scroll reporta justo `selected`, el
+  // cambio es nuestro (consumir y no forzar); si no, vino de fuera y se posiciona.
+  useEffect(() => {
+    if (selected === lastScrollIdx.current) {
+      lastScrollIdx.current = -1
+      return
+    }
+    const el = ref.current
+    if (el) el.scrollTop = selected * WHEEL_ITEM
+  }, [selected])
+
+  const go = (i: number) => {
+    ref.current?.scrollTo({ top: i * WHEEL_ITEM, behavior: 'smooth' })
+  }
+
+  return (
+    <div className="mx-wheel-col">
+      <div
+        ref={ref}
+        className="mx-wheel-scroll"
+        role="listbox"
+        aria-label={label}
+        style={{ height: WHEEL_ITEM * WHEEL_VISIBLE }}
+        onScroll={() => {
+          const el = ref.current
+          const idx = el ? Math.round(el.scrollTop / WHEEL_ITEM) : selected
+          lastScrollIdx.current = idx
+          onSelect(Math.min(count - 1, Math.max(0, idx)))
+        }}
+      >
+        <div
+          className="mx-wheel-pad"
+          style={{ paddingTop: WHEEL_PAD * WHEEL_ITEM, paddingBottom: WHEEL_PAD * WHEEL_ITEM }}
+        >
+          {Array.from({ length: count }, (_, i) => (
+            <button
+              key={i}
+              type="button"
+              role="option"
+              aria-selected={i === selected}
+              className="mx-wheel-item mx-mono"
+              data-on={i === selected ? '1' : '0'}
+              onClick={() => go(i)}
+            >
+              {fmt(i)}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="mx-wheel-hl" />
+      <div className="mx-wheel-fade" data-t="top" />
+      <div className="mx-wheel-fade" data-t="bottom" />
+    </div>
+  )
+}
+
+export function TimeWheel({ open, onClose, title, value, onChange }: {
+  open: boolean
+  onClose: () => void
+  title: string
+  value: string | undefined
+  onChange: (v: string | undefined) => void
+}) {
+  const m = value?.match(/^(\d{1,2}):(\d{2})$/)
+  const startH = m ? Math.min(23, parseInt(m[1], 10)) : 20
+  const startM = m ? Math.min(59, parseInt(m[2], 10)) : 0
+
+  return (
+    <BottomSheet open={open} onClose={onClose} title={title}>
+      {open && (
+        <WheelBody
+          startH={startH}
+          startM={startM}
+          hasValue={!!m}
+          onChange={onChange}
+          onClose={onClose}
+        />
+      )}
+    </BottomSheet>
+  )
+}
+
+// El cuerpo se monta solo al abrir, asi el estado arranca del valor del record
+// sin necesidad de sincronizarlo con un effect.
+function WheelBody({ startH, startM, hasValue, onChange, onClose }: {
+  startH: number
+  startM: number
+  hasValue: boolean
+  onChange: (v: string | undefined) => void
+  onClose: () => void
+}) {
+  const [h, setH] = useState(startH)
+  const [min, setMin] = useState(startM)
+
+  const commit = () => onChange(`${pad2(h)}:${pad2(min)}`)
+
+  return (
+    <>
+      <div className="mx-wheel">
+        <WheelCol label="Horas" count={24} selected={h} onSelect={setH} fmt={i => pad2(i)} />
+        <div className="mx-wheel-sep mx-mono">:</div>
+        <WheelCol label="Minutos" count={60} selected={min} onSelect={setMin} fmt={i => pad2(i)} />
+      </div>
+      <div className="mx-acts">
+        {hasValue && (
+          <button
+            className="mx-btn mx-btn-danger"
+            onClick={() => { onChange(undefined); onClose() }}
+          >
+            Borrar
+          </button>
+        )}
+        <button className="mx-btn" data-p="1" onClick={() => { commit(); onClose() }}>
+          Listo
+        </button>
+      </div>
+    </>
+  )
+}
+
+// --- Pesaje con rueda: entero + decimal, en kg o lb, siempre se guarda en kg ---
+const KG_TO_LB = 2.2046226218
+
+const round1 = (n: number): number => Math.round(n * 10) / 10
+
+export function WeightWheel({ open, onClose, title, initialKg, hasValue, onChange, minKg = 30, maxKg = 250 }: {
+  open: boolean
+  onClose: () => void
+  title: string
+  initialKg: number
+  hasValue: boolean
+  onChange: (v: number | undefined) => void
+  minKg?: number
+  maxKg?: number
+}) {
+  return (
+    <BottomSheet open={open} onClose={onClose} title={title}>
+      {open && (
+        <WeightBody
+          initialKg={initialKg}
+          hasValue={hasValue}
+          minKg={minKg}
+          maxKg={maxKg}
+          onChange={onChange}
+          onClose={onClose}
+        />
+      )}
+    </BottomSheet>
+  )
+}
+
+function WeightBody({ initialKg, hasValue, minKg, maxKg, onChange, onClose }: {
+  initialKg: number
+  hasValue: boolean
+  minKg: number
+  maxKg: number
+  onChange: (v: number | undefined) => void
+  onClose: () => void
+}) {
+  const [unit, setUnit] = useState<'kg' | 'lb'>('kg')
+  const [draftKg, setDraftKg] = useState(round1(initialKg))
+
+  // Unica fuente de verdad: kg. El lb es solo como se ve/edita la rueda.
+  const inUnit = unit === 'kg' ? draftKg : draftKg * KG_TO_LB
+  const rounded = Math.round(inUnit * 10) / 10
+  const whole = Math.floor(rounded)
+  const dec = Math.round((rounded - whole) * 10)
+
+  // El entero se elige por indice en el rango de la unidad activa.
+  const wholeMin = unit === 'kg' ? minKg : Math.max(1, Math.round(minKg * KG_TO_LB))
+  const wholeMax = unit === 'kg' ? maxKg : Math.round(maxKg * KG_TO_LB)
+  const wholeCount = wholeMax - wholeMin + 1
+  const wholeIndex = Math.max(0, Math.min(wholeCount - 1, whole - wholeMin))
+
+  const setInUnit = (v: number) => {
+    const g = unit === 'kg' ? v : v / KG_TO_LB
+    setDraftKg(Math.max(1, round1(g)))
+  }
+
+  return (
+    <>
+      <div className="mx-wv mx-mono">{String(rounded).replace('.', ',')} <span className="mx-u">{unit}</span></div>
+      <div className="mx-wv-seg">
+        <Seg opts={['kg', 'lb']} value={unit} onChange={v => setUnit(v as 'kg' | 'lb')} />
+      </div>
+      <div className="mx-wheel">
+        <WheelCol
+          label="Enteros"
+          count={wholeCount}
+          selected={wholeIndex}
+          onSelect={i => setInUnit(wholeMin + i)}
+          fmt={i => String(wholeMin + i)}
+        />
+        <div className="mx-wheel-sep mx-mono">,</div>
+        <WheelCol
+          label="Decimales"
+          count={DEC_COUNT}
+          selected={dec}
+          onSelect={d => setInUnit(whole + d * 0.1)}
+          fmt={String}
+        />
+      </div>
+      <div className="mx-acts">
+        {hasValue && (
+          <button
+            className="mx-btn mx-btn-danger"
+            onClick={() => { onChange(undefined); onClose() }}
+          >
+            Borrar
+          </button>
+        )}
+        <button className="mx-btn" data-p="1" onClick={() => { onChange(round1(draftKg)); onClose() }}>
+          Listo
+        </button>
+      </div>
+    </>
   )
 }

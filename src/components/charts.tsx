@@ -164,3 +164,46 @@ export function Stat({ label, value, unit, sub, tone }: {
     </div>
   )
 }
+
+/**
+ * Pie de macro: circulo RELLENO que se llena segun lo comido sobre lo que toca.
+ * Rojo si se sobrepasa. Abajo el detalle (comido/objetivo).
+ */
+export function MacroPie({ label, eaten, target, tone }: {
+  label: string
+  eaten: number
+  target: number
+  tone: 'prot' | 'carb' | 'grasa'
+}) {
+  const pct = target > 0 ? Math.min(1, eaten / target) : 0
+  const over = target > 0 && eaten > target
+  const R = 30
+
+  const slice = (p: number): string => {
+    const ang = Math.PI * 2 * p - Math.PI / 2
+    const x = 36 + R * Math.cos(ang)
+    const y = 36 + R * Math.sin(ang)
+    const large = p > 0.5 ? 1 : 0
+    return `M 36 36 L 36 ${36 - R} A ${R} ${R} 0 ${large} 1 ${x.toFixed(2)} ${y.toFixed(2)} Z`
+  }
+
+  return (
+    <div className="mx-pie" data-tone={tone} data-over={over ? '1' : '0'}>
+      <div className="mx-pie-d">
+        <svg viewBox="0 0 72 72" width="72" height="72" role="img" aria-label={`${label}: ${Math.round(eaten)} de ${Math.round(target)} g`}>
+          <circle cx="36" cy="36" r={R} fill="var(--line)" />
+          <path className="mx-pie-arc" d={pct >= 1
+            ? `M36 36 m-${R},0 a${R},${R} 0 1 0 ${R * 2},0 a${R},${R} 0 1 0 -${R * 2},0 Z`
+            : slice(pct)} />
+        </svg>
+        <span className="mx-pie-v mx-mono" aria-hidden>
+          {Math.round(eaten)}<i>g</i>
+        </span>
+      </div>
+      <div className="mx-pie-l">{label}</div>
+      <div className="mx-pie-s mx-mono">
+        {Math.round(eaten)}/{Math.round(target)} · {Math.abs(Math.round(pct * 100))}%
+      </div>
+    </div>
+  )
+}

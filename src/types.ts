@@ -11,28 +11,20 @@ export type MacroKey = keyof Macros
 export type MealSlot = 'desayuno' | 'almuerzo' | 'cena' | 'extra'
 
 /**
- * Una opcion de comida con sus propios macros. La unidad de registro es la
- * COMIDA completa ("Seco de res"), no sus ingredientes.
+ * Una comida registrada. No hay catalogo: los macros de la comida vienen de
+ * `custom`. Cuando se registro con foto + texto, la IA los estimo (`ai`).
  */
-export interface MealOption {
-  id: string
-  name: string
-  slots: MealSlot[] // en que comidas del dia aparece
-  prot: number
-  carb: number
-  grasa: number
-  fav?: boolean
-}
-
-/** Una comida registrada en el dia. */
 export interface MealLog {
   id: string
   slot: MealSlot
-  optionId: string | null // null si fue algo fuera del plan
   portion: number // 1 = porcion normal
   at: number
-  /** Para "comi otra cosa": macros sueltos, sin opcion detras. */
+  /** Macros y nombre de la comida. */
   custom?: { name: string; prot: number; carb: number; grasa: number }
+  /** Comentario del usuario (lo que le dio contexto a la IA). */
+  note?: string
+  /** true si los macros los estimo la IA a partir de una foto. */
+  ai?: boolean
 }
 
 // --- Entrenamiento ---
@@ -74,7 +66,6 @@ export interface AppSettings {
   targets: Macros // objetivo diario
   /** Que fraccion del objetivo diario va en cada comida (0-1). */
   slotShare: Record<MealSlot, number>
-  options: MealOption[]
   split: SplitDay[]
   /** Horas de sueno objetivo, para la linea de referencia del grafico. */
   sleepTarget: number

@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
-import type { AppSettings, AppState, DayLog, Macros, MealLog, MealOption, MealSlot, SplitDay } from '../types'
+import type { AppSettings, AppState, DayLog, Macros, MealLog, MealSlot, SplitDay } from '../types'
 import { storage } from '../lib/storage'
 import { ROUTINE_TEMPLATE } from '../lib/config'
 import { todayStr, uid } from '../lib/logic'
@@ -73,11 +73,9 @@ export function useAppState() {
   // Evita mostrar el onboarding a alguien que si tiene plan guardado en la nube.
   const [loadingInitial, setLoadingInitial] = useState(isSyncEnabled())
   const marks = useRef<PendingMarks>(readMarks())
-  const cloudReadyRef = useRef(cloudReady)
   const stateRef = useRef(state)
 
-  // Espejos para leer el valor actual desde callbacks y timers sin recrearlos.
-  useEffect(() => { cloudReadyRef.current = cloudReady }, [cloudReady])
+  // Espejo para leer el valor actual desde callbacks y timers sin recrearlos.
   useEffect(() => { stateRef.current = state }, [state])
 
   const mark = useCallback((date?: string) => {
@@ -113,8 +111,12 @@ export function useAppState() {
     if (remote) {
       const clean = storage.sanitize(remote)
       const merged = mergeStates(clean, stateRef.current, marks.current)
-      setState(merged)
-      storage.save(merged)
+      // Solo actualiza si el merge trajo algo distinto: evita repeticiones
+      // (que encadenarían otro guardado) cuando la nube ya coincide con local.
+      if (JSON.stringify(merged) !== JSON.stringify(stateRef.current)) {
+        setState(merged)
+        storage.save(merged)
+      }
     }
     setCloudReady(true)
     // Si quedaban cambios offline, ahora si se suben.
@@ -126,14 +128,19 @@ export function useAppState() {
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { void pullFromCloud() }, [pullFromCloud])
 
-  // Reintento de carga cuando vuelve la red o la app al frente
+  // Reconciliacion periodica: revisa la nube cada 30 s y tambien al volver al
+  // frente o reconectar. Como el merge respeta las fechas en edicion (marks),
+  // esto NO pisa lo que estes escribiendo; solo adopta lo que escribio el otro
+  // dispositivo. Sin esto, dos dispositivos abiertos se pisan enteros al
+  // guardar (el ultimo ganaba y podia borrar campos del mismo dia, p. ej. el
+  // bedTime del sueno que escribio el otro).
   useEffect(() => {
     const retry = () => {
-      if (!cloudReadyRef.current && document.visibilityState === 'visible') void pullFromCloud()
+      if (document.visibilityState === 'visible') void pullFromCloud()
     }
     window.addEventListener('online', retry)
     document.addEventListener('visibilitychange', retry)
-    const id = setInterval(retry, 20_000)
+    const id = setInterval(retry, 30_000)
     return () => {
       window.removeEventListener('online', retry)
       document.removeEventListener('visibilitychange', retry)
@@ -183,28 +190,23 @@ export function useAppState() {
     patchRecord(date, r => ({ ...r, meals: [...(r.meals ?? []), ...meals] }))
   }, [patchRecord])
 
-  /** Registra una opcion del plan en una comida del dia. */
-  const logMeal = useCallback((slot: MealSlot, optionId: string, portion = 1, date = todayStr()) => {
-    addMeals([{ id: uid('m'), slot, optionId, portion, at: Date.now() }], date)
-  }, [addMeals])
-
-  /** Registra algo fuera del plan, con sus macros a mano. */
-  const logCustomMeal = useCallback((slot: MealSlot, custom: NonNullable<MealLog['custom']>, portion = 1, date = todayStr()) => {
-    addMeals([{ id: uid('m'), slot, optionId: null, portion, at: Date.now(), custom }], date)
+  /** Registra una comida estimada por la IA: foto + texto -> macros. */
+  const logAiMeal = useCallback((slot: MealSlot, name: string, macros: Macros, note?: string, date = todayStr()) => {
+    addMeals([{
+      id: uid('m'),
+      slot,
+      portion: 1,
+      at: Date.now(),
+      custom: { name, prot: macros.prot, carb: macros.carb, grasa: macros.grasa },
+      ...(note ? { note } : {}),
+      ai: true,
+    }], date)
   }, [addMeals])
 
   const setPortion = useCallback((mealId: string, portion: number, date = todayStr()) => {
     patchRecord(date, r => ({
       ...r,
       meals: (r.meals ?? []).map(m => (m.id === mealId ? { ...m, portion } : m)),
-    }))
-  }, [patchRecord])
-
-  /** Cambia la opcion registrada sin perder el sitio en el dia. */
-  const replaceMeal = useCallback((mealId: string, optionId: string, date = todayStr()) => {
-    patchRecord(date, r => ({
-      ...r,
-      meals: (r.meals ?? []).map(m => (m.id === mealId ? { ...m, optionId, custom: undefined } : m)),
     }))
   }, [patchRecord])
 
@@ -243,36 +245,6 @@ export function useAppState() {
   }, [mark])
 
   const setTargets = useCallback((targets: Macros) => updateSettings({ targets }), [updateSettings])
-
-  const upsertOption = useCallback((option: MealOption) => {
-    mark()
-    setState(prev => {
-      const exists = prev.settings.options.some(o => o.id === option.id)
-      const options = exists
-        ? prev.settings.options.map(o => (o.id === option.id ? option : o))
-        : [...prev.settings.options, option]
-      return { ...prev, settings: { ...prev.settings, options } }
-    })
-  }, [mark])
-
-  const removeOption = useCallback((optionId: string) => {
-    mark()
-    setState(prev => ({
-      ...prev,
-      settings: { ...prev.settings, options: prev.settings.options.filter(o => o.id !== optionId) },
-    }))
-  }, [mark])
-
-  const toggleFav = useCallback((optionId: string) => {
-    mark()
-    setState(prev => ({
-      ...prev,
-      settings: {
-        ...prev.settings,
-        options: prev.settings.options.map(o => (o.id === optionId ? { ...o, fav: !o.fav } : o)),
-      },
-    }))
-  }, [mark])
 
   const upsertSplitDay = useCallback((day: SplitDay) => {
     mark()
@@ -315,10 +287,10 @@ export function useAppState() {
     })
   }, [mark])
 
-  /** Deja el plan en blanco sin tocar el historial de registros. */
+  /** Deja la rutina en blanco sin tocar el historial de registros. */
   const clearPlan = useCallback(() => {
     mark()
-    setState(prev => ({ ...prev, settings: { ...prev.settings, options: [], split: [] } }))
+    setState(prev => ({ ...prev, settings: { ...prev.settings, split: [] } }))
   }, [mark])
 
   // --- Import / Export / Reset ---
@@ -358,10 +330,8 @@ export function useAppState() {
     retrySave: retryNow,
     // registro
     updateRecord,
-    logMeal,
-    logCustomMeal,
+    logAiMeal,
     setPortion,
-    replaceMeal,
     removeMeal,
     copyDay,
     setWorkout,
@@ -369,9 +339,6 @@ export function useAppState() {
     // ajustes
     updateSettings,
     setTargets,
-    upsertOption,
-    removeOption,
-    toggleFav,
     upsertSplitDay,
     removeSplitDay,
     loadRoutineTemplate,

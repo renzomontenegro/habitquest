@@ -42,13 +42,18 @@ Reparto por comida (slotShare de la app): desayuno 20%, almuerzo 42%, cena 38%, 
 | Cena | 70 | 66 | 28 | 800 |
 | Extras | 19 | 18 | 8 | 220 |
 
-> Estos refs los precarga la app sola al crear opciones nuevas. No hay que
-> escribirlos a mano.
+> Estos refs son la referencia que muestra la app al registrar una comida con
+> foto (reparto del objetivo diario). No hay que escribirlos a mano.
 
-## Opciones del plan (por porcion normal)
+## Registro de comidas
 
-Las proporciones van en el nombre: una porcion en la app = "1" en el selector.
-Si tu plato real pesa distinto, ajusta los gramos del nombre y los macros en
+Las comidas se registran con foto (opcional texto) y la IA estima los macros
+según la porción razonable de un plato típico. El reparto define qué debería
+llevar cada comida del día (arriba): si la IA estima muy por encima o por
+debajo, suele ser porción, y se ajusta desde la tarjeta con el selector de
+porción. La foto no se guarda: viaja a la IA y se descarta.
+
+### Comidas de referencia (para guiar a la IA)
 Editar.
 
 ### Desayuno
@@ -116,5 +121,5 @@ Los ejercicios usan el nombre como id, asi el historial de series sigue conectad
 3. **Si no llega a proteina**: la proteina en polvo en extras es el relleno;
    nunca bajar proteina primero.
 4. **Cambiar comidas**: siempre respetando las reglas de arriba (mealprep, sin
-   brocoli/frejol, <20 min). Las opciones viven en el estado de la app
-   (Mi plan), no en el codigo.
+   brocoli/frejol, <20 min). Las comidas se registran con foto y la IA estima;
+   la logica del plan vive en la app, no en el codigo.

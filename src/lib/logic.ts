@@ -1,4 +1,4 @@
-import type { AppSettings, DayLog, Macros, MealLog, MealOption, MealSlot, SetEntry, SplitDay } from '../types'
+import type { AppSettings, DayLog, Macros, MealLog, MealSlot, SetEntry, SplitDay } from '../types'
 import { KCAL_PER_G, RULES } from './config'
 
 // --- Ids ---
@@ -106,43 +106,31 @@ export function kcal(m: Macros): number {
 
 /**
  * Macros de referencia de una comida: la fraccion del objetivo diario que le
- * toca. Es lo que precarga una opcion nueva y un "comi otra cosa", asi que
- * sale de los numeros del usuario, no de una tabla fija.
+ * toca. Es la guia que muestra el registro con foto, asi que salen de los
+ * numeros del usuario, no de una tabla fija.
  */
 export function slotReference(settings: AppSettings, slot: MealSlot): Macros {
   return roundMacros(scaleMacros(settings.targets, settings.slotShare[slot] ?? 0))
 }
 
-export function findOption(options: MealOption[], id: string | null): MealOption | undefined {
-  return id ? options.find(o => o.id === id) : undefined
-}
-
-/** Opciones disponibles para una comida, con los favoritos primero. */
-export function optionsForSlot(options: MealOption[], slot: MealSlot): MealOption[] {
-  return options
-    .filter(o => o.slots.includes(slot))
-    .sort((a, b) => Number(!!b.fav) - Number(!!a.fav))
-}
-
 /** Macros de una comida registrada, ya escalados por la porcion. */
-export function mealMacros(log: MealLog, options: MealOption[]): Macros {
-  const base = log.custom ?? findOption(options, log.optionId)
-  if (!base) return ZERO
-  return scaleMacros({ prot: base.prot, carb: base.carb, grasa: base.grasa }, log.portion)
+export function mealMacros(log: MealLog): Macros {
+  if (!log.custom) return ZERO
+  return scaleMacros({ prot: log.custom.prot, carb: log.custom.carb, grasa: log.custom.grasa }, log.portion)
 }
 
-export function mealName(log: MealLog, options: MealOption[]): string {
-  return log.custom?.name ?? findOption(options, log.optionId)?.name ?? 'Comida eliminada'
+export function mealName(log: MealLog): string {
+  return log.custom?.name || 'Comida'
 }
 
 /** Suma de todo lo comido en un dia. */
-export function dayMacros(record: DayLog | undefined, options: MealOption[]): Macros {
+export function dayMacros(record: DayLog | undefined): Macros {
   if (!record?.meals?.length) return ZERO
-  return record.meals.reduce((acc, m) => addMacros(acc, mealMacros(m, options)), ZERO)
+  return record.meals.reduce((acc, m) => addMacros(acc, mealMacros(m)), ZERO)
 }
 
-export function macrosForDate(records: DayLog[], date: string, options: MealOption[]): Macros {
-  return dayMacros(getRecord(records, date), options)
+export function macrosForDate(records: DayLog[], date: string): Macros {
+  return dayMacros(getRecord(records, date))
 }
 
 /** Lo que falta para llegar al objetivo (puede ser negativo = te pasaste). */
@@ -150,8 +138,8 @@ export function remaining(target: Macros, eaten: Macros): Macros {
   return { prot: target.prot - eaten.prot, carb: target.carb - eaten.carb, grasa: target.grasa - eaten.grasa }
 }
 
-export function sumMacrosOver(records: DayLog[], dates: string[], options: MealOption[]): Macros {
-  return dates.reduce((acc, d) => addMacros(acc, macrosForDate(records, d, options)), ZERO)
+export function sumMacrosOver(records: DayLog[], dates: string[]): Macros {
+  return dates.reduce((acc, d) => addMacros(acc, macrosForDate(records, d)), ZERO)
 }
 
 /** Lo registrado en una comida concreta del dia. */
@@ -190,7 +178,7 @@ export function adherence(records: DayLog[], dates: string[], settings: AppSetti
     const r = getRecord(records, d)
     if (!hasFoodLog(r)) continue
     logged++
-    if (dayOnTarget(dayMacros(r, settings.options), settings.targets, settings.tolerance)) onTarget++
+    if (dayOnTarget(dayMacros(r), settings.targets, settings.tolerance)) onTarget++
   }
   return { onTarget, logged, total: dates.length }
 }
@@ -206,6 +194,22 @@ export function lastActiveDate(records: DayLog[]): string | null {
   return last
 }
 
+/**
+ * Peso del registro mas cercano a `date`. Para el pesaje del dia: arrancas en
+ * el peso de ayer (si lo hay) o del registro con peso mas proximo.
+ */
+export function nearestWeight(records: DayLog[], date: string, span = 60): number | null {
+  for (let i = 1; i <= span; i++) {
+    const w = getRecord(records, addDays(date, -i))?.weight
+    if (w != null) return w
+  }
+  for (let i = 1; i <= span; i++) {
+    const w = getRecord(records, addDays(date, i))?.weight
+    if (w != null) return w
+  }
+  return null
+}
+
 export function weightAvg(records: DayLog[], from: string, to: string): number | null {
   const vals = records.filter(r => r.weight != null && r.date >= from && r.date <= to).map(r => r.weight as number)
   if (vals.length === 0) return null
@@ -219,6 +223,19 @@ export function weightTrend(records: DayLog[]): { delta: number; recent: number;
   const prev = weightAvg(records, addDays(t, -13), addDays(t, -7))
   if (prev === null) return null
   return { delta: Math.round((recent - prev) * 10) / 10, recent, prev }
+}
+
+/**
+ * Tendencia del peso RELATIVA a una fecha (para el encabezado, que mira el dia
+ * visible): promedio de la semana que termina en `date` vs la anterior.
+ * "Si sigues asi, en 7d estarás en" = recent + delta.
+ */
+export function weightTrendAt(records: DayLog[], date: string): { delta: number; recent: number } | null {
+  const recent = weightAvg(records, addDays(date, -6), date)
+  if (recent === null) return null
+  const prev = weightAvg(records, addDays(date, -13), addDays(date, -7))
+  if (prev === null) return null
+  return { delta: Math.round((recent - prev) * 10) / 10, recent }
 }
 
 export function weightSeries(records: DayLog[], days = RULES.weightChartDays): { date: string; weight: number }[] {
@@ -284,6 +301,23 @@ export function hmToMinutes(s?: string): number | null {
   return h * 60 + min
 }
 
+/**
+ * Normaliza una hora a "HH:MM" antes de guardarla. Acepta variantes que suelta
+ * el input (horas de un digito, segundos de mas) pero rechaza formatos raros:
+ * si un valor no-conformante llega al record, el input lo marca como invalido
+ * (tooltip nativo) y el sueno deja de calcular.
+ */
+export function normTime(v: string): string | undefined {
+  if (!v) return undefined
+  const t = v.trim()
+  const m = /^(\d{1,2}):(\d{2})(?::\d{2}(?:\.\d{1,3})?)?$/.exec(t)
+  if (!m) return undefined
+  const h = parseInt(m[1], 10)
+  const min = parseInt(m[2], 10)
+  if (h > 23 || min > 59) return undefined
+  return `${String(h).padStart(2, '0')}:${m[2]}`
+}
+
 export function sleepHours(bed?: string, wake?: string): number | null {
   const b = hmToMinutes(bed)
   const w = hmToMinutes(wake)
@@ -338,6 +372,22 @@ export function workoutForDate(record: DayLog | undefined, split: SplitDay[], da
     if (chosen) return chosen
   }
   return splitDayForDate(split, date)
+}
+
+/**
+ * Peso de trabajo del ultimo entreno del ejercicio ANTES de `date` (el maximo
+ * de esa sesion). Sirve de placeholder y de arranque del wheel: press de pecho
+ * suele ser similar al entreno anterior.
+ */
+export function lastSessionWeight(records: DayLog[], exerciseId: string, date: string, span = 90): number | null {
+  for (let i = 1; i <= span; i++) {
+    const r = getRecord(records, addDays(date, -i))
+    const list = r?.sets?.[exerciseId]
+    if (!list || list.length === 0) continue
+    const nums = list.map(s => parseFloat(s.weight)).filter(n => Number.isFinite(n) && n > 0)
+    if (nums.length > 0) return Math.max(...nums)
+  }
+  return null
 }
 
 export function isRestDay(record: DayLog | undefined, split: SplitDay[], date: string): boolean {
