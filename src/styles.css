@@ -228,19 +228,21 @@ button:active { transform: scale(.985); }
 .mx-wheel-fade[data-t='top'] { top: 0; background: linear-gradient(to bottom, var(--paper) 25%, transparent); }
 .mx-wheel-fade[data-t='bottom'] { bottom: 0; background: linear-gradient(to top, var(--paper) 25%, transparent); }
 
-/* Previo grande del pesaje (rueda kg/lb) */
+/* Previo grande del pesaje (rueda kg/lb): caja con el lapiz en su esquina */
 .mx-wv { font-size: 32px; text-align: center; margin: 4px 0 16px; font-weight: 600; }
-.mx-wv-row { display: flex; align-items: center; justify-content: center; gap: 12px;
-  margin: 4px 0 16px; }
-.mx-wv-num { display: flex; align-items: center; gap: 3px; font-size: 32px; font-weight: 600; }
-.mx-wv-u { font-style: normal; font-size: 16px; font-weight: 500; color: var(--mute);
-  margin-top: 6px; }
-.mx-edit-circle { width: 34px; height: 34px; flex-shrink: 0; border-radius: 999px;
-  border: 1px solid var(--line); background: var(--paper); color: var(--mute);
-  font-size: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.mx-wv-center { display: flex; justify-content: center; margin: 4px 0 16px; }
+.mx-wv-box { position: relative; display: inline-block; padding: 8px 20px 12px;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--paper); }
+.mx-wv-num { display: flex; align-items: center; gap: 3px; font-size: 30px; font-weight: 600; }
+.mx-wv-u { font-style: normal; font-size: 15px; font-weight: 500; color: var(--mute);
+  margin-top: 5px; }
+.mx-edit-circle { position: absolute; right: -9px; bottom: -9px; width: 30px; height: 30px;
+  flex-shrink: 0; border-radius: 999px; border: 1px solid var(--line); background: var(--card);
+  color: var(--mute); font-size: 14px; cursor: pointer; display: flex; align-items: center;
+  justify-content: center; box-shadow: 0 1px 4px rgba(22, 38, 43, .14); }
 .mx-edit-circle:hover { color: var(--ink); border-color: var(--mute); }
 .mx-wv-seg { display: flex; justify-content: center; margin-bottom: 4px; }
-.mx-wv-edit { display: flex; align-items: center; justify-content: center; gap: 6px; }
+.mx-wv-vacio { text-align: center; color: var(--mute); font-size: 30px; font-weight: 600; }
 .mx-wv-in { width: 130px !important; font-size: 26px !important; text-align: center;
   padding: 2px 8px !important; }
 
