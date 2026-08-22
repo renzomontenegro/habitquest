@@ -509,6 +509,14 @@ function WeightBody({ initialKg, hasValue, minKg, maxKg, onChange, onClose }: {
     setText(String(Math.round(disp * 10) / 10).replace('.', ','))
   }
 
+  // Cambiar kg/lb NUNCA toca el draft (que siempre es kg): solo refresca el
+  // texto mostrado. Convertir de nuevo con el estado viejo hundia el valor.
+  const toggleUnit = (v: 'kg' | 'lb') => {
+    setUnit(v)
+    const val = v === 'kg' ? draftKg : draftKg * KG_TO_LB
+    setText(String(Math.round(val * 10) / 10).replace('.', ','))
+  }
+
   const onType = (raw: string) => {
     setText(raw)
     const n = parseFloat(raw.replace(',', '.'))
@@ -536,7 +544,7 @@ function WeightBody({ initialKg, hasValue, minKg, maxKg, onChange, onClose }: {
         </div>
       </div>
       <div className="mx-wv-seg">
-        <Seg opts={['kg', 'lb']} value={unit} onChange={v => { setUnit(v as 'kg' | 'lb'); setInUnit(draftKg) }} />
+        <Seg opts={['kg', 'lb']} value={unit} onChange={v => toggleUnit(v as 'kg' | 'lb')} />
       </div>
       <div className="mx-wheel">
         <WheelCol
