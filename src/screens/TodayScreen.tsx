@@ -2,11 +2,12 @@ import { useRef, useState } from 'react'
 import type { AppController } from '../hooks/useAppState'
 import type { MealLog, MealSlot } from '../types'
 import {
-  addDays, dayMacros, getRecord, headerDate, lastSessionWeight, makeEmptySets, mealMacros, mealName,
+  addDays, dayMacros, getRecord, headerDate, lastNDates, lastSessionWeight, makeEmptySets, mealMacros, mealName,
   mealsInSlot, nearestWeight, parseDate, roundMacros, shortDate, slotReference, workoutForDate,
 } from '../lib/logic'
 import { MACRO_LABEL, PORTIONS, SLOTS, SLOT_LABEL } from '../lib/config'
 import { MealEstimateSheet } from '../components/MealEstimateSheet'
+import { MealIdeaSheet } from '../components/MealIdeaSheet'
 import { MacroPie } from '../components/charts'
 import { BottomSheet, ConfirmButton, Field, RepsWheel, Seg, TimeWheel, Toast, WeightWheel } from '../components/ui'
 
@@ -35,8 +36,9 @@ function secProgress(sec: Sec, record: ReturnType<typeof getRecord>, workout: Re
       return total > 0 ? Math.min(1, filled / total) : 0
     }
     case 'comidas': {
-      const withFood = SLOTS.filter(s => mealsInSlot(record, s.id).length > 0).length
-      return withFood / SLOTS.length
+      const covered = SLOTS.filter(s =>
+        mealsInSlot(record, s.id).length > 0 || (record?.skipped ?? []).includes(s.id)).length
+      return covered / SLOTS.length
     }
     case 'actividad': {
       const s = (record?.steps != null ? 1 : 0) + (record?.waist != null ? 1 : 0)
@@ -209,6 +211,7 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
   const eaten = dayMacros(record)
 
   const [estimating, setEstimating] = useState<MealSlot | null>(null)
+  const [ideaSlot, setIdeaSlot] = useState<MealSlot | null>(null)
   const [editing, setEditing] = useState<MealLog | null>(null)
   const [sleepPicker, setSleepPicker] = useState<null | 'bed' | 'wake'>(null)
   const [weightPicker, setWeightPicker] = useState(false)
@@ -216,9 +219,6 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
   const [repsWheel, setRepsWheel] = useState<null | { exId: string; index: number }>(null)
   const [openSec, setOpenSec] = useState<Sec | null>(null)
   const [toast, setToast] = useState<string | null>(null)
-
-  const yesterday = addDays(viewDate, -1)
-  const canRepeat = !record?.meals?.length && !!getRecord(state.records, yesterday)?.meals?.length
 
   const workout = workoutForDate(record, split, viewDate)
   const weightStart = record?.weight ?? nearestWeight(state.records, viewDate) ?? 100
@@ -256,7 +256,28 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
     actividad: secProgress('actividad', record, workout),
   }
 
+  // Cuanto se desvía la semana en carbos: lo que la IA usa para calibado.
+  const weekCarbs = (() => {
+    let delta = 0
+    let days = 0
+    for (const d of lastNDates(7)) {
+      const r = getRecord(state.records, d)
+      if (!r?.meals?.length) continue
+      days++
+      delta += dayMacros(r).carb - targets.carb
+    }
+    return { delta: Math.round(delta), days }
+  })()
+
   const toggleSec = (s: Sec) => setOpenSec(prev => (prev === s ? null : s))
+
+  const toggleSkip = (slot: MealSlot) => {
+    const skipped = record?.skipped ?? []
+    const on = !skipped.includes(slot)
+    const next = on ? [...skipped, slot] : skipped.filter(x => x !== slot)
+    app.updateRecord({ skipped: next.length > 0 ? next : undefined }, viewDate)
+    setToast(on ? `No comi ${SLOT_LABEL[slot].toLowerCase()}` : `${SLOT_LABEL[slot]} desmarcado`)
+  }
 
   return (
     <>
@@ -408,22 +429,42 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
                     return (
                       <div key={i} className="mx-set">
                         <div className="mx-setn">Serie {i + 1}</div>
-                        <button
-                          className="mx-in mx-weight-trigger mx-mono"
-                          data-empty={set.weight ? '0' : '1'}
-                          onClick={() => setExWheel({ exId: ex.id, index: i })}
-                          title="Peso, en kg o lb"
-                        >
-                          {set.weight ? `${set.weight} kg` : `${guide} kg`}
-                        </button>
-                        <button
-                          className="mx-in mx-reps-trigger mx-mono"
-                          data-empty={set.reps ? '0' : '1'}
-                          onClick={() => setRepsWheel({ exId: ex.id, index: i })}
-                          title="Repeticiones"
-                        >
-                          {set.reps || repLower(ex.reps)}
-                        </button>
+                        <span className="mx-setw">
+                          <button
+                            className="mx-in mx-weight-trigger mx-mono"
+                            data-empty={set.weight ? '0' : '1'}
+                            onClick={() => setExWheel({ exId: ex.id, index: i })}
+                            title="Peso, en kg o lb"
+                          >
+                            {set.weight ? `${set.weight} kg` : `${guide} kg`}
+                          </button>
+                          {set.weight && (
+                            <button
+                              className="mx-in-x"
+                              onClick={() => app.setSet(ex.id, i, 'weight', '', viewDate)}
+                              aria-label={`Borrar peso serie ${i + 1}`}
+                              title="Borrar peso"
+                            >✕</button>
+                          )}
+                        </span>
+                        <span className="mx-setw">
+                          <button
+                            className="mx-in mx-reps-trigger mx-mono"
+                            data-empty={set.reps ? '0' : '1'}
+                            onClick={() => setRepsWheel({ exId: ex.id, index: i })}
+                            title="Repeticiones"
+                          >
+                            {set.reps || repLower(ex.reps)}
+                          </button>
+                          {set.reps && (
+                            <button
+                              className="mx-in-x"
+                              onClick={() => app.setSet(ex.id, i, 'reps', '', viewDate)}
+                              aria-label={`Borrar reps serie ${i + 1}`}
+                              title="Borrar reps"
+                            >✕</button>
+                          )}
+                        </span>
                       </div>
                     )
                   })}
@@ -436,14 +477,6 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
 
       {openSec === 'comidas' && (
         <>
-          {canRepeat && (
-            <button
-              className="mx-repeat"
-              onClick={() => { app.copyDay(yesterday, viewDate); setToast('Copiado de ayer') }}
-            >
-              Comi lo mismo que ayer
-            </button>
-          )}
           <div className="mx-slots">
             {SLOTS.map(s => {
               const logged = mealsInSlot(record, s.id)
@@ -451,15 +484,32 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
                 <div key={s.id} className="mx-slot">
                   <div className="mx-slot-h">
                     <div className="mx-eyebrow">{s.label}</div>
-                    {logged.length > 0 && (
-                      <button className="mx-mini" onClick={() => setEstimating(s.id)}>+ Agregar</button>
-                    )}
+                    <div className="mx-slot-acts">
+                      {logged.length > 0 && (
+                        <button className="mx-mini" onClick={() => setEstimating(s.id)}>+ Agregar</button>
+                      )}
+                      <button
+                        className="mx-q"
+                        onClick={() => setIdeaSlot(s.id)}
+                        aria-label={`Ideas para ${s.label}`}
+                      >?</button>
+                    </div>
                   </div>
 
                   {logged.length === 0 ? (
-                    <button className="mx-pick" onClick={() => setEstimating(s.id)}>
-                      <span>+</span> Registrar {s.label.toLowerCase()}
-                    </button>
+                    <div className="mx-pickrow">
+                      <button className="mx-pick" onClick={() => setEstimating(s.id)}>
+                        <span>+</span> Registrar {s.label.toLowerCase()}
+                      </button>
+                      <button
+                        className="mx-skip"
+                        data-on={(record?.skipped ?? []).includes(s.id) ? '1' : '0'}
+                        aria-pressed={(record?.skipped ?? []).includes(s.id)}
+                        onClick={() => toggleSkip(s.id)}
+                      >
+                        {(record?.skipped ?? []).includes(s.id) ? 'Saltado' : 'No comi'}
+                      </button>
+                    </div>
                   ) : (
                     logged.map(m => {
                       const mm = roundMacros(mealMacros(m))
@@ -538,6 +588,29 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
           onSaveRecurring={saved => {
             app.upsertSavedMeal(saved)
             setToast('Guardada como repetida')
+          }}
+        />
+      )}
+
+      {ideaSlot && (
+        <MealIdeaSheet
+          open
+          slot={ideaSlot}
+          context={{
+            gymDay: (workout?.exercises.length ?? 0) > 0,
+            carbsTarget: targets.carb,
+            carbsEatenToday: Math.round(eaten.carb),
+            carbsRemainingToday: Math.round(targets.carb - eaten.carb),
+            weekCarbsDelta: weekCarbs.delta,
+            weekDaysLogged: weekCarbs.days,
+            protTarget: targets.prot,
+            protEatenToday: Math.round(eaten.prot),
+            slotRef: slotReference(state.settings, ideaSlot),
+          }}
+          onClose={() => setIdeaSlot(null)}
+          onUse={(custom, note) => {
+            app.logAiMeal(ideaSlot, custom.name, custom, note, viewDate)
+            setToast(`${SLOT_LABEL[ideaSlot]} registrado`)
           }}
         />
       )}

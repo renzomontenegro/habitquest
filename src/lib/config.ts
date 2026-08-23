@@ -1,6 +1,6 @@
 import type { Macros, MealSlot } from '../types'
 
-export const APP_VERSION = '3.45'
+export const APP_VERSION = '3.52'
 
 // ---------------------------------------------------------------------------
 // Valores iniciales
@@ -29,6 +29,23 @@ export const SLOT_LABEL: Record<MealSlot, string> = {
   cena: 'Cena',
   extra: 'Extras',
 }
+
+/**
+ * Proteinas base del asistente de idea. La lista la aprobo el usuario; la IA
+ * construye la idea a partir de la proteina y la fuente (cocinar/rappi).
+ */
+export const PROTEINS = [
+  'Pollo',
+  'Carne de res',
+  'Atun',
+  'Pescado blanco',
+  'Chancho',
+  'Mariscos',
+  'Pavita',
+  'Huevos',
+] as const
+
+export type IdeaSource = 'cocinar' | 'rappi'
 
 /**
  * Reparto del objetivo diario entre comidas. Las tres principales suman 1;

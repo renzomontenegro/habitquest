@@ -55,6 +55,18 @@ que alimentar alguna decision o grafico; si un campo no se lee en ningun lado, s
 - Endpoint base de GO: `https://opencode.ai/zen/go/v1` (NO `opencode.go`: ese dominio no existe).
 - La foto NO se almacena en ningun lado: viaja a la IA y se descarta.
 
+### Workflow: Ideas de comida (mismo workflow)
+- En el mismo workflow hay un **segundo webhook**: POST `/webhook/habitquest-suggest`
+  ("Webhook Ideas" -> "Validar Ideas" -> "Pedir a la IA (Ideas)" -> "Parsear Ideas").
+  Recibe `{ slot, protein, source, gymDay, carbsTarget, carbsEatenToday,
+  carbsRemainingToday, weekCarbsDelta, weekDaysLogged, protTarget, protEatenToday, slotRef }`
+  y devuelve `{ ideas: [{ nombre, detalle, prot, carb, grasa, kcal }] }` (4 max).
+- Proteina viene de la lista aprobada (config.ts `PROTEINS`); `source` es `cocinar` o `rappi`.
+- **Carb cycling**: la IA recibe gym hoy, carbos restantes del dia y el acumulado semanal;
+  por eso pide mas carbos si hay entreno o semana en deficit, y menos si no.
+- `max_tokens: 8192`: mimo-v2.5 razona largo y se cortaba a 4096 (finish_reason=length,
+  content=null -> 502). Si la IA vuelve a fallar por tramo, es el primer lugar que mirar.
+
 ### Credenciales n8n
 - `AQKgx9XV1nvU6bv0` — Header Auth PWA (Bearer token para webhooks)
 - `Ik3mnm12LdnGwAcv` — Opencode GO API (httpHeaderAuth, key de la IA, solo en n8n)
@@ -62,7 +74,20 @@ que alimentar alguna decision o grafico; si un campo no se lee en ningun lado, s
 - `egCycENJkHFji6p8` — Google Sheets OAuth2 (legacy, ya no se usa)
 
 ## MCP Config
-El archivo `.mcp.json` en la raiz configura el MCP de n8n con la API key y URL.
+El MCP de n8n se define en **dos archivos** y opencode manda sobre el otro:
+
+- `opencode.json` (raiz, schema `mcp[name].command` + `environment`): el que usa **opencode**.
+  Si esta presente, gana sobre `.mcp.json`.
+- `.mcp.json` (schema `mcpServers[name].env`): lo usan otras tools (Claude Code, etc.).
+
+> El paquete `n8n-mcp` trae un guard SSRF: bloquea IPs privadas/CGNAT (100.x de Tailscale)
+> con `WEBHOOK_SECURITY_MODE=strict` (default). Sin eso el MCP muere con
+> "SSRF protection: Private IP addresses not allowed" aunque la Mac si conecte.
+> El fix es la env `WEBHOOK_SECURITY_MODE=permissive` en **ambos** (sobre todo en
+> `opencode.json`). Cambiar env del MCP requiere cerrar opencode por completo
+> (Cmd+Q): el proceso viejo queda vivo y se siguen usando sus vars.
+> NOTA: `.mcp.json` usa `env`, `opencode.json` usa `environment`; cambiar solo uno
+> decepciona.
 
 ## Modelo de datos (`src/types.ts`)
 
@@ -191,6 +216,7 @@ frontend, hay que actualizar AMBAS claves en ese Code node.
 - `src/hooks/useAppState.ts` — estado global, acciones, merge offline (`AppController`)
 - `src/components/ui.tsx` — BottomSheet, Stepper, MacroBar, SaveDot, Toast, ConfirmButton, TimeWheel, WeightWheel
 - `src/components/MealEstimateSheet.tsx` — registra comida con foto + texto: la IA estima los macros
+- `src/components/MealIdeaSheet.tsx` — asistente de idea: proteina + cocinar/rappi + carb cycling -> la IA sugiere (webhook `habitquest-suggest`)
 - `src/components/charts.tsx` — LineChart, DayBars, PaceBar, Stat (SVG a mano)
 - `src/screens/` — SetupScreen (primer arranque), TodayScreen, WeekScreen, PlanScreen, SettingsSheet
 - `src/styles.css` — tema, app shell, safe areas iOS

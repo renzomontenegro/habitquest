@@ -226,14 +226,6 @@ export function useAppState() {
     patchRecord(date, r => ({ ...r, meals: (r.meals ?? []).filter(m => m.id !== mealId) }))
   }, [patchRecord])
 
-  /** Copia todo lo comido en otra fecha al dia indicado. */
-  const copyDay = useCallback((from: string, to = todayStr()) => {
-    const source = stateRef.current.records.find(r => r.date === from)
-    if (!source?.meals?.length) return
-    const now = Date.now()
-    addMeals(source.meals.map((m, i) => ({ ...m, id: uid('m'), at: now + i })), to)
-  }, [addMeals])
-
   // --- Entrenamiento ---
   const setWorkout = useCallback((workoutId: string | null, date = todayStr()) => {
     patchRecord(date, r => ({ ...r, workoutId }))
@@ -366,7 +358,6 @@ export function useAppState() {
     setPortion,
     logSavedMeal,
     removeMeal,
-    copyDay,
     setWorkout,
     setSet,
     // ajustes

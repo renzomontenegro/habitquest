@@ -1,4 +1,4 @@
-import type { AppState } from '../types'
+import type { AppState, Macros } from '../types'
 
 const SYNC_URL = import.meta.env.VITE_SYNC_URL as string | undefined
 const SYNC_TOKEN = import.meta.env.VITE_SYNC_TOKEN as string | undefined
@@ -67,12 +67,76 @@ function buildHeaders(): Record<string, string> {
   return headers
 }
 
-function getUrl(endpoint: 'habitquest-save' | 'habitquest-load' | 'habitquest-push' | 'habitquest-estimate'): string | null {
+function getUrl(endpoint: 'habitquest-save' | 'habitquest-load' | 'habitquest-push' | 'habitquest-estimate' | 'habitquest-suggest'): string | null {
   if (!SYNC_URL) return null
   const base = SYNC_URL.replace(/\/$/, '')
   // Si la URL ya apunta a un endpoint especifico, reemplazar; si no, concatenar
-  const cleaned = base.replace(/habitquest-(save|load|estimate)$/, endpoint)
+  const cleaned = base.replace(/habitquest-(save|load|estimate|suggest)$/, endpoint)
   return cleaned.endsWith(endpoint) ? cleaned : `${cleaned}/${endpoint}`
+}
+
+// --- Estimar comida desde el plan: la IA no estima nada, solo se estima la comida. ---
+
+export interface MealIdea {
+  nombre: string
+  detalle: string
+  prot: number
+  carb: number
+  grasa: number
+  kcal: number
+}
+
+export interface IdeaContext {
+  slot: string
+  protein: string
+  source: 'cocinar' | 'rappi'
+  gymDay: boolean
+  carbsTarget: number
+  carbsEatenToday: number
+  carbsRemainingToday: number
+  weekCarbsDelta: number
+  weekDaysLogged: number
+  protTarget: number
+  protEatenToday: number
+  slotRef: Macros | null
+}
+
+/**
+ * Pide ideas de comida (peruanas) para un slot segun la proteina elegida y la
+ * fuente (cocinar/rappi). La IA recibe el contexto de carb cycling y devuelve
+ * 3-4 ideas con macros estimados.
+ */
+export async function suggestIdeas(ctx: IdeaContext): Promise<{ ok: boolean; ideas?: MealIdea[]; error?: string }> {
+  const url = getUrl('habitquest-suggest')
+  if (!url) return { ok: false, error: 'Sin servidor de idea configurado.' }
+  try {
+    // mimo-v2.5 razona largo en el modo ideas: hay que darle 2x el techo del
+    // sheet. Un corte a 60 s devolvia "tardo demasiado" con la IA bien.
+    const ctrl = new AbortController()
+    const timer = setTimeout(() => ctrl.abort(), 120_000)
+    let res: Response
+    try {
+      res = await fetch(url, {
+        method: 'POST',
+        headers: buildHeaders(),
+        body: JSON.stringify(ctx),
+        signal: ctrl.signal,
+      })
+    } finally {
+      clearTimeout(timer)
+    }
+    const data = (await res.json().catch(() => ({}))) as { ideas?: MealIdea[]; error?: string }
+    if (!res.ok) return { ok: false, error: data.error ?? `El servidor respondio ${res.status}.` }
+    if (!Array.isArray(data.ideas) || data.ideas.length === 0) {
+      return { ok: false, error: 'La IA no devolvio ideas.' }
+    }
+    return { ok: true, ideas: data.ideas }
+  } catch (e) {
+    if (e instanceof DOMException && e.name === 'AbortError') {
+      return { ok: false, error: 'La IA tardo demasiado. Revisa que el VPN (Tailscale) este activo.' }
+    }
+    return { ok: false, error: friendlyError(e) }
+  }
 }
 
 // --- Estimacion de comida (foto + texto -> IA) ---

@@ -151,6 +151,12 @@ function cleanRecord(v: unknown): DayLog | null {
     if (meals.length > 0) rec.meals = meals
   }
 
+  if (Array.isArray(v.skipped)) {
+    const slots = v.skipped.filter((x): x is MealSlot =>
+      typeof x === 'string' && SLOT_IDS.includes(x as MealSlot))
+    if (slots.length > 0) rec.skipped = [...new Set(slots)]
+  }
+
   const sets = cleanSets(v.sets)
   if (sets) rec.sets = sets
 

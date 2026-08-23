@@ -67,6 +67,7 @@ export interface DayLog {
   bedTime?: string // HH:MM
   wakeTime?: string // HH:MM
   meals?: MealLog[]
+  skipped?: MealSlot[] // comidas que se salto a proposito (no comio)
   workoutId?: string | null // id de SplitDay; null = descanso
   sets?: Record<string, SetEntry[]> // por id de ejercicio
 }

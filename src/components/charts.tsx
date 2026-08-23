@@ -176,6 +176,7 @@ export function MacroPie({ label, eaten, target, tone }: {
   tone: 'prot' | 'carb' | 'grasa'
 }) {
   const pct = target > 0 ? Math.min(1, eaten / target) : 0
+  const pctReal = target > 0 ? eaten / target : 0
   const over = target > 0 && eaten > target
   const R = 30
 
@@ -202,7 +203,7 @@ export function MacroPie({ label, eaten, target, tone }: {
       </div>
       <div className="mx-pie-l">{label}</div>
       <div className="mx-pie-s mx-mono">
-        {Math.round(eaten)}/{Math.round(target)} · {Math.abs(Math.round(pct * 100))}%
+        {Math.round(eaten)}/{Math.round(target)} · {Math.round(pctReal * 100)}%
       </div>
     </div>
   )
