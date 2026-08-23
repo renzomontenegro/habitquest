@@ -114,7 +114,7 @@ export function MealEstimateSheet({ open, slot, reference, savedMeals, onClose, 
           <div className="mx-sub" style={{ marginBottom: 12, lineHeight: 1.5 }}>
             ¿Como la registras?
           </div>
-          <div className="mx-acts" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
+          <div className="mx-acts">
             {savedMeals.length > 0 && (
               <button className="mx-btn" data-p="1" onClick={() => setView('repetidas')}>
                 🍽️ Comida repetida
@@ -169,7 +169,7 @@ export function MealEstimateSheet({ open, slot, reference, savedMeals, onClose, 
           <MonoInput
             value={note}
             onChange={setNote}
-            placeholder="Ej: doble porcion, con queso"
+            placeholder="Ej: 400 gr de arroz + 200 gr de carne + 1 cucharada de aceite"
             className="mx-in-full"
           />
 
