@@ -466,11 +466,11 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
                       return (
                         <div key={m.id} className="mx-logged">
                           <button className="mx-logged-b" onClick={() => setEditing(m)}>
-                            <div className="mx-logged-n">
-                              {mealName(m)}
-                              {m.portion !== 1 && <i className="mx-logged-p">× {portionLabel(m.portion)}</i>}
-                              {m.ai && <i className="mx-logged-off">IA</i>}
-                            </div>
+                        <div className="mx-logged-n">
+                          <span className="mx-logged-name">{mealName(m)}</span>
+                          {m.portion !== 1 && <i className="mx-logged-p">× {portionLabel(m.portion)}</i>}
+                          {m.ai && <i className="mx-logged-off">IA</i>}
+                        </div>
                             {m.note && <div className="mx-logged-note">{m.note}</div>}
                             <div className="mx-logged-m mx-mono">
                               <span>{mm.prot}P</span><span>{mm.carb}C</span><span>{mm.grasa}G</span>
