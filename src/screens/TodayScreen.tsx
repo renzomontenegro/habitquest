@@ -565,6 +565,23 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
             </Field>
             <div className="mx-acts">
               <button className="mx-btn" data-p="1" onClick={() => setEditing(null)}>Listo</button>
+              <button
+                className="mx-btn"
+                onClick={() => {
+                  app.upsertSavedMeal({
+                    id: `sm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                    name: editing.custom?.name || mealName(editing),
+                    prot: editing.custom?.prot ?? 0,
+                    carb: editing.custom?.carb ?? 0,
+                    grasa: editing.custom?.grasa ?? 0,
+                    ...(editing.note ? { note: editing.note } : {}),
+                  })
+                  setToast('Guardada como repetida')
+                  setEditing(null)
+                }}
+              >
+                Guardar repetida
+              </button>
               <ConfirmButton
                 label="Quitar"
                 confirmLabel="Confirmar"
