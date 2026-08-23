@@ -4,7 +4,7 @@ import { estimateMeal, type MealEstimate } from '../lib/sync'
 import { SLOT_LABEL } from '../lib/config'
 import { BottomSheet, MonoInput } from '../components/ui'
 
-const MAX_PHOTOS = 5
+const MAX_PHOTOS = 10
 
 function readAsDataURL(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
