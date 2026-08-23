@@ -1,4 +1,4 @@
-import type { AppSettings, AppState, DayLog, Macros, MealLog, MealSlot, SetEntry, SplitDay } from '../types'
+import type { AppSettings, AppState, DayLog, Macros, MealLog, MealSlot, SavedMeal, SetEntry, SplitDay } from '../types'
 import {
   DEFAULT_SLEEP_TARGET, DEFAULT_SLOT_SHARE, DEFAULT_TARGETS, DEFAULT_TOLERANCE,
 } from './config'
@@ -14,6 +14,7 @@ const STORAGE_KEY = 'sistema_state'
 const defaultSettings = (): AppSettings => ({
   targets: { ...DEFAULT_TARGETS },
   slotShare: { ...DEFAULT_SLOT_SHARE },
+  savedMeals: [],
   split: [],
   sleepTarget: DEFAULT_SLEEP_TARGET,
   tolerance: DEFAULT_TOLERANCE,
@@ -182,6 +183,27 @@ function cleanShare(v: unknown): Record<MealSlot, number> {
   return out
 }
 
+/** Comidas repetidas: solo las del usuario, top 30 para no crecer sin limite. */
+function cleanSavedMeals(v: unknown): SavedMeal[] {
+  if (!Array.isArray(v)) return []
+  return v
+    .filter(isObj)
+    .map(m => {
+      const name = str(m.name).trim()
+      if (!name) return null
+      return {
+        id: str(m.id) || uid('sm'),
+        name,
+        prot: Math.max(0, num(m.prot, 0)),
+        carb: Math.max(0, num(m.carb, 0)),
+        grasa: Math.max(0, num(m.grasa, 0)),
+        ...(optStr(m.note) ? { note: optStr(m.note) } : {}),
+      }
+    })
+    .filter((m): m is SavedMeal => m !== null)
+    .slice(0, 30)
+}
+
 function sanitize(value: unknown): AppState {
   const base = defaultState()
   if (!isObj(value)) return base
@@ -197,6 +219,7 @@ function sanitize(value: unknown): AppState {
   const settings: AppSettings = {
     targets: cleanTargets(s.targets, DEFAULT_TARGETS),
     slotShare: cleanShare(s.slotShare),
+    savedMeals: cleanSavedMeals(s.savedMeals),
     split,
     sleepTarget: Math.min(14, Math.max(1, num(s.sleepTarget, DEFAULT_SLEEP_TARGET))),
     tolerance: Math.min(0.5, Math.max(0.01, num(s.tolerance, DEFAULT_TOLERANCE))),

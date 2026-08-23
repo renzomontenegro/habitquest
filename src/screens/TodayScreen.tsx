@@ -523,11 +523,21 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
           open
           slot={estimating}
           reference={slotReference(state.settings, estimating)}
+          savedMeals={state.settings.savedMeals}
           onClose={() => setEstimating(null)}
-          onSave={(custom, note) => {
+          onUseSaved={saved => {
+            app.logSavedMeal(estimating, saved, 1, viewDate)
+            setToast(`${SLOT_LABEL[estimating]} registrado`)
+            setEstimating(null)
+          }}
+          onEstimate={(custom, note) => {
             app.logAiMeal(estimating, custom.name, custom, note, viewDate)
             setToast(`${SLOT_LABEL[estimating]} registrado`)
             setEstimating(null)
+          }}
+          onSaveRecurring={saved => {
+            app.upsertSavedMeal(saved)
+            setToast('Guardada como repetida')
           }}
         />
       )}

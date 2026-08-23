@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
-import type { AppSettings, AppState, DayLog, Macros, MealLog, MealSlot, SplitDay } from '../types'
+import type { AppSettings, AppState, DayLog, Macros, MealLog, MealSlot, SavedMeal, SplitDay } from '../types'
 import { storage } from '../lib/storage'
 import { ROUTINE_TEMPLATE } from '../lib/config'
 import { todayStr, uid } from '../lib/logic'
@@ -210,6 +210,18 @@ export function useAppState() {
     }))
   }, [patchRecord])
 
+  /** Registra una comida repetida guardada (sin IA: copia sus macros). */
+  const logSavedMeal = useCallback((slot: MealSlot, saved: SavedMeal, portion = 1, date = todayStr()) => {
+    addMeals([{
+      id: uid('m'),
+      slot,
+      portion,
+      at: Date.now(),
+      custom: { name: saved.name, prot: saved.prot, carb: saved.carb, grasa: saved.grasa },
+      ...(saved.note ? { note: saved.note } : {}),
+    }], date)
+  }, [addMeals])
+
   const removeMeal = useCallback((mealId: string, date = todayStr()) => {
     patchRecord(date, r => ({ ...r, meals: (r.meals ?? []).filter(m => m.id !== mealId) }))
   }, [patchRecord])
@@ -245,6 +257,26 @@ export function useAppState() {
   }, [mark])
 
   const setTargets = useCallback((targets: Macros) => updateSettings({ targets }), [updateSettings])
+
+  /** Guarda (o actualiza) una comida como repetida en Mi plan. */
+  const upsertSavedMeal = useCallback((saved: SavedMeal) => {
+    mark()
+    setState(prev => {
+      const exists = prev.settings.savedMeals.some(m => m.id === saved.id)
+      const savedMeals = exists
+        ? prev.settings.savedMeals.map(m => (m.id === saved.id ? saved : m))
+        : [...prev.settings.savedMeals, saved].slice(0, 30)
+      return { ...prev, settings: { ...prev.settings, savedMeals } }
+    })
+  }, [mark])
+
+  const removeSavedMeal = useCallback((id: string) => {
+    mark()
+    setState(prev => ({
+      ...prev,
+      settings: { ...prev.settings, savedMeals: prev.settings.savedMeals.filter(m => m.id !== id) },
+    }))
+  }, [mark])
 
   const upsertSplitDay = useCallback((day: SplitDay) => {
     mark()
@@ -332,6 +364,7 @@ export function useAppState() {
     updateRecord,
     logAiMeal,
     setPortion,
+    logSavedMeal,
     removeMeal,
     copyDay,
     setWorkout,
@@ -339,6 +372,8 @@ export function useAppState() {
     // ajustes
     updateSettings,
     setTargets,
+    upsertSavedMeal,
+    removeSavedMeal,
     upsertSplitDay,
     removeSplitDay,
     loadRoutineTemplate,

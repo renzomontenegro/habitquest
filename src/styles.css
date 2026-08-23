@@ -211,6 +211,12 @@ button:active { transform: scale(.985); }
   background: transparent; color: var(--mute); font-size: 22px; border-radius: 3px; cursor: pointer; }
 .mx-photo-add:hover { color: var(--ink); border-color: var(--mute); }
 
+/* Lista de comidas repetidas */
+.mx-saved-list { display: flex; flex-direction: column; gap: 8px; }
+.mx-saved { border: 1px solid var(--line); border-radius: 3px; background: var(--paper); }
+.mx-saved-b { width: 100%; text-align: left; border: 0; background: transparent; cursor: pointer;
+  padding: 10px 12px; color: var(--ink); }
+
 /* Rueda de hora estilo iOS: dos columnas que siempre entregan "HH:MM" valido */
 .mx-wheel { display: flex; align-items: stretch; justify-content: center; gap: 3px; padding: 6px 0 10px; }
 .mx-wheel-col { position: relative; width: 104px; overflow: hidden; border: 1px solid var(--line);

@@ -10,6 +10,16 @@ export type MacroKey = keyof Macros
 // --- Comidas ---
 export type MealSlot = 'desayuno' | 'almuerzo' | 'cena' | 'extra'
 
+/** Comida guardada como repetida (vino de una estimacion con foto+IA). */
+export interface SavedMeal {
+  id: string
+  name: string
+  prot: number
+  carb: number
+  grasa: number
+  note?: string
+}
+
 /**
  * Una comida registrada. No hay catalogo: los macros de la comida vienen de
  * `custom`. Cuando se registro con foto + texto, la IA los estimo (`ai`).
@@ -66,6 +76,8 @@ export interface AppSettings {
   targets: Macros // objetivo diario
   /** Que fraccion del objetivo diario va en cada comida (0-1). */
   slotShare: Record<MealSlot, number>
+  /** Comidas repetidas: se guardan una vez (foto+IA) y se usan sin tokens. */
+  savedMeals: SavedMeal[]
   split: SplitDay[]
   /** Horas de sueno objetivo, para la linea de referencia del grafico. */
   sleepTarget: number

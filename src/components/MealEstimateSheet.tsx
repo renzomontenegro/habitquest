@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import type { Macros, MealSlot } from '../types'
+import type { Macros, MealSlot, SavedMeal } from '../types'
 import { estimateMeal, type MealEstimate } from '../lib/sync'
 import { SLOT_LABEL } from '../lib/config'
 import { BottomSheet, MonoInput } from '../components/ui'
@@ -42,16 +42,20 @@ async function fileToB64(file: File): Promise<string> {
 }
 
 /**
- * Registro de comida por fotos + texto. La IA (n8n + Opencode GO) estima los
- * macros; las fotos no se guardan en ningun lado (maximo 5).
+ * Registro de comida: primero las repetidas guardadas (0 tokens), y si no hay
+ * (o quieres otra), foto + texto y la IA estima los macros.
  */
-export function MealEstimateSheet({ open, slot, reference, onClose, onSave }: {
+export function MealEstimateSheet({ open, slot, reference, savedMeals, onClose, onUseSaved, onEstimate, onSaveRecurring }: {
   open: boolean
   slot: MealSlot
   reference: Macros | null  // que deberia llevar esta comida segun el reparto
+  savedMeals: SavedMeal[]
   onClose: () => void
-  onSave: (custom: { name: string; prot: number; carb: number; grasa: number }, note: string) => void
+  onUseSaved: (saved: SavedMeal) => void
+  onEstimate: (custom: { name: string; prot: number; carb: number; grasa: number }, note: string) => void
+  onSaveRecurring: (saved: SavedMeal) => void
 }) {
+  const [view, setView] = useState<'repetidas' | 'foto'>('repetidas')
   const fileRef = useRef<HTMLInputElement>(null)
   const [photos, setPhotos] = useState<string[]>([])   // dataURLs para preview
   const [note, setNote] = useState('')
@@ -98,110 +102,160 @@ export function MealEstimateSheet({ open, slot, reference, onClose, onSave }: {
     setStatus('done')
   }
 
+  const customOf = (r: MealEstimate) => ({ name: r.nombre || 'Comida', prot: r.prot, carb: r.carb, grasa: r.grasa })
+
   return (
     <BottomSheet open={open} onClose={onClose} title={`Registrar ${SLOT_LABEL[slot].toLowerCase()}`}>
-      <div className="mx-sub" style={{ marginBottom: 12, lineHeight: 1.5 }}>
-        Fotos + descripcion ({MAX_PHOTOS} max). La IA estima los macros y se guarda el resultado;
-        las fotos no se almacenan.
-      </div>
-
-      <input
-        ref={fileRef}
-        type="file"
-        accept="image/*"
-        multiple
-        hidden
-        onChange={onFiles}
-      />
-
-      {photos.length === 0 ? (
-        <div>
-          <button className="mx-btn" data-p="1" onClick={() => fileRef.current?.click()}>
-            Agregar fotos
-          </button>
-          <div className="mx-sub" style={{ marginTop: 8 }}>
-            Tomar con la camara o elegir de la galeria. La comida puede estar en varias fotos.
+      {view === 'repetidas' ? (
+        <>
+          <div className="mx-sub" style={{ marginBottom: 10, lineHeight: 1.5 }}>
+            Tus comidas guardadas. Se usan al toque, sin gastar IA.
           </div>
-        </div>
-      ) : (
-        <div className="mx-photos">
-          {photos.map((p, i) => (
-            <div key={i} className="mx-photo-th">
-              <img src={p} alt={`Comida ${i + 1}`} />
-              <button
-                className="mx-time-x"
-                onClick={() => removePhoto(i)}
-                aria-label={`Quitar foto ${i + 1}`}
-              >✕</button>
+          {savedMeals.length === 0 ? (
+            <div className="mx-empty">
+              Todavia no tienes comidas guardadas. Registra una con foto y toca
+              <b> Guardar como repetida</b> para tenerla aqui.
             </div>
-          ))}
-          {photos.length < MAX_PHOTOS && (
-            <button className="mx-photo-add" onClick={() => fileRef.current?.click()} aria-label="Agregar foto">
-              +
+          ) : (
+            <div className="mx-saved-list">
+              {savedMeals.map(m => (
+                <div key={m.id} className="mx-saved">
+                  <button className="mx-saved-b" onClick={() => onUseSaved(m)}>
+                    <div className="mx-logged-n"><span className="mx-logged-name">{m.name}</span></div>
+                    {m.note && <div className="mx-logged-note">{m.note}</div>}
+                    <div className="mx-logged-m mx-mono">
+                      <span>{m.prot}P</span><span>{m.carb}C</span><span>{m.grasa}G</span>
+                    </div>
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="mx-acts">
+            <button className="mx-btn" data-p="1" onClick={() => setView('foto')}>
+              Foto nueva (IA)
+            </button>
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="mx-sub" style={{ marginBottom: 12, lineHeight: 1.5 }}>
+            Foto + descripcion ({MAX_PHOTOS} max). La IA estima los macros y se guarda el resultado;
+            las fotos no se almacenan.
+          </div>
+
+          {savedMeals.length > 0 && (
+            <button className="mx-mini" style={{ marginBottom: 10 }} onClick={() => { setView('repetidas'); setStatus('idle'); setResult(null) }}>
+              ← Mis repetidas
             </button>
           )}
-        </div>
-      )}
 
-      <div className="mx-lbl" style={{ margin: '14px 0 2px' }}>Comentario (opcional)</div>
-      <MonoInput
-        value={note}
-        onChange={setNote}
-        placeholder="Ej: doble porcion, con queso"
-        className="mx-in-full"
-      />
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            multiple
+            hidden
+            onChange={onFiles}
+          />
 
-      {reference && (
-        <div className="mx-sub mx-mono" style={{ marginTop: 8 }}>
-          Referencia del plan: {reference.prot}P · {reference.carb}C · {reference.grasa}G
-        </div>
-      )}
+          {photos.length === 0 ? (
+            <div>
+              <button className="mx-btn" data-p="1" onClick={() => fileRef.current?.click()}>
+                Agregar fotos
+              </button>
+              <div className="mx-sub" style={{ marginTop: 8 }}>
+                Tomar con la camara o elegir de la galeria. La comida puede estar en varias fotos.
+              </div>
+            </div>
+          ) : (
+            <div className="mx-photos">
+              {photos.map((p, i) => (
+                <div key={i} className="mx-photo-th">
+                  <img src={p} alt={`Comida ${i + 1}`} />
+                  <button
+                    className="mx-time-x"
+                    onClick={() => removePhoto(i)}
+                    aria-label={`Quitar foto ${i + 1}`}
+                  >✕</button>
+                </div>
+              ))}
+              {photos.length < MAX_PHOTOS && (
+                <button className="mx-photo-add" onClick={() => fileRef.current?.click()} aria-label="Agregar foto">
+                  +
+                </button>
+              )}
+            </div>
+          )}
 
-      {error && <div className="mx-sub" style={{ color: 'var(--bad)', marginTop: 10 }}>{error}</div>}
+          <div className="mx-lbl" style={{ margin: '14px 0 2px' }}>Comentario (opcional)</div>
+          <MonoInput
+            value={note}
+            onChange={setNote}
+            placeholder="Ej: doble porcion, con queso"
+            className="mx-in-full"
+          />
 
-      {status === 'working' && (
-        <div className="mx-sub" style={{ marginTop: 14 }}>Estimando con IA... suele tardar unos 30 s.</div>
-      )}
+          {reference && (
+            <div className="mx-sub mx-mono" style={{ marginTop: 8 }}>
+              Referencia del plan: {reference.prot}P · {reference.carb}C · {reference.grasa}G
+            </div>
+          )}
 
-      {status === 'done' && result && (
-        <div style={{ borderTop: '1px solid var(--line)', marginTop: 14, paddingTop: 12 }}>
-          <div className="mx-lbl">{result.nombre || 'Comida'}</div>
-          <div className="mx-mono" style={{ fontSize: 18, margin: '4px 0' }}>
-            {result.prot}P · {result.carb}C · {result.grasa}G
+          {error && <div className="mx-sub" style={{ color: 'var(--bad)', marginTop: 10 }}>{error}</div>}
+
+          {status === 'working' && (
+            <div className="mx-sub" style={{ marginTop: 14 }}>Estimando con IA... suele tardar unos 30 s.</div>
+          )}
+
+          {status === 'done' && result && (
+            <div style={{ borderTop: '1px solid var(--line)', marginTop: 14, paddingTop: 12 }}>
+              <div className="mx-lbl">{result.nombre || 'Comida'}</div>
+              <div className="mx-mono" style={{ fontSize: 18, margin: '4px 0' }}>
+                {result.prot}P · {result.carb}C · {result.grasa}G
+              </div>
+              <div className="mx-sub">{result.kcal} kcal · estimado por IA</div>
+            </div>
+          )}
+
+          <div className="mx-acts">
+            {status === 'done' ? (
+              <>
+                <button
+                  className="mx-btn" data-p="1"
+                  onClick={() => { onEstimate(customOf(result!), note); onClose() }}
+                >
+                  Guardar
+                </button>
+                <button
+                  className="mx-btn"
+                  onClick={() => {
+                    onSaveRecurring({
+                      id: `sm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                      name: result?.nombre || 'Comida',
+                      prot: result?.prot ?? 0,
+                      carb: result?.carb ?? 0,
+                      grasa: result?.grasa ?? 0,
+                      ...(note ? { note } : {}),
+                    })
+                    setView('repetidas')
+                  }}
+                >
+                  Guardar como repetida
+                </button>
+              </>
+            ) : (
+              <button
+                className="mx-btn" data-p="1"
+                disabled={photos.length === 0 || status === 'working'}
+                onClick={estimar}
+              >
+                {status === 'working' ? 'Estimando...' : 'Estimar macros'}
+              </button>
+            )}
           </div>
-          <div className="mx-sub">{result.kcal} kcal · estimado por IA</div>
-        </div>
+        </>
       )}
-
-      <div className="mx-acts">
-        {status === 'done' ? (
-          <>
-            <button
-              className="mx-btn" data-p="1"
-              onClick={() => {
-                onSave(
-                  { name: result?.nombre || 'Comida', prot: result?.prot ?? 0, carb: result?.carb ?? 0, grasa: result?.grasa ?? 0 },
-                  note,
-                )
-                onClose()
-              }}
-            >
-              Guardar
-            </button>
-            <button className="mx-btn" onClick={() => { setStatus('idle'); setResult(null) }}>
-              Editar
-            </button>
-          </>
-        ) : (
-          <button
-            className="mx-btn" data-p="1"
-            disabled={photos.length === 0 || status === 'working'}
-            onClick={estimar}
-          >
-            {status === 'working' ? 'Estimando...' : 'Estimar macros'}
-          </button>
-        )}
-      </div>
     </BottomSheet>
   )
 }
