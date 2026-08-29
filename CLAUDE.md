@@ -27,6 +27,11 @@ que alimentar alguna decision o grafico; si un campo no se lee en ningun lado, s
 - **Docker Compose path**: `/srv/dev-disk-by-uuid-5ba54928-353f-4fdf-8073-54befd939b8a/n8n/`
 - **Container**: `n8n-n8n-1`
 - **HTTPS**: Cert de Tailscale, config en docker-compose.yml (NO tocar certs ni WEBHOOK_URL)
+- **Certs TLS**: n8n sirve con `n8n/certs/n8n.crt` (Let's Encrypt de Tailscale, vence cada 3 meses).
+  Renovacion: `sudo tailscale cert raspberrypi.tail4656aa.ts.net` y copiar el .crt/.key al mount
+  (`/srv/dev-disk-by-uuid-5ba54928-353f-4fdf-8073-54befd939b8a/n8n/certs/`) + `docker compose restart`.
+  Si el cert vence, iPhone/Gmail del navegador da "Load failed" en Safari (no es la VPN) y el MCP
+  reporta `CERT_HAS_EXPIRED`.
 - **CORS**: `N8N_CORS_ALLOWED_ORIGINS=https://habitquest-khaki.vercel.app` en docker-compose.yml
 - **Env vars van en el bloque `environment:` del compose** (NO en .env)
 
@@ -235,7 +240,8 @@ frontend, hay que actualizar AMBAS claves en ese Code node.
 - **Errores inline y no bloqueantes**: mostrar el problema donde ocurre, sin deshabilitar la UI.
 - **Cada campo que se pide debe usarse**: si un dato del registro diario no alimenta un calculo
   ni un grafico, se elimina. Es la regla que mata la friccion.
-- **Registrar una comida = foto + texto, y la IA estima los macros.** El sheet muestra el
+- **Registrar una comida = foto (opcional) + texto, y la IA estima los macros.** Sin foto la IA
+  estima solo con el comentario. El sheet muestra la
   resultado antes de guardar; la porcion se ajusta despues desde la tarjeta. Un dia sin registro
   no cuenta. Cualquier paso extra obligatorio (pesar, elegir ingredientes) va contra el producto.
 - **Nada del plan del usuario se escribe en el codigo.** Si aparece la tentacion de poner una

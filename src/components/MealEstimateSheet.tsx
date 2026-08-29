@@ -174,8 +174,8 @@ export function MealEstimateSheet({ open, slot, reference, savedMeals, onClose, 
           />
 
           <div className="mx-sub" style={{ margin: '12px 0 2px', lineHeight: 1.5 }}>
-            <b>Tomale foto a la comida</b> y, si puedes, a la <b>tabla nutricional</b> de los
-            alimentos utilizados.
+            <b>Tomale foto a la comida</b> (opcional: sin foto, la IA estima solo con el comentario).
+            Si puedes, foto tambien a la <b>tabla nutricional</b> de los alimentos utilizados.
           </div>
 
           <input
@@ -260,7 +260,7 @@ export function MealEstimateSheet({ open, slot, reference, savedMeals, onClose, 
             ) : (
               <button
                 className="mx-btn" data-p="1"
-                disabled={photos.length === 0 || status === 'working'}
+                disabled={(photos.length === 0 && !note.trim()) || status === 'working'}
                 onClick={estimar}
               >
                 {status === 'working' ? 'Estimando...' : 'Estimar macros'}

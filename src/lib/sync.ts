@@ -47,18 +47,22 @@ export function isSyncEnabled(): boolean {
   return !!SYNC_URL
 }
 
-// Traduce errores tecnicos a mensajes amigables
+// Traduce errores tecnicos a mensajes amigables, pero SIEMPRE dejando ver el
+// detalle real (la causa puede ser otra: cert vencido, proxy, HTTP, etc.).
 function friendlyError(e: unknown): string {
   const msg = e instanceof Error ? e.message : String(e)
+  const detail = msg ? ` (${msg})` : ''
+  if (/certificate|cert_|CERT_HAS_EXPIRED|ERR_CERT|CERTIFICATE/i.test(msg))
+    return `El servidor tiene un problema con su certificado.${detail}`
   if (msg.includes('no encontró ningún servidor') || msg.includes('hostname') || msg.includes('nodename nor servname') || msg.includes('Load failed'))
-    return 'Sin conexion a Tailscale. Activa la VPN para sincronizar.'
+    return `Sin conexion a Tailscale. Activa la VPN para sincronizar.${detail}`
   if (msg.includes('network') || msg.includes('Network') || msg.includes('Failed to fetch') || msg.includes('NetworkError'))
-    return 'Sin conexion a internet.'
+    return `Sin conexion a internet.${detail}`
   if (msg.includes('timed out') || msg.includes('timeout'))
-    return 'El servidor tardo demasiado en responder.'
+    return `El servidor tardo demasiado en responder.${detail}`
   if (msg.includes('CORS') || msg.includes('access control'))
-    return 'Error de permisos CORS en el servidor.'
-  return msg
+    return `Error de permisos CORS en el servidor.${detail}`
+  return msg || 'Error desconocido'
 }
 
 function buildHeaders(): Record<string, string> {
