@@ -167,7 +167,9 @@ export async function estimateMeal(
   if (!url) return { ok: false, error: 'Sin servidor de estimacion configurado.' }
   try {
     const ctrl = new AbortController()
-    const timer = setTimeout(() => ctrl.abort(), 60_000)
+    // La IA a veces tarda 90-120 s (la ultima ejecucion tomo 119 s): el corte
+    // del cliente debe igualar el timeout del nodo HTTP en n8n (120 s).
+    const timer = setTimeout(() => ctrl.abort(), 120_000)
     let res: Response
     try {
       res = await fetch(url, {
@@ -203,7 +205,7 @@ export async function estimateMeal(
     }
   } catch (e) {
     if (e instanceof DOMException && e.name === 'AbortError') {
-      return { ok: false, error: 'La estimacion tardo demasiado. Revisa que el VPN (Tailscale) este activo.' }
+      return { ok: false, error: 'Se corto a los 120 s sin respuesta; el servidor puede seguir procesando. Espera y reintenta (no es la VPN).' }
     }
     return { ok: false, error: friendlyError(e) }
   }

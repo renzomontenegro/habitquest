@@ -59,6 +59,15 @@ que alimentar alguna decision o grafico; si un campo no se lee en ningun lado, s
   (id: `Ik3mnm12LdnGwAcv`, restringida al dominio `opencode.ai`). Nunca en el bundle ni en el repo.
 - Endpoint base de GO: `https://opencode.ai/zen/go/v1` (NO `opencode.go`: ese dominio no existe).
 - La foto NO se almacena en ningun lado: viaja a la IA y se descarta.
+- **Header `x-opencode-session`**: OpenCode GO lo exige desde el 06/09/2026 (sin el, los
+  requests del useragent `n8n` pueden fallar). Esta en AMBOS nodos HTTP ("Pedir a la IA" y
+  "Pedir a la IA (Ideas)") como header fijo con el UUID estable
+  `557fa092-410b-4eed-8225-13d6ac771aaa`. Si cambias de cuenta GO, genera otro y actualizalo
+  en los dos nodos.
+- **Timeouts**: el nodo HTTP tiene 120 s y el cliente (`estimateMeal`/`suggestIdeas` en
+  `sync.ts`) corta a los 120 s. mimo-v2.5 razona largo y a veces tarda 90-120 s (medido:
+  119 s en la ejecucion 6877); NO bajar el techo del cliente por debajo del servidor o el
+  usuario vera "se corto" aunque la IA responda bien despues.
 
 ### Workflow: Ideas de comida (mismo workflow)
 - En el mismo workflow hay un **segundo webhook**: POST `/webhook/habitquest-suggest`

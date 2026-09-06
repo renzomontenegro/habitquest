@@ -225,7 +225,7 @@ export function MealEstimateSheet({ open, slot, reference, savedMeals, onClose, 
           {error && <div className="mx-sub" style={{ color: 'var(--bad)', marginTop: 10 }}>{error}</div>}
 
           {status === 'working' && (
-            <div className="mx-sub" style={{ marginTop: 14 }}>Estimando con IA... suele tardar unos 30 s.</div>
+            <div className="mx-sub" style={{ marginTop: 14 }}>Estimando con IA... suele tardar 1-2 min.</div>
           )}
 
           {status === 'done' && result && (
