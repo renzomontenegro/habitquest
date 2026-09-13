@@ -314,15 +314,19 @@ const pad2 = (n: number): string => String(n).padStart(2, '0')
 // en indices (count) y se traduce al valor al pintar y al elegir.
 const DEC_COUNT = 10
 
-function WheelCol({ label, count, selected, onSelect, fmt = pad2 }: {
+function WheelCol({ label, count, selected, onSelect, fmt = pad2, loop = false }: {
   label: string
   count: number
   selected: number
   onSelect: (index: number) => void
   fmt?: (index: number) => string
+  loop?: boolean
 }) {
   const ref = useRef<HTMLDivElement>(null)
   const lastScrollIdx = useRef(-1)
+  const copies = loop ? 5 : 1
+  const middleOffset = loop ? count * 2 : 0
+  const [activeRaw, setActiveRaw] = useState(middleOffset + selected)
 
   // Con solo saber si el cambio de `selected` vino del propio scroll no basta:
   // llegan varios eventos scroll entre renders y el flag queda "pegado", lo que
@@ -334,12 +338,14 @@ function WheelCol({ label, count, selected, onSelect, fmt = pad2 }: {
       lastScrollIdx.current = -1
       return
     }
+    const raw = middleOffset + selected
+    setActiveRaw(raw)
     const el = ref.current
-    if (el) el.scrollTop = selected * WHEEL_ITEM
-  }, [selected])
+    if (el) el.scrollTop = raw * WHEEL_ITEM
+  }, [middleOffset, selected])
 
-  const go = (i: number) => {
-    ref.current?.scrollTo({ top: i * WHEEL_ITEM, behavior: 'smooth' })
+  const go = (raw: number) => {
+    ref.current?.scrollTo({ top: raw * WHEEL_ITEM, behavior: 'smooth' })
   }
 
   return (
@@ -352,28 +358,48 @@ function WheelCol({ label, count, selected, onSelect, fmt = pad2 }: {
         style={{ height: WHEEL_ITEM * WHEEL_VISIBLE }}
         onScroll={() => {
           const el = ref.current
-          const idx = el ? Math.round(el.scrollTop / WHEEL_ITEM) : selected
+          let raw = el ? Math.round(el.scrollTop / WHEEL_ITEM) : middleOffset + selected
+
+          // Cinco copias permiten girar varias vueltas. Al acercarse a un borde,
+          // se vuelve a la copia central equivalente sin que cambie el numero.
+          if (loop && el) {
+            if (raw < count) {
+              raw += count * 2
+              el.scrollTop = raw * WHEEL_ITEM
+            } else if (raw >= count * 4) {
+              raw -= count * 2
+              el.scrollTop = raw * WHEEL_ITEM
+            }
+          }
+
+          const idx = loop
+            ? ((raw % count) + count) % count
+            : Math.min(count - 1, Math.max(0, raw))
+          setActiveRaw(raw)
           lastScrollIdx.current = idx
-          onSelect(Math.min(count - 1, Math.max(0, idx)))
+          onSelect(idx)
         }}
       >
         <div
           className="mx-wheel-pad"
           style={{ paddingTop: WHEEL_PAD * WHEEL_ITEM, paddingBottom: WHEEL_PAD * WHEEL_ITEM }}
         >
-          {Array.from({ length: count }, (_, i) => (
-            <button
-              key={i}
-              type="button"
-              role="option"
-              aria-selected={i === selected}
-              className="mx-wheel-item mx-mono"
-              data-on={i === selected ? '1' : '0'}
-              onClick={() => go(i)}
-            >
-              {fmt(i)}
-            </button>
-          ))}
+          {Array.from({ length: count * copies }, (_, raw) => {
+            const i = raw % count
+            return (
+              <button
+                key={raw}
+                type="button"
+                role="option"
+                aria-selected={raw === activeRaw}
+                className="mx-wheel-item mx-mono"
+                data-on={raw === activeRaw ? '1' : '0'}
+                onClick={() => go(raw)}
+              >
+                {fmt(i)}
+              </button>
+            )
+          })}
         </div>
       </div>
       <div className="mx-wheel-hl" />
@@ -383,14 +409,15 @@ function WheelCol({ label, count, selected, onSelect, fmt = pad2 }: {
   )
 }
 
-export function TimeWheel({ open, onClose, title, value, onChange }: {
+export function TimeWheel({ open, onClose, title, value, initialValue, onChange }: {
   open: boolean
   onClose: () => void
   title: string
   value: string | undefined
+  initialValue?: string
   onChange: (v: string | undefined) => void
 }) {
-  const m = value?.match(/^(\d{1,2}):(\d{2})$/)
+  const m = (value ?? initialValue)?.match(/^(\d{1,2}):(\d{2})$/)
   const startH = m ? Math.min(23, parseInt(m[1], 10)) : 20
   const startM = m ? Math.min(59, parseInt(m[2], 10)) : 0
 
@@ -400,7 +427,7 @@ export function TimeWheel({ open, onClose, title, value, onChange }: {
         <WheelBody
           startH={startH}
           startM={startM}
-          hasValue={!!m}
+          hasValue={value !== undefined}
           onChange={onChange}
           onClose={onClose}
         />
@@ -426,9 +453,9 @@ function WheelBody({ startH, startM, hasValue, onChange, onClose }: {
   return (
     <>
       <div className="mx-wheel">
-        <WheelCol label="Horas" count={24} selected={h} onSelect={setH} fmt={i => pad2(i)} />
+        <WheelCol label="Horas" count={24} selected={h} onSelect={setH} fmt={i => pad2(i)} loop />
         <div className="mx-wheel-sep mx-mono">:</div>
-        <WheelCol label="Minutos" count={60} selected={min} onSelect={setMin} fmt={i => pad2(i)} />
+        <WheelCol label="Minutos" count={60} selected={min} onSelect={setMin} fmt={i => pad2(i)} loop />
       </div>
       <div className="mx-acts">
         {hasValue && (

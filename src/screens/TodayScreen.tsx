@@ -210,6 +210,15 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
   const record = getRecord(state.records, viewDate)
   const eaten = dayMacros(record)
   const slept = sleepHours(record?.bedTime, record?.wakeTime)
+  const previousSleepTime = (field: 'bedTime' | 'wakeTime'): string | undefined => {
+    for (let i = 1; i <= 30; i++) {
+      const value = getRecord(state.records, addDays(viewDate, -i))?.[field]
+      if (value) return value
+    }
+    return undefined
+  }
+  const previousBedTime = previousSleepTime('bedTime')
+  const previousWakeTime = previousSleepTime('wakeTime')
 
   const [estimating, setEstimating] = useState<MealSlot | null>(null)
   const [ideaSlot, setIdeaSlot] = useState<MealSlot | null>(null)
@@ -681,6 +690,7 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
         open={sleepPicker !== null}
         title={sleepPicker === 'bed' ? 'Me acoste' : 'Me desperte'}
         value={sleepPicker === 'bed' ? record?.bedTime : sleepPicker === 'wake' ? record?.wakeTime : undefined}
+        initialValue={sleepPicker === 'bed' ? previousBedTime : sleepPicker === 'wake' ? previousWakeTime : undefined}
         onClose={() => setSleepPicker(null)}
         onChange={v => {
           app.updateRecord(
