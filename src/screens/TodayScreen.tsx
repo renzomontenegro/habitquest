@@ -791,7 +791,7 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
           }}
           onSaveRecurring={saved => {
             app.upsertSavedMeal(saved)
-            setToast('Guardada como repetida')
+            setToast('Guardada como recurrente')
           }}
         />
       )}
@@ -853,11 +853,11 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
                     grasa: editing.custom?.grasa ?? 0,
                     ...(editing.note ? { note: editing.note } : {}),
                   })
-                  setToast('Guardada como repetida')
+                  setToast('Guardada como recurrente')
                   setEditing(null)
                 }}
               >
-                Guardar repetida
+                Guardar como recurrente
               </button>
               <ConfirmButton
                 label="Quitar"

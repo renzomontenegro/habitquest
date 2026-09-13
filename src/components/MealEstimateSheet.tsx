@@ -41,11 +41,11 @@ async function fileToB64(file: File): Promise<string> {
   return canvas.toDataURL('image/jpeg', 0.72).replace(/^data:image\/jpeg;base64,/, '')
 }
 
-type View = 'elegir' | 'repetidas' | 'foto' | 'nombrar'
+type View = 'capturar' | 'nombrar'
 
 /**
- * Registro de comida: primero eliges entre repetida (0 tokens) o una nueva.
- * La nueva acepta descripcion, foto o ambas. Al guardar una repetida pide nombre.
+ * Registro directo: descripcion y foto opcional en una sola vista. Las comidas
+ * recurrentes se eligen desde el mismo formulario, sin una pantalla intermedia.
  */
 export function MealEstimateSheet({ open, slot, reference, savedMeals, onClose, onUseSaved, onEstimate, onSaveRecurring }: {
   open: boolean
@@ -57,7 +57,7 @@ export function MealEstimateSheet({ open, slot, reference, savedMeals, onClose, 
   onEstimate: (custom: { name: string; prot: number; carb: number; grasa: number }, note: string) => void
   onSaveRecurring: (saved: SavedMeal) => void
 }) {
-  const [view, setView] = useState<View>('elegir')
+  const [view, setView] = useState<View>('capturar')
   const fileRef = useRef<HTMLInputElement>(null)
   const [photos, setPhotos] = useState<string[]>([])   // dataURLs para preview
   const [note, setNote] = useState('')
@@ -106,79 +106,44 @@ export function MealEstimateSheet({ open, slot, reference, savedMeals, onClose, 
   }
 
   const customOf = (r: MealEstimate) => ({ name: r.nombre || 'Comida', prot: r.prot, carb: r.carb, grasa: r.grasa })
+  const updateNote = (value: string) => {
+    setNote(value)
+    if (status === 'done') {
+      setStatus('idle')
+      setResult(null)
+    }
+    setError(null)
+  }
 
   return (
     <BottomSheet open={open} onClose={onClose} title={`Registrar ${SLOT_LABEL[slot].toLowerCase()}`}>
-      {view === 'elegir' && (
+      {view === 'capturar' && (
         <>
-          <div className="mx-sub" style={{ marginBottom: 12, lineHeight: 1.5 }}>
-            ¿Como la registras?
-          </div>
-          <div className="mx-acts">
-            {savedMeals.length > 0 && (
-              <button className="mx-btn" data-p="1" onClick={() => setView('repetidas')}>
-                🍽️ Comida repetida
-              </button>
-            )}
-            <button className="mx-btn" data-p={savedMeals.length === 0 ? '1' : undefined} onClick={() => setView('foto')}>
-              Nueva comida · foto o texto
+          <div className="mx-lbl" style={{ margin: '0 0 5px' }}>¿Que comiste?</div>
+          <div className="mx-meal-capture">
+            <MonoInput
+              value={note}
+              onChange={updateNote}
+              placeholder="Ej: hamburguesa doble con papas"
+              className="mx-in-full"
+              autoFocus
+            />
+            <button
+              className="mx-camera-trigger"
+              data-on={photos.length > 0 ? '1' : '0'}
+              onClick={() => fileRef.current?.click()}
+              aria-label={photos.length > 0 ? `Agregar otra foto. ${photos.length} adjuntas` : 'Adjuntar foto opcional'}
+              title="Adjuntar foto opcional"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 7.5h3l1.4-2h7.2l1.4 2h3v11H4z" />
+                <circle cx="12" cy="13" r="3.5" />
+              </svg>
+              {photos.length > 0 && <span>{photos.length}</span>}
             </button>
           </div>
-          {savedMeals.length === 0 && (
-            <div className="mx-sub" style={{ marginTop: 10, lineHeight: 1.5 }}>
-              Para tener repetidas: registra una con foto o texto y toca <b>Guardar como repetida</b>.
-            </div>
-          )}
-        </>
-      )}
-
-      {view === 'repetidas' && (
-        <>
-          <div className="mx-sub" style={{ marginBottom: 10, lineHeight: 1.5 }}>
-            Tus comidas guardadas. Se usan al toque, sin gastar IA.
-          </div>
-          {savedMeals.length === 0 ? (
-            <div className="mx-empty">
-              Todavia no tienes comidas guardadas. Registra una con foto o texto y toca
-              <b> Guardar como repetida</b> para tenerla aqui.
-            </div>
-          ) : (
-            <div className="mx-saved-list">
-              {savedMeals.map(m => (
-                <div key={m.id} className="mx-saved">
-                  <button className="mx-saved-b" onClick={() => onUseSaved(m)}>
-                    <div className="mx-logged-n"><span className="mx-logged-name">{m.name}</span></div>
-                    {m.note && <div className="mx-logged-note">{m.note}</div>}
-                    <div className="mx-logged-m mx-mono">
-                      <span>{m.prot}P</span><span>{m.carb}C</span><span>{m.grasa}G</span>
-                    </div>
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-          <div className="mx-acts">
-            <button className="mx-btn" onClick={() => setView('elegir')}>← Volver</button>
-          </div>
-        </>
-      )}
-
-      {view === 'foto' && (
-        <>
-          <div className="mx-lbl" style={{ margin: '0 0 5px' }}>Describe lo que comiste</div>
-          <MonoInput
-            value={note}
-            onChange={setNote}
-            placeholder="Ej: hamburguesa doble con papas y mayonesa"
-            className="mx-in-full"
-            autoFocus
-          />
           <div className="mx-sub" style={{ marginTop: 6 }}>
-            Si ya comiste, esto basta. Incluye cantidades o tamaño cuando los recuerdes.
-          </div>
-
-          <div className="mx-sub" style={{ margin: '16px 0 2px', lineHeight: 1.5 }}>
-            <b>Foto opcional.</b> Ayuda a estimar la porción, pero no es obligatoria.
+            El texto es suficiente. La foto ayuda, pero es opcional.
           </div>
 
           <input
@@ -190,16 +155,25 @@ export function MealEstimateSheet({ open, slot, reference, savedMeals, onClose, 
             onChange={onFiles}
           />
 
-          {photos.length === 0 ? (
-            <div style={{ marginTop: 8 }}>
-              <button className="mx-btn" onClick={() => fileRef.current?.click()}>
-                Agregar foto opcional
-              </button>
-              <div className="mx-sub" style={{ marginTop: 8 }}>
-                Tomar con la camara o elegir de la galeria (hasta {MAX_PHOTOS}).
-              </div>
+          {savedMeals.length > 0 && (
+            <div className="mx-recurring-pick">
+              <label className="mx-lbl" htmlFor={`recurrente-${slot}`}>O usa una comida recurrente</label>
+              <select
+                id={`recurrente-${slot}`}
+                className="mx-select"
+                defaultValue=""
+                onChange={e => {
+                  const saved = savedMeals.find(meal => meal.id === e.target.value)
+                  if (saved) onUseSaved(saved)
+                }}
+              >
+                <option value="" disabled>Elegir comida guardada...</option>
+                {savedMeals.map(meal => <option key={meal.id} value={meal.id}>{meal.name}</option>)}
+              </select>
             </div>
-          ) : (
+          )}
+
+          {photos.length > 0 && (
             <div className="mx-photos" style={{ marginTop: 8 }}>
               {photos.map((p, i) => (
                 <div key={i} className="mx-photo-th">
@@ -257,7 +231,7 @@ export function MealEstimateSheet({ open, slot, reference, savedMeals, onClose, 
                     setView('nombrar')
                   }}
                 >
-                  Guardar como repetida
+                  Guardar como recurrente
                 </button>
               </>
             ) : (
@@ -293,20 +267,22 @@ export function MealEstimateSheet({ open, slot, reference, savedMeals, onClose, 
               className="mx-btn" data-p="1"
               disabled={name.trim().length === 0}
               onClick={() => {
-                onSaveRecurring({
+                const saved = {
                   id: `sm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
                   name: name.trim(),
                   prot: result?.prot ?? 0,
                   carb: result?.carb ?? 0,
                   grasa: result?.grasa ?? 0,
                   ...(note ? { note } : {}),
-                })
-                setView('repetidas')
+                }
+                onSaveRecurring(saved)
+                onEstimate(customOf(result!), note)
+                onClose()
               }}
             >
               Guardar
             </button>
-            <button className="mx-btn" onClick={() => setView('foto')}>← Volver</button>
+            <button className="mx-btn" onClick={() => setView('capturar')}>← Volver</button>
           </div>
         </>
       )}

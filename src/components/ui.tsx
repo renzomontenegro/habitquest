@@ -96,6 +96,7 @@ export function MonoInput({ value, onChange, placeholder, inputMode, className, 
       placeholder={placeholder}
       inputMode={inputMode ?? 'text'}
       autoFocus={autoFocus}
+      data-autofocus={autoFocus ? 'true' : undefined}
     />
   )
 }
