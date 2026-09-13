@@ -374,7 +374,9 @@ button:active { transform: scale(.985); }
 
 /* ===== HOY: una tarjeta por comida, dos por fila ===== */
 
-.mx-slots { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 8px; }
+.mx-slots { display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(210px, 100%), 1fr));
+  gap: 8px; margin-bottom: 8px; }
 
 .mx-slot { background: var(--card); border: 1px solid var(--line); border-radius: 3px;
   padding: 12px 13px; }
