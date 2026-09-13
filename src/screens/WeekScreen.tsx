@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import type { AppController } from '../hooks/useAppState'
 import {
-  addDays, adherence, getRecord, getVerdict, hasFoodLog, kcal,
+  addDays, adherence, foodLogCoverage, getRecord, getVerdict, hasCompleteFoodLog, kcal,
   lastNDates, macrosForDate, shortDate, sleepHours, strengthDrops, sumMacrosOver,
   waistSeries, weekDates, weekPace, weightAvg, weightProjection, weightTrend,
 } from '../lib/logic'
@@ -19,13 +19,17 @@ export function WeekScreen({ app }: { app: AppController }) {
   const verdict = getVerdict(records, state.settings)
   const V = VERDICT_TEXT[verdict] ?? VERDICT_TEXT.ok
 
-  const weekTotals = useMemo(() => sumMacrosOver(records, week), [records, week])
+  const completeDates = useMemo(
+    () => week.filter(d => hasCompleteFoodLog(getRecord(records, d))),
+    [records, week],
+  )
+  const weekTotals = useMemo(() => sumMacrosOver(records, completeDates), [records, completeDates])
   const weekTarget = { prot: targets.prot * 7, carb: targets.carb * 7, grasa: targets.grasa * 7 }
 
   const adh = useMemo(() => adherence(records, week, state.settings), [records, week, state.settings])
 
   const macroByDay = useMemo(
-    () => week.map(d => (hasFoodLog(getRecord(records, d)) ? macrosForDate(records, d) : null)),
+    () => week.map(d => (hasCompleteFoodLog(getRecord(records, d)) ? macrosForDate(records, d) : null)),
     [records, week],
   )
 
@@ -112,13 +116,23 @@ export function WeekScreen({ app }: { app: AppController }) {
         )
       })()}
 
+      {week.some(d => {
+        const c = foodLogCoverage(getRecord(records, d))
+        return c.covered > 0 && !c.complete
+      }) && (
+        <div className="mx-nudge">
+          <div className="mx-lbl">Hay días sin cerrar</div>
+          <p>Los macros parciales no entran al acumulado. Cierra cada día para evaluar datos completos.</p>
+        </div>
+      )}
+
       {/* --- Cifras --- */}
       <div className="mx-three">
         <Stat
-          label="Registrados"
+          label="Cerrados"
           value={`${adh.logged}`}
           unit="/7"
-          sub="dias con comida"
+          sub="días completos"
         />
         <Stat
           label="En objetivo"
@@ -148,7 +162,7 @@ export function WeekScreen({ app }: { app: AppController }) {
         <PaceBar label={MACRO_LABEL.carb} value={weekTotals.carb} target={weekTarget.carb} pace={pace} />
         <PaceBar label={MACRO_LABEL.grasa} value={weekTotals.grasa} target={weekTarget.grasa} pace={pace} />
         <div className="mx-legend">
-          La marca vertical es donde deberias ir hoy. {kcal(weekTotals)} kcal acumuladas.
+          La marca vertical es el ritmo esperado. {kcal(weekTotals)} kcal en días cerrados.
         </div>
       </div>
 
@@ -170,7 +184,7 @@ export function WeekScreen({ app }: { app: AppController }) {
             />
           </div>
         ))}
-        <div className="mx-legend">Las barras huecas son dias sin registrar, no dias en cero.</div>
+        <div className="mx-legend">Las barras huecas son días sin cerrar, no días en cero.</div>
       </div>
 
       {/* --- Peso --- */}

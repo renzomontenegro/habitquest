@@ -148,13 +148,27 @@ export function mealsInSlot(record: DayLog | undefined, slot: MealSlot): MealLog
 }
 
 // --- Adherencia ---
-/** Un dia cuenta como registrado si tiene al menos una comida. */
+/** Un dia tiene algun registro de comida, aunque todavia pueda estar incompleto. */
 export function hasFoodLog(r: DayLog | undefined): boolean {
   return !!r?.meals?.length
 }
 
+/** Slots confirmados con comida o marcados como no consumidos. */
+export function foodLogCoverage(r: DayLog | undefined): { covered: number; total: number; complete: boolean } {
+  const slots: MealSlot[] = ['desayuno', 'almuerzo', 'cena', 'extra']
+  const covered = slots.filter(slot =>
+    (r?.meals ?? []).some(m => m.slot === slot) || (r?.skipped ?? []).includes(slot),
+  ).length
+  return { covered, total: slots.length, complete: covered === slots.length }
+}
+
+/** Solo un dia cerrado permite evaluar si se cumplio el objetivo. */
+export function hasCompleteFoodLog(r: DayLog | undefined): boolean {
+  return foodLogCoverage(r).complete
+}
+
 export function loggedDays(records: DayLog[], dates: string[]): number {
-  return dates.filter(d => hasFoodLog(getRecord(records, d))).length
+  return dates.filter(d => hasCompleteFoodLog(getRecord(records, d))).length
 }
 
 /** Ratio consumido/objetivo por macro, acotado para la barra. */
@@ -176,7 +190,7 @@ export function adherence(records: DayLog[], dates: string[], settings: AppSetti
   let logged = 0
   for (const d of dates) {
     const r = getRecord(records, d)
-    if (!hasFoodLog(r)) continue
+    if (!hasCompleteFoodLog(r)) continue
     logged++
     if (dayOnTarget(dayMacros(r), settings.targets, settings.tolerance)) onTarget++
   }

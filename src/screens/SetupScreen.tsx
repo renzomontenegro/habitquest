@@ -42,8 +42,8 @@ export function SetupScreen({ onDone }: { onDone: (targets: Macros) => void }) {
       </button>
 
       <div className="mx-sub" style={{ marginTop: 12, lineHeight: 1.5 }}>
-        Despues vas a crear tus comidas: cada una con sus macros, para que registrar
-        sea elegir una y nada mas.
+        Despues solo necesitas una foto o una descripcion. La IA estima los macros
+        y tu confirmas el resultado antes de guardarlo.
       </div>
     </div>
   )

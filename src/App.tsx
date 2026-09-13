@@ -6,7 +6,7 @@ import { SettingsSheet } from './screens/SettingsSheet'
 import { SetupScreen } from './screens/SetupScreen'
 import { useAppState } from './hooks/useAppState'
 import { usePWAUpdate } from './hooks/usePWAUpdate'
-import { headerDate, isoWeek, parseDate, weightTrendAt } from './lib/logic'
+import { headerDate, isoWeek, parseDate } from './lib/logic'
 import { APP_VERSION } from './lib/config'
 import { SaveDot } from './components/ui'
 
@@ -102,12 +102,6 @@ export default function App() {
 
   const todayDate = parseDate(app.today) ?? new Date()
   const viewDateObj = parseDate(viewDate) ?? todayDate
-  // "Si sigues asi, en 7d": promedio de la semana que termina en el dia visible
-  // + la tasa semanal del promedio anterior. Sin dos ventanas no hay ritmo.
-  const trendAt = weightTrendAt(app.state.records, viewDate)
-  const en7d = trendAt
-    ? { kg: Math.round((trendAt.recent + trendAt.delta) * 10) / 10 }
-    : null
   const viewingToday = viewDate === app.today
 
   // Primer arranque: no se muestra nada mas hasta tener objetivos. Se espera a
@@ -183,15 +177,12 @@ export default function App() {
                   onRetry={app.retrySave}
                 />
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ textAlign: 'right' }}>
-                  <div className="mx-eyebrow">Si sigues asi, en 7d:</div>
-                  <div className="mx-mono" style={{ fontSize: 15, fontWeight: 600 }}>
-                    {en7d ? `${en7d.kg} kg` : 'Pesate unos dias'}
-                  </div>
-                </div>
-                <button className="mx-gear" onClick={() => setSettingsOpen(true)} aria-label="Ajustes">⚙</button>
-              </div>
+              <button className="mx-gear" onClick={() => setSettingsOpen(true)} aria-label="Abrir ajustes">
+                <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                  <path d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4Z" fill="none" stroke="currentColor" strokeWidth="1.8" />
+                  <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06A1.7 1.7 0 0 0 15 19.37a1.7 1.7 0 0 0-1 .63 1.7 1.7 0 0 0-.37 1.05V21h-4v-.08A1.7 1.7 0 0 0 8.57 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.2 15a1.7 1.7 0 0 0-.63-1A1.7 1.7 0 0 0 2.52 13H2v-4h.52A1.7 1.7 0 0 0 4.2 7a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 8.57 2.6a1.7 1.7 0 0 0 1-.63A1.7 1.7 0 0 0 9.94 1h4v.08A1.7 1.7 0 0 0 15 2.6a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.4 7a1.7 1.7 0 0 0 .63 1 1.7 1.7 0 0 0 1.05.37H21v4h-.08A1.7 1.7 0 0 0 19.4 15Z" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
             </div>
 
             <div className="mx-tabs">

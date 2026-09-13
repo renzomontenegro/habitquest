@@ -6,14 +6,17 @@ sesion futura antes de tocar comidas, rutina u objetivos.
 ## Perfil
 
 - Sexo / edad: M, 24
-- Peso actual: 112 kg · Altura: 174 cm
-- Entrenamiento: fuerza 4x/semana (Upper/Lower A/B)
+- Peso actual: ~111 kg · Altura: 174 cm
+- Trabajo hibrido: presencial martes y jueves; esos dias normalmente no desayuna.
+- Entrenamiento base: fuerza lunes, miercoles y viernes; sabado opcional.
 
 ## Objetivo
 
-- Bajar grasa hasta **90 kg para el 1 de diciembre de 2026** (22 kg en ~16 semanas).
-- Ritmo requerido: ~1.3 kg/semana. Es un deficit agresivo; lo sostenible es
-  ~1 kg/semana. Se empieza fuerte y se vigila con la tendencia de peso de la app.
+- Boda: **5 de diciembre de 2026**.
+- Meta aspiracional para la boda: **95 kg**.
+- **100 kg** es el hito realista de exito; 90 kg queda como objetivo posterior.
+- El ritmo hacia 95 kg es agresivo. No se aumenta la restriccion sin antes tener
+  14 dias consecutivos de registro completo y revisar la tendencia real.
 
 ## Reglas alimentarias (las que pidio el usuario)
 
@@ -27,20 +30,26 @@ sesion futura antes de tocar comidas, rutina u objetivos.
 
 ## Numeros del plan
 
-Calculo con Mifflin-St Jeor + factor 1.5 (4x fuerza):
+La **fuente de verdad actual es la app sincronizada**:
 
-- BMR ≈ 2090 kcal · TDEE ≈ **3100 kcal**
-- Objetivo diario ≈ **2115 kcal** (deficit ~1000 kcal)
-- **Targets: proteina 185 g · carbo 175 g · grasa 75 g**
+- **Targets: proteina 150 g · carbo 150 g · grasa 60 g**
+- Total aproximado: **1740 kcal**.
+
+El calculo anterior de 185 P / 175 C / 75 G (~2115 kcal) queda descartado para
+no mantener dos planes contradictorios. Tampoco se baja de 1740 kcal todavia:
+los registros incompletos impiden medir la ingesta real.
 
 Reparto por comida (slotShare de la app): desayuno 20%, almuerzo 42%, cena 38%, extra 10%.
 
 | Comida | P | C | G | kcal |
 |---|---|---|---|---|
-| Desayuno | 37 | 35 | 15 | 425 |
-| Almuerzo | 78 | 74 | 32 | 900 |
-| Cena | 70 | 66 | 28 | 800 |
-| Extras | 19 | 18 | 8 | 220 |
+| Desayuno | 30 | 30 | 12 | 348 |
+| Almuerzo | 63 | 63 | 25 | 729 |
+| Cena | 57 | 57 | 23 | 663 |
+| Extras | 15 | 15 | 6 | 174 |
+
+Martes y jueves no se obliga el desayuno: almuerzo y cena siguen siendo las
+comidas previstas y cualquier mandarina o Charkitos se registra como extra.
 
 > Estos refs son la referencia que muestra la app al registrar una comida con
 > foto (reparto del objetivo diario). No hay que escribirlos a mano.
@@ -90,7 +99,8 @@ Desayuno avena + proteina (P34 C57 G8) · almuerzo arroz verde + pollo
 (P48 C42 G15) · cena arroz + panceta (P39 C28 G63) · extra proteina (P25 C4 G2)
 → **P146 C131 G88 ≈ 1900 kcal**.
 
-Queda corto de proteina (~40 g) y algo bajo de kcal. Para cerrar:
+Con los targets sincronizados, ese ejemplo queda casi en proteina y carbo,
+pero alto en grasa. Para cerrar:
 - Subir el main de almuerzo a porcion **1.5** (arroz verde + pollo suma
   P72 C63 G23) o
 - Los dias sin panceta, cambiar la cena por pollo a la plancha + arroz
@@ -99,7 +109,7 @@ Queda corto de proteina (~40 g) y algo bajo de kcal. Para cerrar:
 > La regla del producto: un dia bajo se compensa con uno alto. Lo que decide es
 > el acumulado semanal, no el dia exacto.
 
-## Rutina actual (Upper/Lower 4 dias)
+## Rutina actual (3 dias base + sabado opcional)
 
 - **Lunes — Upper A** (enfasis empuje): Bench Press 3×6-8, Cable Row 3×8-10,
   OHP mancuernas 3×8-10, Lat Pulldown 3×10-12, Lateral Raise 3×12-15

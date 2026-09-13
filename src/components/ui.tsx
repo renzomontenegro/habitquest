@@ -11,12 +11,32 @@ export function BottomSheet({ open, onClose, title, children, wide, center }: {
   wide?: boolean
   center?: boolean
 }) {
-  // El teclado de iOS no debe dejar el sheet detras del contenido de la pagina.
+  const titleId = useId()
+  const sheetRef = useRef<HTMLDivElement>(null)
+
+  // Dialogo modal real: mueve el foco, lo contiene y lo devuelve al cerrar.
   useEffect(() => {
     if (!open) return
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    const previous = document.activeElement as HTMLElement | null
+    const focusable = () => Array.from(sheetRef.current?.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    ) ?? [])
+    requestAnimationFrame(() => focusable()[0]?.focus())
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+      if (e.key !== 'Tab') return
+      const items = focusable()
+      if (!items.length) return
+      const first = items[0]
+      const last = items[items.length - 1]
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus() }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus() }
+    }
     window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      previous?.focus()
+    }
   }, [open, onClose])
 
   return (
@@ -30,6 +50,10 @@ export function BottomSheet({ open, onClose, title, children, wide, center }: {
           onClick={onClose}
         >
           <motion.div
+            ref={sheetRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={titleId}
             initial={center ? { y: 40, opacity: 0.6 } : { y: 420 }}
             animate={center ? { y: 0, opacity: 1 } : { y: 0 }}
             exit={center ? { y: 40, opacity: 0.6 } : { y: 420 }}
@@ -41,7 +65,7 @@ export function BottomSheet({ open, onClose, title, children, wide, center }: {
           >
             {!center && <div className="mx-sheet-grab" />}
             <div className="mx-sheet-head">
-              <div className="mx-eyebrow">{title}</div>
+              <div className="mx-eyebrow" id={titleId}>{title}</div>
               <button className="mx-sheet-x" onClick={onClose} aria-label="Cerrar">✕</button>
             </div>
             {children}
@@ -120,12 +144,13 @@ export function Seg({ opts, value, onChange }: {
 }
 
 // --- Stepper numerico: menos teclado, mas taps ---
-export function Stepper({ value, onChange, step = 10, min = 0, suffix }: {
+export function Stepper({ value, onChange, step = 10, min = 0, suffix, ariaLabel }: {
   value: number
   onChange: (v: number) => void
   step?: number
   min?: number
   suffix?: string
+  ariaLabel?: string
 }) {
   const clamp = (n: number) => Math.max(min, Math.round(n * 100) / 100)
   return (
@@ -135,6 +160,7 @@ export function Stepper({ value, onChange, step = 10, min = 0, suffix }: {
         className="mx-stepper-v mx-mono"
         value={String(value)}
         inputMode="decimal"
+        aria-label={ariaLabel}
         onChange={e => {
           const n = parseFloat(e.target.value)
           onChange(isNaN(n) ? min : clamp(n))

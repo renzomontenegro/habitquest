@@ -2,14 +2,15 @@ import { useRef, useState } from 'react'
 import type { AppController } from '../hooks/useAppState'
 import type { MealLog, MealSlot } from '../types'
 import {
-  addDays, dayMacros, getRecord, headerDate, lastNDates, lastSessionWeight, makeEmptySets, mealMacros, mealName,
-  mealsInSlot, nearestWeight, parseDate, roundMacros, shortDate, sleepHours, slotReference, workoutForDate,
+  addDays, dayMacros, daysBetween, foodLogCoverage, getRecord, headerDate, kcal, lastNDates, lastSessionWeight,
+  makeEmptySets, mealMacros, mealName, mealsInSlot, nearestWeight, parseDate, roundMacros, shortDate, sleepHours,
+  slotReference, weightAvg, weightTrendAt, workoutForDate,
 } from '../lib/logic'
 import { MACRO_LABEL, PORTIONS, SLOTS, SLOT_LABEL } from '../lib/config'
 import { MealEstimateSheet } from '../components/MealEstimateSheet'
 import { MealIdeaSheet } from '../components/MealIdeaSheet'
 import { MacroPie } from '../components/charts'
-import { BottomSheet, ConfirmButton, Field, RepsWheel, Seg, TimeWheel, Toast, WeightWheel } from '../components/ui'
+import { BottomSheet, ConfirmButton, Field, RepsWheel, Seg, Stepper, TimeWheel, Toast, WeightWheel } from '../components/ui'
 
 function portionLabel(p: number): string {
   if (p === 0.5) return '½'
@@ -47,13 +48,30 @@ function secProgress(sec: Sec, record: ReturnType<typeof getRecord>, workout: Re
   }
 }
 
-const SECS: { id: Sec; icon: string; label: string; color: string }[] = [
-  { id: 'sueno', icon: '😴', label: 'Sueno', color: 'var(--warn)' },
-  { id: 'peso', icon: '⚖️', label: 'Peso', color: 'var(--good)' },
-  { id: 'entreno', icon: '🏋️', label: 'Entrenamiento', color: 'var(--ink)' },
-  { id: 'comidas', icon: '🍽️', label: 'Comidas', color: 'var(--signal)' },
-  { id: 'actividad', icon: '🚶', label: 'Actividad', color: 'var(--mute)' },
+const SECS: { id: Sec; label: string; color: string }[] = [
+  { id: 'sueno', label: 'Sueno', color: 'var(--warn)' },
+  { id: 'peso', label: 'Peso', color: 'var(--good)' },
+  { id: 'entreno', label: 'Entrenamiento', color: 'var(--ink)' },
+  { id: 'comidas', label: 'Comidas', color: 'var(--signal)' },
+  { id: 'actividad', label: 'Actividad', color: 'var(--mute)' },
 ]
+
+const SECTION_ICON_PATHS: Record<Sec, string[]> = {
+  comidas: ['M4 3v8a2 2 0 0 0 2 2h1V3', 'M5.5 3v10', 'M18 3v18', 'M18 3c-3 2-4 5-4 8h4', 'M7 13v8'],
+  entreno: ['M6 7v10', 'M18 7v10', 'M3 9v6', 'M21 9v6', 'M6 12h12'],
+  peso: ['M5 5h14l2 16H3L5 5Z', 'M9 9a3 3 0 0 1 6 0', 'M12 9l2-2'],
+  actividad: ['M13 5a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z', 'M7 22l3-7 2 2v5', 'M18 22l-3-9-4-3 2-3 3 3 4 1'],
+  sueno: ['M20 15.5A8.5 8.5 0 0 1 8.5 4 8.5 8.5 0 1 0 20 15.5Z'],
+}
+
+function SectionIcon({ id }: { id: Sec }) {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
+      strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {SECTION_ICON_PATHS[id].map((d, i) => <path d={d} key={i} />)}
+    </svg>
+  )
+}
 
 /** Path del "queso" de un pie-circulo: porcion rellena desde las 12 horas. */
 function pieSlice(cx: number, cy: number, r: number, pct: number): string {
@@ -186,7 +204,7 @@ function CategoryRing({ progress, open, onTap }: {
                   <path d={pieSlice(32, 32, r, pct)} fill={s.color} />
                 ) : null}
               </svg>
-              <span className="mx-ring-emo" aria-hidden>{s.icon}</span>
+              <span className="mx-ring-emo" aria-hidden><SectionIcon id={s.id} /></span>
             </button>
           )
         })}
@@ -228,10 +246,40 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
   const [exWheel, setExWheel] = useState<null | { exId: string; index: number }>(null)
   const [repsWheel, setRepsWheel] = useState<null | { exId: string; index: number }>(null)
   const [openSec, setOpenSec] = useState<Sec | null>(null)
+  const [goalEditor, setGoalEditor] = useState(false)
+  const [closingDay, setClosingDay] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
 
   const workout = workoutForDate(record, split, viewDate)
   const weightStart = record?.weight ?? nearestWeight(state.records, viewDate) ?? 100
+  const eatenKcal = kcal(eaten)
+  const targetKcal = kcal(targets)
+  const kcalLeft = targetKcal - eatenKcal
+  const foodCoverage = foodLogCoverage(record)
+  const missingSlots = SLOTS.filter(s =>
+    mealsInSlot(record, s.id).length === 0 && !(record?.skipped ?? []).includes(s.id),
+  )
+  const preferredSlot: MealSlot = (() => {
+    const hour = viewDate === today ? new Date().getHours() : 12
+    const preferred: MealSlot = hour < 11 ? 'desayuno' : hour < 17 ? 'almuerzo' : 'cena'
+    if (missingSlots.some(s => s.id === preferred)) return preferred
+    return missingSlots.find(s => s.id !== 'extra')?.id ?? missingSlots[0]?.id ?? 'extra'
+  })()
+  const avg7 = weightAvg(state.records, addDays(viewDate, -6), viewDate)
+  const goalDays = state.settings.targetDate ? daysBetween(viewDate, state.settings.targetDate) : null
+  const goalWeight = state.settings.targetWeight
+  const goalLeft = avg7 != null && goalWeight != null ? Math.max(0, avg7 - goalWeight) : null
+  const requiredPerWeek = goalLeft != null && goalDays != null && goalDays > 0
+    ? goalLeft / (goalDays / 7)
+    : null
+  const actualTrend = weightTrendAt(state.records, viewDate)?.delta ?? null
+  const projectedGoalWeight = avg7 != null && actualTrend != null && goalDays != null && goalDays > 0
+    ? avg7 + actualTrend * (goalDays / 7)
+    : null
+  const recentWaist = state.records
+    .filter(r => r.waist != null && r.date <= viewDate)
+    .sort((a, b) => b.date.localeCompare(a.date))[0]
+  const waistDue = !recentWaist || daysBetween(recentWaist.date, viewDate) >= 7
 
   // Peso al que arranca el wheel de una serie: lo ya cargado, si no el ultimo
   // entreno del ejercicio, si no 50 (caso de un dia nuevo sin historial).
@@ -313,13 +361,96 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
         )}
       </div>
 
+      {/* --- La meta visible: la fecha deja de vivir escondida en Mi plan --- */}
+      <section className="mx-goal" aria-label="Meta de peso">
+        <div className="mx-goal-top">
+          <div>
+            <div className="mx-eyebrow">Meta con fecha</div>
+            {goalWeight != null && state.settings.targetDate ? (
+              <div className="mx-goal-title">
+                <span className="mx-mono">{goalWeight} kg</span>
+                <span>para el {shortDate(state.settings.targetDate)}</span>
+              </div>
+            ) : (
+              <div className="mx-goal-title"><span>Define a dónde vas</span></div>
+            )}
+          </div>
+          <button className="mx-mini" onClick={() => setGoalEditor(true)}>Editar meta</button>
+        </div>
+        {goalWeight != null && state.settings.targetDate && (
+          <>
+            <div className="mx-goal-grid">
+              <div>
+                <span className="mx-goal-number mx-mono">{goalDays != null ? Math.max(0, goalDays) : '—'}</span>
+                <small>días</small>
+              </div>
+              <div>
+                <span className="mx-goal-number mx-mono">{avg7 != null ? avg7.toFixed(1) : '—'}</span>
+                <small>kg promedio</small>
+              </div>
+              <div>
+                <span className="mx-goal-number mx-mono">{goalLeft != null ? goalLeft.toFixed(1) : '—'}</span>
+                <small>kg por bajar</small>
+              </div>
+            </div>
+            <div className="mx-goal-pace">
+              <span>Ritmo necesario <b className="mx-mono">{requiredPerWeek != null ? `-${requiredPerWeek.toFixed(1)} kg/sem` : '—'}</b></span>
+              <span>Ritmo actual <b className="mx-mono">{actualTrend != null ? `${actualTrend > 0 ? '+' : ''}${actualTrend.toFixed(1)} kg/sem` : 'sin datos'}</b></span>
+            </div>
+            {projectedGoalWeight != null && (
+              <div className="mx-goal-projection">
+                Al ritmo actual llegarías con <b className="mx-mono">{projectedGoalWeight.toFixed(1)} kg</b>
+              </div>
+            )}
+            <button
+              className="mx-waist-callout"
+              data-due={waistDue ? '1' : '0'}
+              onClick={() => setOpenSec('actividad')}
+            >
+              <span>{waistDue ? 'Mide tu cintura esta semana' : `Cintura: ${recentWaist?.waist} cm`}</span>
+              <small>{waistDue ? 'A la altura del ombligo, con el abdomen relajado' : `Última medida: ${shortDate(recentWaist!.date)}`}</small>
+            </button>
+          </>
+        )}
+      </section>
+
+      {/* --- Calorias primero: es la decision que el usuario necesita hoy --- */}
+      <section className="mx-calorie" data-over={kcalLeft < 0 ? '1' : '0'} aria-label="Calorias de hoy">
+        <div className="mx-calorie-copy">
+          <div className="mx-eyebrow">Hoy</div>
+          <div className="mx-calorie-value mx-mono">
+            {kcalLeft >= 0 ? kcalLeft : `+${Math.abs(kcalLeft)}`}<span> kcal</span>
+          </div>
+          <div className="mx-calorie-label">{kcalLeft >= 0 ? 'disponibles' : 'sobre el objetivo'}</div>
+          <div className="mx-calorie-track" aria-hidden>
+            <i style={{ width: `${Math.min(100, targetKcal > 0 ? (eatenKcal / targetKcal) * 100 : 0)}%` }} />
+          </div>
+          <div className="mx-sub mx-mono">{eatenKcal} / {targetKcal} kcal</div>
+        </div>
+        <div className="mx-calorie-actions">
+          <button className="mx-quick-meal" onClick={() => setEstimating(preferredSlot)}>
+            Registrar {SLOT_LABEL[preferredSlot].toLowerCase()}
+          </button>
+          <button className="mx-quick-other" onClick={() => setOpenSec('comidas')}>Elegir otra comida</button>
+        </div>
+        <div className="mx-day-close" data-complete={foodCoverage.complete ? '1' : '0'}>
+          <div>
+            <b>{foodCoverage.complete ? 'Día de comida cerrado' : `${foodCoverage.covered} de ${foodCoverage.total} comidas confirmadas`}</b>
+            <span>{foodCoverage.complete ? 'Ya se puede evaluar este día.' : 'Confirma lo que comiste y lo que no.'}</span>
+          </div>
+          {!foodCoverage.complete && (
+            <button onClick={() => setClosingDay(true)}>Cerrar día</button>
+          )}
+        </div>
+      </section>
+
       <div className="mx-bp">
         <MacroPie label={MACRO_LABEL.prot} eaten={eaten.prot} target={targets.prot} tone="prot" />
         <MacroPie label={MACRO_LABEL.carb} eaten={eaten.carb} target={targets.carb} tone="carb" />
         <MacroPie label={MACRO_LABEL.grasa} eaten={eaten.grasa} target={targets.grasa} tone="grasa" />
       </div>
 
-      {/* --- Anillo de categorias: tap para abrir/cerrar cada una --- */}
+      {/* --- Anillo de categorias: conserva acceso rapido al resto del registro --- */}
       <CategoryRing
         progress={progress}
         open={openSec}
@@ -328,6 +459,68 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
       <div className="mx-ring-hint mx-sub">Toca un circulo para registrar o ver esa categoria.</div>
 
       {/* --- Contenido de la categoria en modal centrado (una a la vez) --- */}
+      <BottomSheet open={goalEditor} onClose={() => setGoalEditor(false)} title="Editar meta">
+        <div className="mx-sub" style={{ marginBottom: 10 }}>
+          La portada usa estos datos para mostrar los días restantes y el ritmo necesario.
+        </div>
+        <Field label="Peso objetivo">
+          <Stepper
+            value={state.settings.targetWeight ?? 95}
+            onChange={v => app.updateSettings({ targetWeight: Math.max(30, v) })}
+            step={0.5}
+            ariaLabel="Peso objetivo en kilogramos"
+            min={30}
+            suffix="kg"
+          />
+        </Field>
+        <Field label="Fecha objetivo">
+          <input
+            className="mx-in mx-date"
+            type="date"
+            value={state.settings.targetDate ?? ''}
+            onChange={e => app.updateSettings({ targetDate: e.target.value || undefined })}
+          />
+        </Field>
+        <div className="mx-acts">
+          <button
+            className="mx-btn"
+            data-p="1"
+            onClick={() => {
+              if (state.settings.targetWeight == null) app.updateSettings({ targetWeight: 95 })
+              setGoalEditor(false)
+            }}
+          >
+            Guardar meta
+          </button>
+        </div>
+      </BottomSheet>
+
+      <BottomSheet open={closingDay} onClose={() => setClosingDay(false)} title="Cerrar día">
+        <div className="mx-close-summary">
+          <div className="mx-lbl">Falta confirmar</div>
+          <div className="mx-close-slots">
+            {missingSlots.map(s => <span key={s.id}>{s.label}</span>)}
+          </div>
+          <p>Si comiste algo más, regístralo. Si no, confirma que no comiste nada más.</p>
+        </div>
+        <div className="mx-acts">
+          <button
+            className="mx-btn"
+            data-p="1"
+            onClick={() => {
+              app.updateRecord({ skipped: [...new Set([...(record?.skipped ?? []), ...missingSlots.map(s => s.id)])] }, viewDate)
+              setClosingDay(false)
+              setToast('Día de comida cerrado')
+            }}
+          >
+            No comí nada más
+          </button>
+          <button className="mx-btn" onClick={() => { setClosingDay(false); setOpenSec('comidas') }}>
+            Registrar comida
+          </button>
+        </div>
+      </BottomSheet>
+
       <BottomSheet
         open={openSec !== null}
         onClose={() => setOpenSec(null)}
