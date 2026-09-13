@@ -6,10 +6,9 @@ import {
   makeEmptySets, mealMacros, mealName, mealsInSlot, nearestWeight, parseDate, roundMacros, shortDate, sleepHours,
   slotReference, weightAvg, weightTrendAt, workoutForDate,
 } from '../lib/logic'
-import { MACRO_LABEL, PORTIONS, SLOTS, SLOT_LABEL } from '../lib/config'
+import { PORTIONS, SLOTS, SLOT_LABEL } from '../lib/config'
 import { MealEstimateSheet } from '../components/MealEstimateSheet'
 import { MealIdeaSheet } from '../components/MealIdeaSheet'
-import { MacroPie } from '../components/charts'
 import { WeekScreen } from './WeekScreen'
 import { BottomSheet, ConfirmButton, Field, RepsWheel, Seg, Stepper, TimeWheel, Toast, WeightWheel } from '../components/ui'
 
@@ -31,8 +30,8 @@ function secProgress(sec: Sec, record: ReturnType<typeof getRecord>, workout: Re
     case 'peso':
       return record?.weight != null ? 1 : 0
     case 'entreno': {
-      if (record?.workoutId === null) return 1 // descanso explicito
-      if (!workout || workout.exercises.length === 0) return 0
+      if (record?.workoutId === null || !workout) return 1 // descanso explicito o planificado
+      if (workout.exercises.length === 0) return 0
       const total = workout.exercises.reduce((n, ex) => n + ex.sets, 0)
       const filled = Object.values(record?.sets ?? {}).reduce((n, list) => n + list.length, 0)
       return total > 0 ? Math.min(1, filled / total) : 0
@@ -104,6 +103,8 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
   const [openSec, setOpenSec] = useState<Sec | null>(null)
   const [goalEditor, setGoalEditor] = useState(false)
   const [closingDay, setClosingDay] = useState(false)
+  const [tasksOpen, setTasksOpen] = useState(false)
+  const [progressOpen, setProgressOpen] = useState(false)
   const [measureField, setMeasureField] = useState<'steps' | 'waist' | null>(null)
   const [measureDraft, setMeasureDraft] = useState('')
   const [measureError, setMeasureError] = useState<string | null>(null)
@@ -118,12 +119,13 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
   const missingSlots = SLOTS.filter(s =>
     mealsInSlot(record, s.id).length === 0 && !(record?.skipped ?? []).includes(s.id),
   )
-  const preferredSlot: MealSlot = (() => {
-    const hour = viewDate === today ? new Date().getHours() : 12
-    const preferred: MealSlot = hour < 11 ? 'desayuno' : hour < 17 ? 'almuerzo' : 'cena'
-    if (missingSlots.some(s => s.id === preferred)) return preferred
-    return missingSlots.find(s => s.id !== 'extra')?.id ?? missingSlots[0]?.id ?? 'extra'
-  })()
+  const hour = viewDate === today ? new Date().getHours() : 23
+  const dueMealIds: MealSlot[] = hour < 11
+    ? ['desayuno']
+    : hour < 17
+      ? ['almuerzo', 'desayuno']
+      : ['cena', 'almuerzo', 'desayuno']
+  const dueMealSlot = dueMealIds.find(id => missingSlots.some(s => s.id === id)) ?? null
   const avg7 = weightAvg(state.records, addDays(viewDate, -6), viewDate)
   const goalDays = state.settings.targetDate ? daysBetween(viewDate, state.settings.targetDate) : null
   const goalWeight = state.settings.targetWeight
@@ -198,12 +200,32 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
     { id: 'cintura', sec: 'actividad', label: 'Cintura', status: waistDue ? 'Esta semana' : `${recentWaist?.waist} cm`, done: !waistDue },
   ]
   const pendingTrace = traceTasks.filter(t => !t.done).length + (foodCoverage.complete ? 0 : 1)
-  const nextTask = traceTasks.find(t => !t.done)
-  const primaryTraceLabel = !foodCoverage.complete
-    ? `Registrar ${SLOT_LABEL[preferredSlot].toLowerCase()}`
-    : nextTask
-      ? `Registrar ${nextTask.label.toLowerCase()}`
-      : 'Registrar algo más'
+  const taskById = (id: string) => traceTasks.find(task => task.id === id && !task.done)
+  const priority = hour < 11
+    ? ['peso', 'sueno', 'meal', 'cintura', 'entreno', 'pasos']
+    : hour < 17
+      ? ['meal', 'peso', 'sueno', 'entreno', 'cintura', 'pasos']
+      : ['meal', 'entreno', 'pasos', 'closeFood', 'peso', 'sueno', 'cintura']
+  const primaryKey = priority.find(key => {
+    if (key === 'meal') return dueMealSlot !== null
+    if (key === 'closeFood') return !foodCoverage.complete
+    return taskById(key) != null
+  }) ?? 'extra'
+  const primaryTask = taskById(primaryKey)
+  const primaryTraceLabel = primaryKey === 'meal' && dueMealSlot
+    ? `Registrar ${SLOT_LABEL[dueMealSlot].toLowerCase()}`
+    : primaryKey === 'closeFood'
+      ? 'Cerrar comidas de hoy'
+      : primaryTask
+        ? `Registrar ${primaryTask.label.toLowerCase()}`
+        : 'Registrar algo más'
+  const primaryHeadline = primaryKey === 'meal' && dueMealSlot
+    ? `${SLOT_LABEL[dueMealSlot]} pendiente`
+    : primaryKey === 'closeFood'
+      ? 'Comidas sin cerrar'
+      : primaryTask
+        ? `${primaryTask.label} pendiente`
+        : 'Hoy está completo'
 
   const openMeasure = (field: 'steps' | 'waist') => {
     setMeasureDraft(String(field === 'steps' ? record?.steps ?? '' : record?.waist ?? ''))
@@ -219,8 +241,9 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
   }
 
   const runPrimaryTrace = () => {
-    if (!foodCoverage.complete) setEstimating(preferredSlot)
-    else if (nextTask) openTraceTask(nextTask)
+    if (primaryKey === 'meal' && dueMealSlot) setEstimating(dueMealSlot)
+    else if (primaryKey === 'closeFood') setClosingDay(true)
+    else if (primaryTask) openTraceTask(primaryTask)
     else setEstimating('extra')
   }
 
@@ -256,99 +279,104 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
         )}
       </div>
 
-      {/* Registrar manda: todas las acciones del dia quedan antes del progreso. */}
-      <section className="mx-trace-now" data-complete={pendingTrace === 0 ? '1' : '0'} aria-label="Pendientes de hoy">
-        <div className="mx-trace-head">
-          <div>
-            <div className="mx-eyebrow">Traza hoy</div>
-            <div className="mx-trace-title">
-              {pendingTrace === 0 ? 'Hoy quedó trazado' : `Te faltan ${pendingTrace} registros`}
-            </div>
-            <div className="mx-sub">{pendingTrace === 0 ? 'Ya puedes confiar en los datos de hoy.' : 'No cierres el día con huecos.'}</div>
-          </div>
-          <div className="mx-trace-kcal" data-over={kcalLeft < 0 ? '1' : '0'}>
-            <b className="mx-mono">{kcalLeft >= 0 ? kcalLeft : `+${Math.abs(kcalLeft)}`}</b>
-            <span>kcal {kcalLeft >= 0 ? 'disponibles' : 'de más'}</span>
-          </div>
+      <section className="mx-now" data-complete={pendingTrace === 0 ? '1' : '0'} aria-label="Siguiente accion">
+        <div className="mx-now-copy">
+          <div className="mx-eyebrow">Ahora</div>
+          <h2>{pendingTrace === 0 ? 'Hoy está completo' : primaryHeadline}</h2>
+          <p>
+            {pendingTrace === 0
+              ? 'Todo lo necesario quedó trazado.'
+              : `${pendingTrace} ${pendingTrace === 1 ? 'registro pendiente' : 'registros pendientes'} hoy.`}
+          </p>
         </div>
-
-        <button className="mx-trace-primary" onClick={runPrimaryTrace}>
-          {primaryTraceLabel}
-          <span>
-            {!foodCoverage.complete
-              ? `${foodCoverage.covered}/${foodCoverage.total} comidas confirmadas`
-              : nextTask
-                ? 'Toca para completar ahora'
-                : 'El día está completo'}
-          </span>
+        <button className="mx-now-primary" onClick={runPrimaryTrace}>
+          {pendingTrace === 0 ? 'Registrar algo más' : primaryTraceLabel}
         </button>
+        <div className="mx-now-status">
+          <span data-over={kcalLeft < 0 ? '1' : '0'}>
+            <b className="mx-mono">{kcalLeft >= 0 ? kcalLeft : `+${Math.abs(kcalLeft)}`}</b> kcal {kcalLeft >= 0 ? 'disponibles' : 'de más'}
+          </span>
+          <span><b>{foodCoverage.covered}/{foodCoverage.total}</b> comidas</span>
+          <button onClick={() => setTasksOpen(true)}>Ver pendientes</button>
+        </div>
+      </section>
 
-        <div className="mx-trace-grid">
+      <section className="mx-goal-strip" aria-label="Meta de boda">
+        {goalWeight != null && state.settings.targetDate ? (
+          <>
+            <div className="mx-goal-strip-days">
+              <b className="mx-mono">{goalDays != null ? Math.max(0, goalDays) : '—'}</b>
+              <span>días para la boda</span>
+            </div>
+            <div className="mx-goal-strip-line">
+              <span>Actual <b>{avg7 != null ? `${avg7.toFixed(1)} kg` : 'sin promedio'}</b></span>
+              <i aria-hidden>→</i>
+              <span>Meta <b>{goalWeight} kg</b></span>
+            </div>
+          </>
+        ) : (
+          <div className="mx-goal-strip-empty">Define tu meta para la boda.</div>
+        )}
+        <button onClick={() => setGoalEditor(true)} aria-label="Editar meta">Editar</button>
+      </section>
+
+      <button
+        className="mx-progress-entry"
+        onClick={() => actualTrend == null && record?.weight == null ? setWeightPicker(true) : setProgressOpen(true)}
+      >
+        <span>
+          <small>Progreso</small>
+          <b>{actualTrend != null ? `${actualTrend > 0 ? '+' : ''}${actualTrend.toFixed(1)} kg/sem` : 'Necesita más pesajes'}</b>
+        </span>
+        <span>
+          {projectedGoalWeight != null
+            ? `Proyección boda: ${projectedGoalWeight.toFixed(1)} kg`
+            : requiredPerWeek != null
+              ? `Necesitas -${requiredPerWeek.toFixed(1)} kg/sem`
+              : record?.weight == null
+                ? 'Registra tu peso para empezar la tendencia'
+                : 'Ver tendencia y días incompletos'}
+        </span>
+        <i aria-hidden>→</i>
+      </button>
+
+      {/* Los detalles aparecen solo cuando ayudan a completar una accion. */}
+      <BottomSheet open={tasksOpen} onClose={() => setTasksOpen(false)} title="Pendientes de hoy">
+        <div className="mx-task-list">
+          <button
+            data-done={foodCoverage.complete ? '1' : '0'}
+            onClick={() => { setTasksOpen(false); setOpenSec('comidas') }}
+          >
+            <SectionIcon id="comidas" />
+            <span><b>Comidas</b><small>{foodCoverage.covered}/{foodCoverage.total} confirmadas</small></span>
+            <i aria-hidden>{foodCoverage.complete ? '✓' : '→'}</i>
+          </button>
           {traceTasks.map(task => (
             <button
               key={task.id}
-              className="mx-trace-task"
               data-done={task.done ? '1' : '0'}
-              onClick={() => openTraceTask(task)}
-              aria-label={`${task.label}: ${task.status}`}
+              onClick={() => { setTasksOpen(false); openTraceTask(task) }}
             >
               <SectionIcon id={task.sec} />
-              <span>{task.label}<small>{task.status}</small></span>
+              <span><b>{task.label}</b><small>{task.status}</small></span>
               <i aria-hidden>{task.done ? '✓' : '→'}</i>
             </button>
           ))}
         </div>
-
-        <div className="mx-trace-foot">
-          <button onClick={() => setOpenSec('comidas')}>Ver todas las comidas</button>
-          {!foodCoverage.complete && <button onClick={() => setClosingDay(true)}>Cerrar comidas</button>}
-          {foodCoverage.complete && <span>Comidas cerradas ✓</span>}
-        </div>
-      </section>
-
-      {/* La cuenta regresiva tiene contexto antes que cualquier peso. */}
-      <section className="mx-deadline" aria-label="Progreso hacia la boda">
-        <div className="mx-deadline-main">
-          {goalWeight != null && state.settings.targetDate ? (
-            <>
-              <div className="mx-deadline-days">
-                <b className="mx-mono">{goalDays != null ? Math.max(0, goalDays) : '—'}</b>
-                <span>días para la boda</span>
-              </div>
-              <div className="mx-deadline-weights">
-                <span>Peso actual <b className="mx-mono">{avg7 != null ? `${avg7.toFixed(1)} kg` : 'sin promedio'}</b></span>
-                <span>Meta de boda <b className="mx-mono">{goalWeight} kg</b></span>
-              </div>
-            </>
-          ) : (
-            <div className="mx-deadline-empty">Define la fecha y el peso de tu meta.</div>
-          )}
-          <button className="mx-mini" onClick={() => setGoalEditor(true)}>Editar</button>
-        </div>
-        {goalWeight != null && state.settings.targetDate && (
-          <div className="mx-deadline-pace">
-            <span>Necesitas <b className="mx-mono">{requiredPerWeek != null ? `-${requiredPerWeek.toFixed(1)} kg/sem` : 'más pesajes'}</b></span>
-            <span>Vas a <b className="mx-mono">{actualTrend != null ? `${actualTrend > 0 ? '+' : ''}${actualTrend.toFixed(1)} kg/sem` : 'sin tendencia'}</b></span>
-            {projectedGoalWeight != null && <span>Proyección <b className="mx-mono">{projectedGoalWeight.toFixed(1)} kg</b></span>}
-          </div>
+        {!foodCoverage.complete && (
+          <button className="mx-btn" onClick={() => { setTasksOpen(false); setClosingDay(true) }}>
+            Cerrar comidas de hoy
+          </button>
         )}
-      </section>
+      </BottomSheet>
 
-      <div className="mx-bp">
-        <MacroPie label={MACRO_LABEL.prot} eaten={eaten.prot} target={targets.prot} tone="prot" />
-        <MacroPie label={MACRO_LABEL.carb} eaten={eaten.carb} target={targets.carb} tone="carb" />
-        <MacroPie label={MACRO_LABEL.grasa} eaten={eaten.grasa} target={targets.grasa} tone="grasa" />
-      </div>
+      <BottomSheet open={progressOpen} onClose={() => setProgressOpen(false)} title="Progreso" wide>
+        <WeekScreen
+          app={app}
+          onSelectDate={date => { setProgressOpen(false); setViewDate(date) }}
+        />
+      </BottomSheet>
 
-      <section className="mx-progress-section" aria-label="Progreso y tendencias">
-        <div className="mx-progress-head">
-          <div className="mx-eyebrow">Tu progreso</div>
-          <div>La semana, tendencias y gráficos viven aquí.</div>
-        </div>
-        <WeekScreen app={app} onSelectDate={setViewDate} />
-      </section>
-
-      {/* --- Contenido del registro en modales (una categoria a la vez) --- */}
       <BottomSheet open={goalEditor} onClose={() => setGoalEditor(false)} title="Editar meta">
         <div className="mx-sub" style={{ marginBottom: 10 }}>
           La portada usa estos datos para mostrar los días restantes y el ritmo necesario.
@@ -579,6 +607,10 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
 
       {openSec === 'comidas' && (
         <>
+          <div className="mx-food-summary">
+            <div><b className="mx-mono">{eatenKcal}</b><span>de {targetKcal} kcal</span></div>
+            <div className="mx-mono"><span>{Math.round(eaten.prot)}P</span><span>{Math.round(eaten.carb)}C</span><span>{Math.round(eaten.grasa)}G</span></div>
+          </div>
           <div className="mx-slots">
             {SLOTS.map(s => {
               const logged = mealsInSlot(record, s.id)
