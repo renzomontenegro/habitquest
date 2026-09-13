@@ -13,6 +13,31 @@ export function BottomSheet({ open, onClose, title, children, wide, center }: {
 }) {
   const titleId = useId()
   const sheetRef = useRef<HTMLDivElement>(null)
+  const [viewport, setViewport] = useState<{ height: number; top: number } | null>(null)
+
+  // En iOS el teclado reduce visualViewport, pero no siempre el inset de un fixed.
+  // Ajustar el overlay a esa area evita que cualquier formulario quede detras del teclado.
+  useEffect(() => {
+    if (!open || !window.visualViewport) return
+    const visual = window.visualViewport
+    const update = () => {
+      setViewport({ height: visual.height, top: visual.offsetTop })
+      window.setTimeout(() => {
+        const active = document.activeElement as HTMLElement | null
+        if (active && sheetRef.current?.contains(active)) {
+          active.scrollIntoView({ block: 'center', inline: 'nearest' })
+        }
+      }, 60)
+    }
+    const frame = window.requestAnimationFrame(update)
+    visual.addEventListener('resize', update)
+    visual.addEventListener('scroll', update)
+    return () => {
+      window.cancelAnimationFrame(frame)
+      visual.removeEventListener('resize', update)
+      visual.removeEventListener('scroll', update)
+    }
+  }, [open])
 
   // Dialogo modal real: mueve el foco, lo contiene y lo devuelve al cerrar.
   useEffect(() => {
@@ -50,6 +75,7 @@ export function BottomSheet({ open, onClose, title, children, wide, center }: {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           className={`fixed inset-0 z-50 flex justify-center bg-black/40 ${center ? 'items-center' : 'items-end'}`}
+          style={viewport ? { height: viewport.height, top: viewport.top, bottom: 'auto' } : undefined}
           onClick={onClose}
         >
           <motion.div
@@ -64,6 +90,7 @@ export function BottomSheet({ open, onClose, title, children, wide, center }: {
             className="mx-sheet"
             data-wide={wide ? '1' : '0'}
             data-center={center ? '1' : '0'}
+            style={viewport ? { maxHeight: Math.max(180, viewport.height - (center ? 52 : 8)) } : undefined}
             onClick={e => e.stopPropagation()}
           >
             {!center && <div className="mx-sheet-grab" />}

@@ -909,7 +909,8 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .mx-svg { overflow: visible; }
 .mx-line { stroke-width: 2.2; }
 .mx-refline { stroke: var(--signal); }
-button:focus-visible, select:focus-visible, input:focus-visible { outline-color: var(--ink); outline-offset: 2px; }
+button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-visible { outline-color: var(--ink); outline-offset: 2px; }
+input, select, textarea { scroll-margin-block: 18vh; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }

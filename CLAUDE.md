@@ -232,7 +232,8 @@ frontend, hay que actualizar AMBAS claves en ese Code node.
 - `src/lib/storage.ts` — localStorage, `sanitize` y la migracion del modelo viejo
 - `src/lib/sync.ts` — cola de guardado, reintentos, flush, `estimateMeal()` (foto -> IA)
 - `src/hooks/useAppState.ts` — estado global, acciones, merge offline (`AppController`)
-- `src/components/ui.tsx` — BottomSheet, Stepper, MacroBar, SaveDot, Toast, ConfirmButton, TimeWheel, WeightWheel
+- `src/components/ui.tsx` — BottomSheet, Stepper, MacroBar, SaveDot, Toast, ConfirmButton, TimeWheel, WeightWheel.
+  `BottomSheet` se ajusta a `visualViewport` para que ningun input quede detras del teclado movil.
 - `src/components/MealEstimateSheet.tsx` — registra comida con foto + texto: la IA estima los macros
 - `src/components/MealIdeaSheet.tsx` — asistente de idea: proteina + cocinar/rappi + carb cycling -> la IA sugiere (webhook `habitquest-suggest`)
 - `src/components/charts.tsx` — LineChart, DayBars, PaceBar, Stat (SVG a mano)
