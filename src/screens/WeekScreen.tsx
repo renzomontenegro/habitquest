@@ -2,8 +2,8 @@ import { useMemo } from 'react'
 import type { AppController } from '../hooks/useAppState'
 import {
   addDays, adherence, foodLogCoverage, getRecord, getVerdict, hasCompleteFoodLog, kcal,
-  lastNDates, macrosForDate, shortDate, sleepHours, strengthDrops, sumMacrosOver,
-  waistSeries, weekDates, weekPace, weightAvg, weightProjection, weightTrend,
+  lastNDates, macrosForDate, sleepHours, strengthDrops, sumMacrosOver,
+  waistSeries, weekDates, weekPace, weightAvg, weightTrend,
 } from '../lib/logic'
 import { MACRO_LABEL, RULES, VERDICT_TEXT } from '../lib/config'
 import { DayBars, LineChart, PaceBar, Stat } from '../components/charts'
@@ -54,7 +54,6 @@ export function WeekScreen({ app }: { app: AppController }) {
 
   const waist = useMemo(() => waistSeries(records, 90), [records])
   const drops = useMemo(() => strengthDrops(records, split), [records, split])
-  const projection = weightProjection(records, state.settings)
 
   if (records.length === 0) {
     return (
@@ -76,45 +75,6 @@ export function WeekScreen({ app }: { app: AppController }) {
         </div>
         <div className="mx-verdict-n">{V.note}</div>
       </div>
-
-      {/* --- Meta de peso --- */}
-      {(() => {
-        const s = state.settings
-        const hasGoal = s.targetWeight != null && s.targetDate
-        if (!hasGoal) return null
-        if (!projection) {
-          return (
-            <div className="mx-card">
-              <div className="mx-card-t">
-                <div className="mx-eyebrow">Meta: {s.targetWeight} kg · {s.targetDate ? shortDate(s.targetDate) : ''}</div>
-              </div>
-              <div className="mx-empty">
-                Sin tendencia de peso todavia. Pesate unos dias seguidos y la semana te dira
-                si vas a llegar al ritmo actual.
-              </div>
-            </div>
-          )
-        }
-        const onTrack = projection.gap >= 0
-        return (
-          <div className="mx-card">
-            <div className="mx-card-t">
-              <div className="mx-eyebrow">Meta · {shortDate(projection.targetDate)}</div>
-              <div className="mx-mono" style={{ fontSize: 12, fontWeight: 600 }}>
-                {s.targetWeight} kg
-              </div>
-            </div>
-            <div className="mx-meta" data-on={onTrack ? '1' : '0'}>
-              <span className="mx-meta-v mx-mono">{projection.projected} kg</span>
-              <span className="mx-meta-t">
-                {onTrack
-                  ? `Al ritmo actual (${Math.abs(projection.perWeek).toFixed(1)} kg/sem) llegarias a ${projection.projected} kg para el ${shortDate(projection.targetDate)}. Te sobran ${projection.gap.toFixed(1)} kg de margen.`
-                  : `Al ritmo actual (${Math.abs(projection.perWeek).toFixed(1)} kg/sem) llegarias a ${projection.projected} kg para el ${shortDate(projection.targetDate)}. Quedan ${Math.abs(projection.gap).toFixed(1)} kg por bajar.`}
-              </span>
-            </div>
-          </div>
-        )
-      })()}
 
       {week.some(d => {
         const c = foodLogCoverage(getRecord(records, d))

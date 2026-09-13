@@ -279,22 +279,6 @@ button:active { transform: scale(.985); }
   color: var(--mute); font-size: 12px; }
 .mx-fold-body { margin-top: 14px; }
 
-/* Anillo de categorias (circulos RELLENOS tipo pie que se pintan por porcion) */
-.mx-ring { position: relative; margin: 4px auto 0; touch-action: none; user-select: none; }
-.mx-ring-wheel { position: absolute; inset: 0; will-change: transform; }
-.mx-ring-b { position: absolute; width: 64px; height: 64px; border: 0; background: transparent;
-  cursor: pointer; padding: 0; }
-.mx-ring-b > svg { display: block; }
-.mx-ring-b[data-on='1'] { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: 999px; }
-.mx-ring-emo { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
-  font-size: 20px; line-height: 1; pointer-events: none; filter: grayscale(1) opacity(.45);
-  transition: filter .25s ease; }
-.mx-ring-b[data-done='1'] .mx-ring-emo { filter: none; }
-.mx-ring-c { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
-  width: 74px; height: 74px; border: 1px solid var(--line); border-radius: 999px;
-  background: var(--card); display: flex; align-items: center; justify-content: center;
-  font-size: 17px; font-weight: 600; color: var(--ink); }
-.mx-ring-hint { text-align: center; margin-top: 2px; }
 .mx-sec { margin-top: 12px; }
 
 /* ===== HOY: macros restantes ===== */
@@ -313,67 +297,60 @@ button:active { transform: scale(.985); }
 .mx-day-v { font-size: 16px; font-weight: 600; margin-top: 2px; }
 .mx-go-today { margin-left: 6px; padding: 2px 8px; font-size: 10px; }
 
-/* La meta y las calorias son el primer nivel de Hoy. El resto del registro
-   conserva su sitio, pero ya no compite con la decision principal. */
-.mx-goal { background: var(--ink); color: var(--card); border-radius: 4px; padding: 16px;
-  margin-bottom: 10px; }
-.mx-goal .mx-eyebrow { color: rgba(244, 245, 241, .64); }
-.mx-goal-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
-.mx-goal-top .mx-mini { flex-shrink: 0; min-height: 36px; background: transparent;
-  border-color: rgba(244, 245, 241, .3); color: var(--card); }
-.mx-goal-title { display: flex; align-items: baseline; flex-wrap: wrap; gap: 7px; margin-top: 5px;
-  font-size: 12px; color: rgba(244, 245, 241, .75); }
-.mx-goal-title .mx-mono { font-family: 'Archivo', sans-serif; font-size: 24px; font-weight: 700;
-  letter-spacing: -.035em; color: var(--card); }
-.mx-goal-grid { display: grid; grid-template-columns: repeat(3, 1fr); margin-top: 18px;
-  border-top: 1px solid rgba(244, 245, 241, .18); border-bottom: 1px solid rgba(244, 245, 241, .18); }
-.mx-goal-grid > div { padding: 12px 8px 11px; border-left: 1px solid rgba(244, 245, 241, .18); }
-.mx-goal-grid > div:first-child { padding-left: 0; border-left: 0; }
-.mx-goal-number { display: block; font-size: 21px; font-weight: 600; line-height: 1; }
-.mx-goal-grid small { display: block; margin-top: 5px; font-size: 9px; line-height: 1.25;
-  color: rgba(244, 245, 241, .62); }
-.mx-goal-pace { display: flex; justify-content: space-between; gap: 10px; margin-top: 11px;
-  font-size: 10px; color: rgba(244, 245, 241, .64); }
-.mx-goal-pace span:last-child { text-align: right; }
-.mx-goal-pace b { display: block; margin-top: 3px; color: var(--card); font-size: 11px; }
-.mx-goal-projection { margin-top: 10px; padding: 8px 10px; background: rgba(244, 245, 241, .08);
-  border-left: 2px solid var(--signal); font-size: 10.5px; color: rgba(244, 245, 241, .7); }
-.mx-goal-projection b { color: var(--card); }
-.mx-waist-callout { width: 100%; min-height: 44px; margin-top: 12px; padding: 9px 10px;
-  text-align: left; border: 1px solid rgba(244, 245, 241, .22); border-radius: 3px;
-  background: rgba(244, 245, 241, .06); color: var(--card); cursor: pointer; }
-.mx-waist-callout span { display: block; font-size: 11.5px; font-weight: 600; }
-.mx-waist-callout small { display: block; margin-top: 3px; font-size: 9.5px;
-  color: rgba(244, 245, 241, .62); }
-.mx-waist-callout[data-due='1'] { border-color: rgba(244, 245, 241, .42); }
+/* Registrar primero: este bloque debe caber completo en la primera pantalla. */
+.mx-trace-now { background: var(--card); border: 1px solid var(--line); border-top: 3px solid var(--bad);
+  border-radius: 3px; padding: 13px; margin-bottom: 9px; }
+.mx-trace-now[data-complete='1'] { border-top-color: var(--good); }
+.mx-trace-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.mx-trace-title { margin-top: 3px; font-family: 'Archivo', sans-serif; font-size: 19px;
+  font-weight: 700; letter-spacing: -.025em; }
+.mx-trace-kcal { flex-shrink: 0; text-align: right; padding-top: 1px; }
+.mx-trace-kcal b { display: block; font-size: 17px; }
+.mx-trace-kcal span { display: block; max-width: 82px; font-size: 9px; color: var(--mute); }
+.mx-trace-kcal[data-over='1'] b { color: var(--bad); }
+.mx-trace-primary { width: 100%; min-height: 50px; margin-top: 11px; padding: 8px 13px;
+  display: flex; justify-content: space-between; align-items: center; gap: 12px; border: 1px solid var(--signal);
+  border-radius: 3px; background: var(--signal); color: #fff; font-size: 14px; font-weight: 700; cursor: pointer; }
+.mx-trace-primary span { font-size: 9.5px; font-weight: 500; opacity: .78; text-align: right; }
+.mx-trace-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; margin-top: 7px; }
+.mx-trace-task { position: relative; min-width: 0; min-height: 66px; padding: 7px 3px 6px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  border: 1px solid var(--line); border-radius: 3px; background: var(--paper); color: var(--ink); cursor: pointer; }
+.mx-trace-task > span { min-width: 0; width: 100%; font-size: 9.5px; font-weight: 600; text-align: center; }
+.mx-trace-task small { display: block; overflow: hidden; text-overflow: ellipsis; margin-top: 2px;
+  color: var(--bad); font-size: 8px; font-weight: 500; white-space: nowrap; }
+.mx-trace-task > i { position: absolute; top: 4px; right: 5px; color: var(--bad); font-size: 9px; font-style: normal; }
+.mx-trace-task[data-done='1'] { border-color: rgba(46, 107, 79, .35); }
+.mx-trace-task[data-done='1'] small, .mx-trace-task[data-done='1'] > i { color: var(--good); }
+.mx-trace-foot { min-height: 29px; display: flex; align-items: flex-end; justify-content: space-between;
+  gap: 8px; margin-top: 6px; border-top: 1px solid var(--line); padding-top: 6px; }
+.mx-trace-foot button { min-height: 28px; border: 0; background: transparent; padding: 3px 0;
+  color: var(--mute); font-size: 9.5px; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.mx-trace-foot button:last-child { color: var(--bad); font-weight: 600; }
+.mx-trace-foot span { color: var(--good); font-size: 9.5px; font-weight: 600; }
 
-.mx-calorie { background: var(--card); border: 1px solid var(--line); border-radius: 4px;
-  padding: 15px; margin-bottom: 12px; }
-.mx-calorie-copy { display: grid; grid-template-columns: 1fr auto; align-items: end; column-gap: 12px; }
-.mx-calorie-copy .mx-eyebrow { grid-column: 1 / -1; }
-.mx-calorie-value { font-family: 'Archivo', sans-serif; font-size: 38px; font-weight: 700;
-  letter-spacing: -.045em; line-height: 1; margin-top: 6px; }
-.mx-calorie-value span { font-size: 13px; letter-spacing: 0; color: var(--mute); }
-.mx-calorie-label { align-self: center; font-size: 11px; color: var(--mute); text-align: right; }
-.mx-calorie-track { grid-column: 1 / -1; height: 5px; background: var(--line); margin-top: 11px; overflow: hidden; }
-.mx-calorie-track i { display: block; height: 100%; background: var(--signal); }
-.mx-calorie[data-over='1'] .mx-calorie-value { color: var(--bad); }
-.mx-calorie[data-over='1'] .mx-calorie-track i { background: var(--bad); }
-.mx-calorie-copy > .mx-sub { grid-column: 1 / -1; margin-top: 6px; }
-.mx-calorie-actions { display: grid; grid-template-columns: 1fr auto; gap: 7px; margin-top: 14px; }
-.mx-quick-meal, .mx-quick-other { min-height: 46px; border-radius: 3px; cursor: pointer; }
-.mx-quick-meal { border: 1px solid var(--signal); background: var(--signal); color: #fff;
-  padding: 10px 14px; font-size: 14px; font-weight: 700; }
-.mx-quick-other { border: 1px solid var(--line); background: var(--paper); color: var(--ink);
-  padding: 9px 11px; font-size: 11px; }
-.mx-day-close { display: flex; justify-content: space-between; align-items: center; gap: 10px;
-  margin-top: 12px; padding-top: 11px; border-top: 1px solid var(--line); }
-.mx-day-close b, .mx-day-close span { display: block; }
-.mx-day-close b { font-size: 11.5px; }
-.mx-day-close span { margin-top: 2px; font-size: 10px; color: var(--mute); }
-.mx-day-close > button { flex-shrink: 0; min-height: 36px; padding: 7px 11px; border: 1px solid var(--ink);
-  border-radius: 3px; background: transparent; color: var(--ink); font-size: 11px; font-weight: 600; }
-.mx-day-close[data-complete='1'] b { color: var(--good); }
+/* Cuenta regresiva compacta: cada peso siempre lleva una etiqueta semantica. */
+.mx-deadline { background: var(--ink); color: var(--card); border-radius: 3px; padding: 12px 13px; margin-bottom: 10px; }
+.mx-deadline-main { display: flex; align-items: center; gap: 12px; }
+.mx-deadline-days { width: 105px; flex-shrink: 0; border-right: 1px solid rgba(244, 245, 241, .2); }
+.mx-deadline-days b { display: block; font-size: 29px; line-height: 1; }
+.mx-deadline-days span { display: block; margin-top: 4px; font-size: 9px; color: rgba(244, 245, 241, .62); }
+.mx-deadline-weights { flex: 1; min-width: 0; display: grid; gap: 6px; }
+.mx-deadline-weights span { font-size: 9px; color: rgba(244, 245, 241, .62); }
+.mx-deadline-weights b { display: block; margin-top: 1px; color: var(--card); font-size: 12px; white-space: nowrap; }
+.mx-deadline .mx-mini { flex-shrink: 0; min-height: 34px; padding: 6px 9px; background: transparent;
+  border-color: rgba(244, 245, 241, .3); color: var(--card); }
+.mx-deadline-empty { flex: 1; font-size: 12px; }
+.mx-deadline-pace { display: flex; justify-content: space-between; gap: 8px; margin-top: 10px;
+  padding-top: 9px; border-top: 1px solid rgba(244, 245, 241, .18); }
+.mx-deadline-pace span { font-size: 8.5px; color: rgba(244, 245, 241, .58); }
+.mx-deadline-pace b { display: block; margin-top: 2px; color: var(--card); font-size: 9.5px; }
+
+.mx-progress-section { margin-top: 18px; padding-top: 16px; border-top: 2px solid var(--ink); }
+.mx-progress-head { margin-bottom: 10px; }
+.mx-progress-head > div:last-child { margin-top: 4px; font-family: 'Archivo', sans-serif;
+  font-size: 18px; font-weight: 700; letter-spacing: -.02em; }
+
 .mx-close-summary p { margin: 11px 0 0; font-size: 12px; line-height: 1.5; color: var(--mute); }
 .mx-close-slots { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 9px; }
 .mx-close-slots span { padding: 5px 8px; border: 1px solid var(--line); border-radius: 2px;
@@ -737,10 +714,9 @@ button:active { transform: scale(.985); }
 button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--signal); outline-offset: 1px; }
 
 @media (max-width: 360px) {
-  .mx-goal-grid small { font-size: 8px; }
-  .mx-goal-number { font-size: 18px; }
-  .mx-calorie-actions { grid-template-columns: 1fr; }
-  .mx-quick-other { min-height: 40px; }
+  .mx-trace-task > span { font-size: 8.5px; }
+  .mx-trace-task small { font-size: 7.5px; }
+  .mx-deadline-days { width: 90px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

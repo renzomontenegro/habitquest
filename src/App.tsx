@@ -1,6 +1,5 @@
 import { useState, useCallback, useRef } from 'react'
 import { TodayScreen } from './screens/TodayScreen'
-import { WeekScreen } from './screens/WeekScreen'
 import { PlanScreen } from './screens/PlanScreen'
 import { SettingsSheet } from './screens/SettingsSheet'
 import { SetupScreen } from './screens/SetupScreen'
@@ -10,9 +9,9 @@ import { headerDate, isoWeek, parseDate } from './lib/logic'
 import { APP_VERSION } from './lib/config'
 import { SaveDot } from './components/ui'
 
-type Tab = 'hoy' | 'semana' | 'plan'
+type Tab = 'hoy' | 'plan'
 
-const TABS: [Tab, string][] = [['hoy', 'Hoy'], ['semana', 'La semana'], ['plan', 'Mi plan']]
+const TABS: [Tab, string][] = [['hoy', 'Hoy'], ['plan', 'Mi plan']]
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('hoy')
@@ -66,10 +65,10 @@ export default function App() {
   }, [])
 
   const onTouchStart = useCallback((e: React.TouchEvent) => {
-    // El pull no aplica dentro del anillo (ruleta) ni en los modales/sheets:
-    // sus gestos son propios y el evento bullea hasta el main.
+    // El pull no aplica dentro de modales/sheets: sus gestos son propios y el
+    // evento bullea hasta el contenedor principal.
     const t = e.target as HTMLElement
-    if (t.closest?.('.mx-ring') || t.closest?.('.mx-sheet')) return
+    if (t.closest?.('.mx-sheet')) return
     if ((e.currentTarget as HTMLElement).scrollTop <= 0) {
       touchStartY.current = e.touches[0].clientY
       pulling.current = true
@@ -199,7 +198,6 @@ export default function App() {
             </div>
 
             {tab === 'hoy' && <TodayScreen app={app} viewDate={viewDate} setViewDate={setViewDate} goToday={goToday} />}
-            {tab === 'semana' && <WeekScreen app={app} />}
             {tab === 'plan' && <PlanScreen app={app} />}
           </div>
         </div>

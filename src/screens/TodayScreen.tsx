@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import type { AppController } from '../hooks/useAppState'
 import type { MealLog, MealSlot } from '../types'
 import {
@@ -10,6 +10,7 @@ import { MACRO_LABEL, PORTIONS, SLOTS, SLOT_LABEL } from '../lib/config'
 import { MealEstimateSheet } from '../components/MealEstimateSheet'
 import { MealIdeaSheet } from '../components/MealIdeaSheet'
 import { MacroPie } from '../components/charts'
+import { WeekScreen } from './WeekScreen'
 import { BottomSheet, ConfirmButton, Field, RepsWheel, Seg, Stepper, TimeWheel, Toast, WeightWheel } from '../components/ui'
 
 function portionLabel(p: number): string {
@@ -41,10 +42,8 @@ function secProgress(sec: Sec, record: ReturnType<typeof getRecord>, workout: Re
         mealsInSlot(record, s.id).length > 0 || (record?.skipped ?? []).includes(s.id)).length
       return covered / SLOTS.length
     }
-    case 'actividad': {
-      const s = (record?.steps != null ? 1 : 0) + (record?.waist != null ? 1 : 0)
-      return s === 0 ? 0 : s === 1 ? 0.5 : 1
-    }
+    case 'actividad':
+      return record?.steps != null ? 1 : 0
   }
 }
 
@@ -70,149 +69,6 @@ function SectionIcon({ id }: { id: Sec }) {
       strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       {SECTION_ICON_PATHS[id].map((d, i) => <path d={d} key={i} />)}
     </svg>
-  )
-}
-
-/** Path del "queso" de un pie-circulo: porcion rellena desde las 12 horas. */
-function pieSlice(cx: number, cy: number, r: number, pct: number): string {
-  const ang = Math.PI * 2 * pct - Math.PI / 2
-  const x = cx + r * Math.cos(ang)
-  const y = cy + r * Math.sin(ang)
-  const large = pct > 0.5 ? 1 : 0
-  return `M ${cx} ${cy} L ${cx} ${cy - r} A ${r} ${r} 0 ${large} 1 ${x.toFixed(2)} ${y.toFixed(2)} Z`
-}
-
-/** Circulos de categorias RELLENOS tipo pie, en anillo GIRATORIO (ruleta). */
-function CategoryRing({ progress, open, onTap }: {
-  progress: Record<Sec, number>
-  open: Sec | null
-  onTap: (s: Sec) => void
-}) {
-  const SIZE = 300
-  const R = 118
-  const CX = SIZE / 2
-  const CY = SIZE / 2
-  const total = Object.values(progress).reduce((a, b) => a + b, 0) / SECS.length
-  const r = 29
-
-  const ringRef = useRef<HTMLDivElement>(null)
-  const [rot, setRot] = useState(0)
-  const dragging = useRef(false)
-  const lastAngle = useRef(0)
-  const lastT = useRef(0)
-  const velocity = useRef(0)       // grados por segundo
-  const moved = useRef(false)      // hubo giro con arrastre (para no disparar el click)
-  const raf = useRef<number | null>(null)
-
-  const angleAt = (clientX: number, clientY: number): number => {
-    const el = ringRef.current
-    if (!el) return 0
-    const rect = el.getBoundingClientRect()
-    const cx = rect.left + rect.width / 2
-    const cy = rect.top + rect.height / 2
-    return (Math.atan2(clientY - cy, clientX - cx) * 180) / Math.PI
-  }
-
-  const stopDecay = () => {
-    if (raf.current != null) cancelAnimationFrame(raf.current)
-    raf.current = null
-  }
-
-  const decay = () => {
-    stopDecay()
-    const step = () => {
-      if (Math.abs(velocity.current) < 4) {
-        velocity.current = 0
-        raf.current = null
-        return
-      }
-      setRot(r => r + velocity.current * 0.016)
-      velocity.current *= 0.972 // friccion: se va frenando sola
-      raf.current = requestAnimationFrame(step)
-    }
-    step()
-  }
-
-  const onDown = (e: React.PointerEvent) => {
-    stopDecay()
-    dragging.current = true
-    moved.current = false
-    lastAngle.current = angleAt(e.clientX, e.clientY)
-    lastT.current = performance.now()
-    velocity.current = 0
-    ;(e.target as HTMLElement).setPointerCapture?.(e.pointerId)
-  }
-
-  const onMove = (e: React.PointerEvent) => {
-    if (!dragging.current) return
-    const a = angleAt(e.clientX, e.clientY)
-    const d = (((a - lastAngle.current + 540) % 360) - 180)
-    if (Math.abs(d) > 1.5) moved.current = true
-    const now = performance.now()
-    const dt = Math.max(1, now - lastT.current)
-    velocity.current = velocity.current * 0.65 + (d / dt) * 1000 * 0.35
-    setRot(r => r + d)
-    lastAngle.current = a
-    lastT.current = now
-  }
-
-  const onUp = () => {
-    dragging.current = false
-    decay()
-  }
-
-  const tap = (s: Sec) => {
-    if (moved.current) {
-      moved.current = false // fue un giro, no un tap
-      return
-    }
-    onTap(s)
-  }
-
-  return (
-    <div
-      ref={ringRef}
-      className="mx-ring"
-      style={{ width: SIZE, height: SIZE }}
-      onPointerDown={onDown}
-      onPointerMove={onMove}
-      onPointerUp={onUp}
-      onPointerCancel={onUp}
-      onPointerLeave={onUp}
-    >
-      <div className="mx-ring-wheel" style={{ transform: `rotate(${rot}deg)` }}>
-        {SECS.map((s, i) => {
-          const ang = -Math.PI / 2 + (i * 2 * Math.PI) / SECS.length
-          const x = CX + R * Math.cos(ang)
-          const y = CY + R * Math.sin(ang)
-          const pct = progress[s.id]
-          return (
-            <button
-              key={s.id}
-              className="mx-ring-b"
-              style={{ left: x - 32, top: y - 32, '--c': s.color } as React.CSSProperties}
-              data-on={open === s.id ? '1' : '0'}
-              data-done={pct >= 1 ? '1' : '0'}
-              onClick={() => tap(s.id)}
-              aria-label={`${s.label}: ${Math.round(pct * 100)}%`}
-            >
-              <svg viewBox="0 0 64 64" width="64" height="64" aria-hidden>
-                <circle cx="32" cy="32" r={r} fill="var(--line)" />
-                {pct >= 1 ? (
-                  <circle cx="32" cy="32" r={r} fill={s.color} />
-                ) : pct > 0 ? (
-                  <path d={pieSlice(32, 32, r, pct)} fill={s.color} />
-                ) : null}
-              </svg>
-              <span className="mx-ring-emo" aria-hidden><SectionIcon id={s.id} /></span>
-            </button>
-          )
-        })}
-      </div>
-      <div className="mx-ring-c mx-mono" aria-hidden>
-        {Math.round(total * 100)}%
-      </div>
-    </div>
   )
 }
 
@@ -327,7 +183,31 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
     return { delta: Math.round(delta), days }
   })()
 
-  const toggleSec = (s: Sec) => setOpenSec(prev => (prev === s ? null : s))
+  const traceTasks: { id: string; sec: Sec; label: string; status: string; done: boolean }[] = [
+    { id: 'peso', sec: 'peso', label: 'Peso', status: record?.weight != null ? `${record.weight} kg` : 'Falta', done: record?.weight != null },
+    { id: 'pasos', sec: 'actividad', label: 'Pasos', status: record?.steps != null ? record.steps.toLocaleString('es-PE') : 'Falta', done: record?.steps != null },
+    { id: 'entreno', sec: 'entreno', label: 'Entreno', status: progress.entreno >= 1 ? 'Listo' : 'Falta', done: progress.entreno >= 1 },
+    { id: 'sueno', sec: 'sueno', label: 'Sueno', status: progress.sueno >= 1 ? `${slept?.toFixed(1) ?? '—'} h` : 'Falta', done: progress.sueno >= 1 },
+    { id: 'cintura', sec: 'actividad', label: 'Cintura', status: waistDue ? 'Esta semana' : `${recentWaist?.waist} cm`, done: !waistDue },
+  ]
+  const pendingTrace = traceTasks.filter(t => !t.done).length + (foodCoverage.complete ? 0 : 1)
+  const nextTask = traceTasks.find(t => !t.done)
+  const primaryTraceLabel = !foodCoverage.complete
+    ? `Registrar ${SLOT_LABEL[preferredSlot].toLowerCase()}`
+    : nextTask
+      ? `Registrar ${nextTask.label.toLowerCase()}`
+      : 'Registrar algo más'
+
+  const openTraceTask = (task: (typeof traceTasks)[number]) => {
+    if (task.id === 'peso') setWeightPicker(true)
+    else setOpenSec(task.sec)
+  }
+
+  const runPrimaryTrace = () => {
+    if (!foodCoverage.complete) setEstimating(preferredSlot)
+    else if (nextTask) openTraceTask(nextTask)
+    else setEstimating('extra')
+  }
 
   const toggleSkip = (slot: MealSlot) => {
     const skipped = record?.skipped ?? []
@@ -361,87 +241,82 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
         )}
       </div>
 
-      {/* --- La meta visible: la fecha deja de vivir escondida en Mi plan --- */}
-      <section className="mx-goal" aria-label="Meta de peso">
-        <div className="mx-goal-top">
+      {/* Registrar manda: todas las acciones del dia quedan antes del progreso. */}
+      <section className="mx-trace-now" data-complete={pendingTrace === 0 ? '1' : '0'} aria-label="Pendientes de hoy">
+        <div className="mx-trace-head">
           <div>
-            <div className="mx-eyebrow">Meta con fecha</div>
-            {goalWeight != null && state.settings.targetDate ? (
-              <div className="mx-goal-title">
-                <span className="mx-mono">{goalWeight} kg</span>
-                <span>para el {shortDate(state.settings.targetDate)}</span>
-              </div>
-            ) : (
-              <div className="mx-goal-title"><span>Define a dónde vas</span></div>
-            )}
+            <div className="mx-eyebrow">Traza hoy</div>
+            <div className="mx-trace-title">
+              {pendingTrace === 0 ? 'Hoy quedó trazado' : `Te faltan ${pendingTrace} registros`}
+            </div>
+            <div className="mx-sub">{pendingTrace === 0 ? 'Ya puedes confiar en los datos de hoy.' : 'No cierres el día con huecos.'}</div>
           </div>
-          <button className="mx-mini" onClick={() => setGoalEditor(true)}>Editar meta</button>
+          <div className="mx-trace-kcal" data-over={kcalLeft < 0 ? '1' : '0'}>
+            <b className="mx-mono">{kcalLeft >= 0 ? kcalLeft : `+${Math.abs(kcalLeft)}`}</b>
+            <span>kcal {kcalLeft >= 0 ? 'disponibles' : 'de más'}</span>
+          </div>
         </div>
-        {goalWeight != null && state.settings.targetDate && (
-          <>
-            <div className="mx-goal-grid">
-              <div>
-                <span className="mx-goal-number mx-mono">{goalDays != null ? Math.max(0, goalDays) : '—'}</span>
-                <small>días</small>
-              </div>
-              <div>
-                <span className="mx-goal-number mx-mono">{avg7 != null ? avg7.toFixed(1) : '—'}</span>
-                <small>kg promedio</small>
-              </div>
-              <div>
-                <span className="mx-goal-number mx-mono">{goalLeft != null ? goalLeft.toFixed(1) : '—'}</span>
-                <small>kg por bajar</small>
-              </div>
-            </div>
-            <div className="mx-goal-pace">
-              <span>Ritmo necesario <b className="mx-mono">{requiredPerWeek != null ? `-${requiredPerWeek.toFixed(1)} kg/sem` : '—'}</b></span>
-              <span>Ritmo actual <b className="mx-mono">{actualTrend != null ? `${actualTrend > 0 ? '+' : ''}${actualTrend.toFixed(1)} kg/sem` : 'sin datos'}</b></span>
-            </div>
-            {projectedGoalWeight != null && (
-              <div className="mx-goal-projection">
-                Al ritmo actual llegarías con <b className="mx-mono">{projectedGoalWeight.toFixed(1)} kg</b>
-              </div>
-            )}
+
+        <button className="mx-trace-primary" onClick={runPrimaryTrace}>
+          {primaryTraceLabel}
+          <span>
+            {!foodCoverage.complete
+              ? `${foodCoverage.covered}/${foodCoverage.total} comidas confirmadas`
+              : nextTask
+                ? 'Toca para completar ahora'
+                : 'El día está completo'}
+          </span>
+        </button>
+
+        <div className="mx-trace-grid">
+          {traceTasks.map(task => (
             <button
-              className="mx-waist-callout"
-              data-due={waistDue ? '1' : '0'}
-              onClick={() => setOpenSec('actividad')}
+              key={task.id}
+              className="mx-trace-task"
+              data-done={task.done ? '1' : '0'}
+              onClick={() => openTraceTask(task)}
+              aria-label={`${task.label}: ${task.status}`}
             >
-              <span>{waistDue ? 'Mide tu cintura esta semana' : `Cintura: ${recentWaist?.waist} cm`}</span>
-              <small>{waistDue ? 'A la altura del ombligo, con el abdomen relajado' : `Última medida: ${shortDate(recentWaist!.date)}`}</small>
+              <SectionIcon id={task.sec} />
+              <span>{task.label}<small>{task.status}</small></span>
+              <i aria-hidden>{task.done ? '✓' : '→'}</i>
             </button>
-          </>
-        )}
+          ))}
+        </div>
+
+        <div className="mx-trace-foot">
+          <button onClick={() => setOpenSec('comidas')}>Ver todas las comidas</button>
+          {!foodCoverage.complete && <button onClick={() => setClosingDay(true)}>Cerrar comidas</button>}
+          {foodCoverage.complete && <span>Comidas cerradas ✓</span>}
+        </div>
       </section>
 
-      {/* --- Calorias primero: es la decision que el usuario necesita hoy --- */}
-      <section className="mx-calorie" data-over={kcalLeft < 0 ? '1' : '0'} aria-label="Calorias de hoy">
-        <div className="mx-calorie-copy">
-          <div className="mx-eyebrow">Hoy</div>
-          <div className="mx-calorie-value mx-mono">
-            {kcalLeft >= 0 ? kcalLeft : `+${Math.abs(kcalLeft)}`}<span> kcal</span>
-          </div>
-          <div className="mx-calorie-label">{kcalLeft >= 0 ? 'disponibles' : 'sobre el objetivo'}</div>
-          <div className="mx-calorie-track" aria-hidden>
-            <i style={{ width: `${Math.min(100, targetKcal > 0 ? (eatenKcal / targetKcal) * 100 : 0)}%` }} />
-          </div>
-          <div className="mx-sub mx-mono">{eatenKcal} / {targetKcal} kcal</div>
-        </div>
-        <div className="mx-calorie-actions">
-          <button className="mx-quick-meal" onClick={() => setEstimating(preferredSlot)}>
-            Registrar {SLOT_LABEL[preferredSlot].toLowerCase()}
-          </button>
-          <button className="mx-quick-other" onClick={() => setOpenSec('comidas')}>Elegir otra comida</button>
-        </div>
-        <div className="mx-day-close" data-complete={foodCoverage.complete ? '1' : '0'}>
-          <div>
-            <b>{foodCoverage.complete ? 'Día de comida cerrado' : `${foodCoverage.covered} de ${foodCoverage.total} comidas confirmadas`}</b>
-            <span>{foodCoverage.complete ? 'Ya se puede evaluar este día.' : 'Confirma lo que comiste y lo que no.'}</span>
-          </div>
-          {!foodCoverage.complete && (
-            <button onClick={() => setClosingDay(true)}>Cerrar día</button>
+      {/* La cuenta regresiva tiene contexto antes que cualquier peso. */}
+      <section className="mx-deadline" aria-label="Progreso hacia la boda">
+        <div className="mx-deadline-main">
+          {goalWeight != null && state.settings.targetDate ? (
+            <>
+              <div className="mx-deadline-days">
+                <b className="mx-mono">{goalDays != null ? Math.max(0, goalDays) : '—'}</b>
+                <span>días para la boda</span>
+              </div>
+              <div className="mx-deadline-weights">
+                <span>Peso actual <b className="mx-mono">{avg7 != null ? `${avg7.toFixed(1)} kg` : 'sin promedio'}</b></span>
+                <span>Meta de boda <b className="mx-mono">{goalWeight} kg</b></span>
+              </div>
+            </>
+          ) : (
+            <div className="mx-deadline-empty">Define la fecha y el peso de tu meta.</div>
           )}
+          <button className="mx-mini" onClick={() => setGoalEditor(true)}>Editar</button>
         </div>
+        {goalWeight != null && state.settings.targetDate && (
+          <div className="mx-deadline-pace">
+            <span>Necesitas <b className="mx-mono">{requiredPerWeek != null ? `-${requiredPerWeek.toFixed(1)} kg/sem` : 'más pesajes'}</b></span>
+            <span>Vas a <b className="mx-mono">{actualTrend != null ? `${actualTrend > 0 ? '+' : ''}${actualTrend.toFixed(1)} kg/sem` : 'sin tendencia'}</b></span>
+            {projectedGoalWeight != null && <span>Proyección <b className="mx-mono">{projectedGoalWeight.toFixed(1)} kg</b></span>}
+          </div>
+        )}
       </section>
 
       <div className="mx-bp">
@@ -450,15 +325,15 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
         <MacroPie label={MACRO_LABEL.grasa} eaten={eaten.grasa} target={targets.grasa} tone="grasa" />
       </div>
 
-      {/* --- Anillo de categorias: conserva acceso rapido al resto del registro --- */}
-      <CategoryRing
-        progress={progress}
-        open={openSec}
-        onTap={toggleSec}
-      />
-      <div className="mx-ring-hint mx-sub">Toca un circulo para registrar o ver esa categoria.</div>
+      <section className="mx-progress-section" aria-label="Progreso y tendencias">
+        <div className="mx-progress-head">
+          <div className="mx-eyebrow">Tu progreso</div>
+          <div>La semana, tendencias y gráficos viven aquí.</div>
+        </div>
+        <WeekScreen app={app} />
+      </section>
 
-      {/* --- Contenido de la categoria en modal centrado (una a la vez) --- */}
+      {/* --- Contenido del registro en modales (una categoria a la vez) --- */}
       <BottomSheet open={goalEditor} onClose={() => setGoalEditor(false)} title="Editar meta">
         <div className="mx-sub" style={{ marginBottom: 10 }}>
           La portada usa estos datos para mostrar los días restantes y el ritmo necesario.
@@ -495,7 +370,7 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
         </div>
       </BottomSheet>
 
-      <BottomSheet open={closingDay} onClose={() => setClosingDay(false)} title="Cerrar día">
+      <BottomSheet open={closingDay} onClose={() => setClosingDay(false)} title="Cerrar comidas">
         <div className="mx-close-summary">
           <div className="mx-lbl">Falta confirmar</div>
           <div className="mx-close-slots">
@@ -510,7 +385,7 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
             onClick={() => {
               app.updateRecord({ skipped: [...new Set([...(record?.skipped ?? []), ...missingSlots.map(s => s.id)])] }, viewDate)
               setClosingDay(false)
-              setToast('Día de comida cerrado')
+              setToast('Comidas del día cerradas')
             }}
           >
             No comí nada más
