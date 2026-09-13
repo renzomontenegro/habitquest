@@ -21,7 +21,10 @@ export function BottomSheet({ open, onClose, title, children, wide, center }: {
     const focusable = () => Array.from(sheetRef.current?.querySelectorAll<HTMLElement>(
       'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
     ) ?? [])
-    requestAnimationFrame(() => focusable()[0]?.focus())
+    requestAnimationFrame(() => {
+      const preferred = sheetRef.current?.querySelector<HTMLElement>('[data-autofocus="true"]')
+      ;(preferred ?? focusable()[0])?.focus()
+    })
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
       if (e.key !== 'Tab') return

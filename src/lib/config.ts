@@ -1,6 +1,6 @@
 import type { Macros, MealSlot } from '../types'
 
-export const APP_VERSION = '3.64'
+export const APP_VERSION = '3.68'
 
 // ---------------------------------------------------------------------------
 // Valores iniciales
@@ -59,6 +59,7 @@ export const DEFAULT_SLOT_SHARE: Record<MealSlot, number> = {
 }
 
 export const DEFAULT_SLEEP_TARGET = 7.5
+export const DEFAULT_STEPS_TARGET = 8000
 
 /** Margen para dar un dia por cumplido. */
 export const DEFAULT_TOLERANCE = 0.12

@@ -79,7 +79,7 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
   goToday: () => void
 }) {
   const { state, today } = app
-  const { split, targets, sleepTarget } = state.settings
+  const { split, targets, sleepTarget, stepsTarget } = state.settings
 
   const record = getRecord(state.records, viewDate)
   const eaten = dayMacros(record)
@@ -104,6 +104,9 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
   const [openSec, setOpenSec] = useState<Sec | null>(null)
   const [goalEditor, setGoalEditor] = useState(false)
   const [closingDay, setClosingDay] = useState(false)
+  const [measureField, setMeasureField] = useState<'steps' | 'waist' | null>(null)
+  const [measureDraft, setMeasureDraft] = useState('')
+  const [measureError, setMeasureError] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
 
   const workout = workoutForDate(record, split, viewDate)
@@ -185,7 +188,11 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
 
   const traceTasks: { id: string; sec: Sec; label: string; status: string; done: boolean }[] = [
     { id: 'peso', sec: 'peso', label: 'Peso', status: record?.weight != null ? `${record.weight} kg` : 'Falta', done: record?.weight != null },
-    { id: 'pasos', sec: 'actividad', label: 'Pasos', status: record?.steps != null ? record.steps.toLocaleString('es-PE') : 'Falta', done: record?.steps != null },
+    {
+      id: 'pasos', sec: 'actividad', label: 'Pasos',
+      status: record?.steps != null ? `${record.steps.toLocaleString('es-PE')} / ${stepsTarget.toLocaleString('es-PE')}` : 'Falta',
+      done: record?.steps != null,
+    },
     { id: 'entreno', sec: 'entreno', label: 'Entreno', status: progress.entreno >= 1 ? 'Listo' : 'Falta', done: progress.entreno >= 1 },
     { id: 'sueno', sec: 'sueno', label: 'Sueno', status: progress.sueno >= 1 ? `${slept?.toFixed(1) ?? '—'} h` : 'Falta', done: progress.sueno >= 1 },
     { id: 'cintura', sec: 'actividad', label: 'Cintura', status: waistDue ? 'Esta semana' : `${recentWaist?.waist} cm`, done: !waistDue },
@@ -198,8 +205,16 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
       ? `Registrar ${nextTask.label.toLowerCase()}`
       : 'Registrar algo más'
 
+  const openMeasure = (field: 'steps' | 'waist') => {
+    setMeasureDraft(String(field === 'steps' ? record?.steps ?? '' : record?.waist ?? ''))
+    setMeasureError(null)
+    setMeasureField(field)
+  }
+
   const openTraceTask = (task: (typeof traceTasks)[number]) => {
     if (task.id === 'peso') setWeightPicker(true)
+    else if (task.id === 'pasos') openMeasure('steps')
+    else if (task.id === 'cintura') openMeasure('waist')
     else setOpenSec(task.sec)
   }
 
@@ -330,7 +345,7 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
           <div className="mx-eyebrow">Tu progreso</div>
           <div>La semana, tendencias y gráficos viven aquí.</div>
         </div>
-        <WeekScreen app={app} />
+        <WeekScreen app={app} onSelectDate={setViewDate} />
       </section>
 
       {/* --- Contenido del registro en modales (una categoria a la vez) --- */}
@@ -625,34 +640,70 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
         </>
       )}
 
-      {openSec === 'actividad' && (
-        <>
-          <Field label="Pasos" sub="Lo copias de tu celular.">
-            <input
-              className="mx-in"
-              value={record?.steps != null ? String(record.steps) : ''}
-              onChange={e => {
-                const v = e.target.value
-                app.updateRecord({ steps: v === '' ? undefined : parseInt(v, 10) }, viewDate)
-              }}
-              inputMode="numeric"
-              placeholder="—"
-            />
-          </Field>
-          <Field label="Cintura" sub="Al ombligo. Con una vez por semana basta.">
-            <input
-              className="mx-in"
-              value={record?.waist != null ? String(record.waist) : ''}
-              onChange={e => {
-                const v = e.target.value
-                app.updateRecord({ waist: v === '' ? undefined : parseFloat(v) }, viewDate)
-              }}
-              inputMode="decimal"
-              placeholder="—"
-            />
-          </Field>
-        </>
-      )}
+      </BottomSheet>
+
+      <BottomSheet
+        open={measureField !== null}
+        onClose={() => setMeasureField(null)}
+        title={measureField === 'steps' ? 'Registrar pasos' : 'Medir cintura'}
+      >
+        {measureField && (() => {
+          const parsed = Number(measureDraft.replace(',', '.'))
+          const valid = Number.isFinite(parsed) && parsed > 0
+          const stepsLeft = measureField === 'steps' && valid ? Math.max(0, stepsTarget - parsed) : null
+          return (
+            <>
+              <div className="mx-measure-intro">
+                <div className="mx-eyebrow">
+                  {measureField === 'steps' ? `Objetivo ${stepsTarget.toLocaleString('es-PE')}` : 'Una vez por semana'}
+                </div>
+                <p>
+                  {measureField === 'steps'
+                    ? 'Copia el total de hoy desde Salud o tu reloj.'
+                    : 'Cinta horizontal al nivel del ombligo, abdomen relajado.'}
+                </p>
+              </div>
+              <div className="mx-measure-value">
+                <input
+                  autoFocus
+                  data-autofocus="true"
+                  value={measureDraft}
+                  inputMode={measureField === 'steps' ? 'numeric' : 'decimal'}
+                  aria-label={measureField === 'steps' ? 'Pasos de hoy' : 'Cintura en centimetros'}
+                  placeholder="0"
+                  onFocus={e => e.currentTarget.select()}
+                  onChange={e => { setMeasureDraft(e.target.value); setMeasureError(null) }}
+                />
+                <span>{measureField === 'steps' ? 'pasos' : 'cm'}</span>
+              </div>
+              {measureField === 'steps' && valid && (
+                <div className="mx-measure-result" data-done={stepsLeft === 0 ? '1' : '0'}>
+                  {stepsLeft === 0
+                    ? parsed > stepsTarget
+                      ? `Objetivo superado por ${Math.round(parsed - stepsTarget).toLocaleString('es-PE')} pasos.`
+                      : 'Objetivo de pasos cumplido.'
+                    : `Te faltan ${stepsLeft?.toLocaleString('es-PE')} pasos para el objetivo.`}
+                </div>
+              )}
+              {measureError && <div className="mx-inline-error" role="alert">{measureError}</div>}
+              <div className="mx-acts">
+                <button
+                  className="mx-btn"
+                  data-p="1"
+                  onClick={() => {
+                    if (!valid) { setMeasureError('Escribe un número mayor que cero.'); return }
+                    if (measureField === 'steps') app.updateRecord({ steps: Math.round(parsed) }, viewDate)
+                    else app.updateRecord({ waist: Math.round(parsed * 10) / 10 }, viewDate)
+                    setToast(measureField === 'steps' ? 'Pasos guardados' : 'Cintura guardada')
+                    setMeasureField(null)
+                  }}
+                >
+                  Guardar {measureField === 'steps' ? 'pasos' : 'cintura'}
+                </button>
+              </div>
+            </>
+          )
+        })()}
       </BottomSheet>
 
       {estimating && (

@@ -1,6 +1,6 @@
 import type { AppSettings, AppState, DayLog, Macros, MealLog, MealSlot, SavedMeal, SetEntry, SplitDay } from '../types'
 import {
-  DEFAULT_SLEEP_TARGET, DEFAULT_SLOT_SHARE, DEFAULT_TARGETS, DEFAULT_TOLERANCE,
+  DEFAULT_SLEEP_TARGET, DEFAULT_SLOT_SHARE, DEFAULT_STEPS_TARGET, DEFAULT_TARGETS, DEFAULT_TOLERANCE,
 } from './config'
 import { normTime, todayStr, uid } from './logic'
 
@@ -17,6 +17,7 @@ const defaultSettings = (): AppSettings => ({
   savedMeals: [],
   split: [],
   sleepTarget: DEFAULT_SLEEP_TARGET,
+  stepsTarget: DEFAULT_STEPS_TARGET,
   tolerance: DEFAULT_TOLERANCE,
   startDate: todayStr(),
   setupDone: false,
@@ -228,6 +229,7 @@ function sanitize(value: unknown): AppState {
     savedMeals: cleanSavedMeals(s.savedMeals),
     split,
     sleepTarget: Math.min(14, Math.max(1, num(s.sleepTarget, DEFAULT_SLEEP_TARGET))),
+    stepsTarget: Math.min(50000, Math.max(1000, Math.round(num(s.stepsTarget, DEFAULT_STEPS_TARGET)))),
     tolerance: Math.min(0.5, Math.max(0.01, num(s.tolerance, DEFAULT_TOLERANCE))),
     // Meta de peso opcional: peso > 0 y fecha con formato valido, o no va.
     ...(num(s.targetWeight, 0) > 0 ? { targetWeight: num(s.targetWeight, 0) } : {}),

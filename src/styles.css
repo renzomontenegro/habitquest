@@ -351,6 +351,23 @@ button:active { transform: scale(.985); }
 .mx-progress-head > div:last-child { margin-top: 4px; font-family: 'Archivo', sans-serif;
   font-size: 18px; font-weight: 700; letter-spacing: -.02em; }
 
+.mx-measure-intro p { margin: 6px 0 14px; font-size: 12px; line-height: 1.5; color: var(--mute); }
+.mx-measure-value { display: flex; align-items: baseline; justify-content: center; gap: 8px;
+  padding: 16px 10px; border: 1px solid var(--line); background: var(--paper); }
+.mx-measure-value input { width: 190px; border: 0; outline: 0; background: transparent; color: var(--ink);
+  font-family: 'IBM Plex Mono', monospace; font-size: 38px; font-weight: 600; text-align: right; }
+.mx-measure-value span { color: var(--mute); font-size: 12px; }
+.mx-measure-result { margin-top: 9px; padding: 8px 10px; border-left: 2px solid var(--warn);
+  background: rgba(134, 95, 17, .07); color: var(--warn); font-size: 11px; line-height: 1.4; }
+.mx-measure-result[data-done='1'] { border-color: var(--good); background: rgba(46, 107, 79, .07); color: var(--good); }
+.mx-inline-error { margin-top: 8px; color: var(--bad); font-size: 11px; font-weight: 600; }
+.mx-pending-days { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
+.mx-pending-days button { min-width: 62px; min-height: 44px; padding: 6px 8px; border: 1px solid rgba(155, 50, 38, .3);
+  border-radius: 2px; background: var(--card); color: var(--ink); text-align: left; cursor: pointer; }
+.mx-pending-days span, .mx-pending-days small { display: block; }
+.mx-pending-days span { font-size: 10.5px; font-weight: 600; }
+.mx-pending-days small { margin-top: 2px; color: var(--bad); font-size: 8.5px; }
+
 .mx-close-summary p { margin: 11px 0 0; font-size: 12px; line-height: 1.5; color: var(--mute); }
 .mx-close-slots { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 9px; }
 .mx-close-slots span { padding: 5px 8px; border: 1px solid var(--line); border-radius: 2px;

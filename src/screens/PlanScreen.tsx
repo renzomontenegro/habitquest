@@ -107,7 +107,7 @@ export function PlanScreen({ app }: { app: AppController }) {
         <div className="mx-row">
           <div style={{ flex: 1 }}>
             <div className="mx-lbl">Horas de sueno objetivo</div>
-            <div className="mx-sub">Es la linea de referencia del grafico de sueno.</div>
+            <div className="mx-sub">Sirve para saber si dormiste lo suficiente.</div>
           </div>
           <Stepper
             value={settings.sleepTarget}
@@ -115,6 +115,19 @@ export function PlanScreen({ app }: { app: AppController }) {
             step={0.5}
             min={1}
             suffix="h"
+          />
+        </div>
+        <div className="mx-row">
+          <div style={{ flex: 1 }}>
+            <div className="mx-lbl">Objetivo diario de pasos</div>
+            <div className="mx-sub">Al registrarlos, Hoy te dice cuantos faltan.</div>
+          </div>
+          <Stepper
+            value={settings.stepsTarget}
+            onChange={v => app.updateSettings({ stepsTarget: Math.min(50000, Math.max(1000, Math.round(v))) })}
+            step={500}
+            min={1000}
+            suffix=""
           />
         </div>
         <div className="mx-row">

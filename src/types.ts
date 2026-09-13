@@ -80,8 +80,10 @@ export interface AppSettings {
   /** Comidas repetidas: se guardan una vez (foto+IA) y se usan sin tokens. */
   savedMeals: SavedMeal[]
   split: SplitDay[]
-  /** Horas de sueno objetivo, para la linea de referencia del grafico. */
+  /** Horas de sueno objetivo. */
   sleepTarget: number
+  /** Pasos diarios: convierte el registro en una decision, no solo en un dato. */
+  stepsTarget: number
   /** Margen para dar un dia por cumplido (0.12 = ±12%). */
   tolerance: number
   /** Meta de peso: hacia donde va la tendencia. Sin estos no hay proyeccion. */
