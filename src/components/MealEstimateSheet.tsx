@@ -44,8 +44,8 @@ async function fileToB64(file: File): Promise<string> {
 type View = 'elegir' | 'repetidas' | 'foto' | 'nombrar'
 
 /**
- * Registro de comida: primero eliges entre repetida (0 tokens) o una nueva
- * (foto + comentario -> IA). Al guardar una repetida pides el nombre.
+ * Registro de comida: primero eliges entre repetida (0 tokens) o una nueva.
+ * La nueva acepta descripcion, foto o ambas. Al guardar una repetida pide nombre.
  */
 export function MealEstimateSheet({ open, slot, reference, savedMeals, onClose, onUseSaved, onEstimate, onSaveRecurring }: {
   open: boolean
@@ -91,7 +91,7 @@ export function MealEstimateSheet({ open, slot, reference, savedMeals, onClose, 
   }
 
   const estimar = async () => {
-    if (photos.length === 0 || status === 'working') return
+    if ((photos.length === 0 && !note.trim()) || status === 'working') return
     setStatus('working')
     setError(null)
     const images = photos.map(p => p.slice(p.indexOf(',') + 1))
@@ -120,13 +120,13 @@ export function MealEstimateSheet({ open, slot, reference, savedMeals, onClose, 
                 🍽️ Comida repetida
               </button>
             )}
-            <button className="mx-btn" onClick={() => setView('foto')}>
-              📷 Nueva comida (IA)
+            <button className="mx-btn" data-p={savedMeals.length === 0 ? '1' : undefined} onClick={() => setView('foto')}>
+              Nueva comida · foto o texto
             </button>
           </div>
           {savedMeals.length === 0 && (
             <div className="mx-sub" style={{ marginTop: 10, lineHeight: 1.5 }}>
-              Para tener repetidas: registra una con foto y toca <b>Guardar como repetida</b>.
+              Para tener repetidas: registra una con foto o texto y toca <b>Guardar como repetida</b>.
             </div>
           )}
         </>
@@ -139,7 +139,7 @@ export function MealEstimateSheet({ open, slot, reference, savedMeals, onClose, 
           </div>
           {savedMeals.length === 0 ? (
             <div className="mx-empty">
-              Todavia no tienes comidas guardadas. Registra una con foto y toca
+              Todavia no tienes comidas guardadas. Registra una con foto o texto y toca
               <b> Guardar como repetida</b> para tenerla aqui.
             </div>
           ) : (
@@ -165,17 +165,20 @@ export function MealEstimateSheet({ open, slot, reference, savedMeals, onClose, 
 
       {view === 'foto' && (
         <>
-          <div className="mx-lbl" style={{ margin: '0 0 2px' }}>Comentario</div>
+          <div className="mx-lbl" style={{ margin: '0 0 5px' }}>Describe lo que comiste</div>
           <MonoInput
             value={note}
             onChange={setNote}
-            placeholder="Ej: 400 gr de arroz + 200 gr de carne + 1 cucharada de aceite"
+            placeholder="Ej: hamburguesa doble con papas y mayonesa"
             className="mx-in-full"
+            autoFocus
           />
+          <div className="mx-sub" style={{ marginTop: 6 }}>
+            Si ya comiste, esto basta. Incluye cantidades o tamaño cuando los recuerdes.
+          </div>
 
-          <div className="mx-sub" style={{ margin: '12px 0 2px', lineHeight: 1.5 }}>
-            <b>Tomale foto a la comida</b> (opcional: sin foto, la IA estima solo con el comentario).
-            Si puedes, foto tambien a la <b>tabla nutricional</b> de los alimentos utilizados.
+          <div className="mx-sub" style={{ margin: '16px 0 2px', lineHeight: 1.5 }}>
+            <b>Foto opcional.</b> Ayuda a estimar la porción, pero no es obligatoria.
           </div>
 
           <input
@@ -189,8 +192,8 @@ export function MealEstimateSheet({ open, slot, reference, savedMeals, onClose, 
 
           {photos.length === 0 ? (
             <div style={{ marginTop: 8 }}>
-              <button className="mx-btn" data-p="1" onClick={() => fileRef.current?.click()}>
-                Agregar fotos
+              <button className="mx-btn" onClick={() => fileRef.current?.click()}>
+                Agregar foto opcional
               </button>
               <div className="mx-sub" style={{ marginTop: 8 }}>
                 Tomar con la camara o elegir de la galeria (hasta {MAX_PHOTOS}).

@@ -703,6 +703,7 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
       <BottomSheet
         open={measureField !== null}
         onClose={() => setMeasureField(null)}
+        center
         title={measureField === 'steps'
           ? measureDate === today ? 'Registrar pasos' : 'Registrar pasos de ayer'
           : 'Medir cintura'}

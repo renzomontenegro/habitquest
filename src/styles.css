@@ -869,7 +869,9 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .mx-stepper button { border: 0; border-radius: 50%; background: #E5E5E0; }
 
 .mx-sheet { border: 0; border-radius: 24px 24px 0 0; padding: 12px 20px 32px; }
-.mx-sheet[data-center='1'] { border: 0; border-radius: 20px; }
+.mx-sheet[data-center='1'] { align-self: flex-start;
+  margin: calc(env(safe-area-inset-top, 0px) + 16px) 20px 20px;
+  border: 0; border-radius: 20px; }
 .mx-sheet-x { width: 36px; height: 36px; border: 0; border-radius: 50%; }
 .mx-sheet-grab { width: 42px; background: #C7C7C1; }
 .mx-slot, .mx-saved, .mx-adjust, .mx-empty-cta { border: 0; border-radius: 14px; background: var(--paper); }
