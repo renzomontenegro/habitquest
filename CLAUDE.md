@@ -238,7 +238,7 @@ frontend, hay que actualizar AMBAS claves en ese Code node.
 ## Reglas de desarrollo
 - **Versionado**: Despues de cada cambio, incrementar `APP_VERSION` en `src/lib/config.ts`.
   El usuario lo lee en Ajustes para verificar que el deploy se aplico.
-- **Deploy**: Solo `git push origin main`. Vercel hace auto-deploy. NO usar `vercel` CLI.
+- **Deploy**: Despues de cada cambio completado, hacer commit y `git push origin main` automaticamente, salvo que el usuario pida explicitamente no pushear. Vercel hace auto-deploy. NO usar `vercel` CLI.
 - **Docker Compose en Pi**: para aplicar env vars nuevas usar `sudo docker compose up -d`
   (NO `restart`). Backup antes: `sudo cp docker-compose.yml docker-compose.yml.bak-$(date +%Y%m%d-%H%M)`.
 - **VITE_ env vars son build-time**: cambiarlas en Vercel requiere redeploy.
