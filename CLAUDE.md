@@ -208,8 +208,12 @@ permiso, obtiene la suscripcion y la registra con `registerPushSubscription()` c
 
 El backend ya existe: el workflow **"Sistema Push"** (`XI555krGiKbDvH4F`) registra la
 suscripcion (webhook `habitquest-push`, upsert en DataTable `e1410wlZvquWmkLD` con key
-`push_sub`) y envía recordatorios con un Cron a las **9:00, 12:00 y 21:00**. El envio usa un
-Code node con la implementacion manual del protocolo Web Push (JWT ES256 + aes128gcm) con el
+`push_sub`) y envia recordatorios contextuales a las **9:00, 12:55, 19:55 y 23:00**. Antes de
+notificar lee el ultimo estado de la DataTable: a las 23:00 pide pasos solo si faltan; a la
+manana recupera los pasos de ayer; el domingo pide cintura y el lunes hace un unico rescate si se
+omitio. Almuerzo,
+cena, peso y cierre tambien se omiten si ya estan registrados. El envio usa un Code node con la
+implementacion manual del protocolo Web Push (JWT ES256 + aes128gcm) con el
 par VAPID embebido (`VAPID_PUBLIC`/`VAPID_PRIVATE` en el propio Code node). El webhook
 `sistema-push-send` permite enviar a mano para probar. Si se cambia el par VAPID en el
 frontend, hay que actualizar AMBAS claves en ese Code node.

@@ -790,6 +790,7 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .mx-task-list i { color: var(--signal); font-style: normal; }
 .mx-task-list > button[data-done='1'] { background: #EAF3EE; }
 .mx-task-list > button[data-done='1'] small, .mx-task-list > button[data-done='1'] i { color: var(--good); }
+.mx-task-list > button[data-done='later'] small, .mx-task-list > button[data-done='later'] i { color: var(--mute); }
 .mx-food-summary { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px;
   padding: 12px 14px; border-radius: 14px; background: var(--ink); color: #fff; }
 .mx-food-summary > div:first-child b { font-size: 21px; }

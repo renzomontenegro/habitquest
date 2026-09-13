@@ -106,6 +106,7 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
   const [tasksOpen, setTasksOpen] = useState(false)
   const [progressOpen, setProgressOpen] = useState(false)
   const [measureField, setMeasureField] = useState<'steps' | 'waist' | null>(null)
+  const [measureDate, setMeasureDate] = useState(viewDate)
   const [measureDraft, setMeasureDraft] = useState('')
   const [measureError, setMeasureError] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
@@ -141,6 +142,9 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
     .filter(r => r.waist != null && r.date <= viewDate)
     .sort((a, b) => b.date.localeCompare(a.date))[0]
   const waistDue = !recentWaist || daysBetween(recentWaist.date, viewDate) >= 7
+  const yesterday = addDays(today, -1)
+  const yesterdayRecord = getRecord(state.records, yesterday)
+  const missedYesterdaySteps = viewDate === today && yesterdayRecord?.steps == null
 
   // Peso al que arranca el wheel de una serie: lo ya cargado, si no el ultimo
   // entreno del ejercicio, si no 50 (caso de un dia nuevo sin historial).
@@ -188,47 +192,59 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
     return { delta: Math.round(delta), days }
   })()
 
-  const traceTasks: { id: string; sec: Sec; label: string; status: string; done: boolean }[] = [
-    { id: 'peso', sec: 'peso', label: 'Peso', status: record?.weight != null ? `${record.weight} kg` : 'Falta', done: record?.weight != null },
+  const traceTasks: { id: string; sec: Sec; label: string; status: string; done: boolean; due: boolean }[] = [
+    { id: 'peso', sec: 'peso', label: 'Peso', status: record?.weight != null ? `${record.weight} kg` : 'Falta', done: record?.weight != null, due: true },
     {
       id: 'pasos', sec: 'actividad', label: 'Pasos',
-      status: record?.steps != null ? `${record.steps.toLocaleString('es-PE')} / ${stepsTarget.toLocaleString('es-PE')}` : 'Falta',
+      status: record?.steps != null
+        ? `${record.steps.toLocaleString('es-PE')} / ${stepsTarget.toLocaleString('es-PE')}`
+        : hour >= 23 ? 'Falta' : 'A las 11 p. m.',
       done: record?.steps != null,
+      due: hour >= 23,
     },
-    { id: 'entreno', sec: 'entreno', label: 'Entreno', status: progress.entreno >= 1 ? 'Listo' : 'Falta', done: progress.entreno >= 1 },
-    { id: 'sueno', sec: 'sueno', label: 'Sueno', status: progress.sueno >= 1 ? `${slept?.toFixed(1) ?? '—'} h` : 'Falta', done: progress.sueno >= 1 },
-    { id: 'cintura', sec: 'actividad', label: 'Cintura', status: waistDue ? 'Esta semana' : `${recentWaist?.waist} cm`, done: !waistDue },
+    { id: 'entreno', sec: 'entreno', label: 'Entreno', status: progress.entreno >= 1 ? 'Listo' : 'Falta', done: progress.entreno >= 1, due: true },
+    { id: 'sueno', sec: 'sueno', label: 'Sueno', status: progress.sueno >= 1 ? `${slept?.toFixed(1) ?? '—'} h` : 'Falta', done: progress.sueno >= 1, due: true },
+    { id: 'cintura', sec: 'actividad', label: 'Cintura', status: waistDue ? 'Medición semanal' : `${recentWaist?.waist} cm`, done: !waistDue, due: waistDue },
   ]
-  const pendingTrace = traceTasks.filter(t => !t.done).length + (foodCoverage.complete ? 0 : 1)
-  const taskById = (id: string) => traceTasks.find(task => task.id === id && !task.done)
+  const foodPendingNow = dueMealSlot !== null || (hour >= 21 && !foodCoverage.complete)
+  const pendingToday = traceTasks.filter(t => t.due && !t.done).length + (foodPendingNow ? 1 : 0)
+  const pendingTrace = pendingToday + (missedYesterdaySteps ? 1 : 0)
+  const taskById = (id: string) => traceTasks.find(task => task.id === id && task.due && !task.done)
   const priority = hour < 11
-    ? ['peso', 'sueno', 'meal', 'cintura', 'entreno', 'pasos']
+    ? ['yesterdaySteps', 'peso', 'sueno', 'meal', 'cintura', 'entreno', 'pasos']
     : hour < 17
-      ? ['meal', 'peso', 'sueno', 'entreno', 'cintura', 'pasos']
-      : ['meal', 'entreno', 'pasos', 'closeFood', 'peso', 'sueno', 'cintura']
+      ? ['meal', 'yesterdaySteps', 'peso', 'sueno', 'entreno', 'cintura', 'pasos']
+      : ['meal', 'yesterdaySteps', 'entreno', 'pasos', 'closeFood', 'peso', 'sueno', 'cintura']
   const primaryKey = priority.find(key => {
+    if (key === 'yesterdaySteps') return missedYesterdaySteps
     if (key === 'meal') return dueMealSlot !== null
-    if (key === 'closeFood') return !foodCoverage.complete
+    if (key === 'closeFood') return hour >= 21 && !foodCoverage.complete
     return taskById(key) != null
   }) ?? 'extra'
   const primaryTask = taskById(primaryKey)
-  const primaryTraceLabel = primaryKey === 'meal' && dueMealSlot
-    ? `Registrar ${SLOT_LABEL[dueMealSlot].toLowerCase()}`
-    : primaryKey === 'closeFood'
-      ? 'Cerrar comidas de hoy'
+  const primaryTraceLabel = primaryKey === 'yesterdaySteps'
+    ? 'Registrar pasos de ayer'
+    : primaryKey === 'meal' && dueMealSlot
+      ? `Registrar ${SLOT_LABEL[dueMealSlot].toLowerCase()}`
+      : primaryKey === 'closeFood'
+        ? 'Cerrar comidas de hoy'
       : primaryTask
         ? `Registrar ${primaryTask.label.toLowerCase()}`
         : 'Registrar algo más'
-  const primaryHeadline = primaryKey === 'meal' && dueMealSlot
-    ? `${SLOT_LABEL[dueMealSlot]} pendiente`
-    : primaryKey === 'closeFood'
-      ? 'Comidas sin cerrar'
+  const primaryHeadline = primaryKey === 'yesterdaySteps'
+    ? 'Ayer quedó sin pasos'
+    : primaryKey === 'meal' && dueMealSlot
+      ? `${SLOT_LABEL[dueMealSlot]} pendiente`
+      : primaryKey === 'closeFood'
+        ? 'Comidas sin cerrar'
       : primaryTask
         ? `${primaryTask.label} pendiente`
         : 'Hoy está completo'
 
-  const openMeasure = (field: 'steps' | 'waist') => {
-    setMeasureDraft(String(field === 'steps' ? record?.steps ?? '' : record?.waist ?? ''))
+  const openMeasure = (field: 'steps' | 'waist', date = viewDate) => {
+    const source = getRecord(state.records, date)
+    setMeasureDate(date)
+    setMeasureDraft(String(field === 'steps' ? source?.steps ?? '' : source?.waist ?? ''))
     setMeasureError(null)
     setMeasureField(field)
   }
@@ -241,7 +257,8 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
   }
 
   const runPrimaryTrace = () => {
-    if (primaryKey === 'meal' && dueMealSlot) setEstimating(dueMealSlot)
+    if (primaryKey === 'yesterdaySteps') openMeasure('steps', yesterday)
+    else if (primaryKey === 'meal' && dueMealSlot) setEstimating(dueMealSlot)
     else if (primaryKey === 'closeFood') setClosingDay(true)
     else if (primaryTask) openTraceTask(primaryTask)
     else setEstimating('extra')
@@ -286,7 +303,9 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
           <p>
             {pendingTrace === 0
               ? 'Todo lo necesario quedó trazado.'
-              : `${pendingTrace} ${pendingTrace === 1 ? 'registro pendiente' : 'registros pendientes'} hoy.`}
+              : missedYesterdaySteps
+                ? `${pendingToday} de hoy · 1 pendiente de ayer.`
+                : `${pendingToday} ${pendingToday === 1 ? 'registro pendiente' : 'registros pendientes'} hoy.`}
           </p>
         </div>
         <button className="mx-now-primary" onClick={runPrimaryTrace}>
@@ -341,10 +360,17 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
       </button>
 
       {/* Los detalles aparecen solo cuando ayudan a completar una accion. */}
-      <BottomSheet open={tasksOpen} onClose={() => setTasksOpen(false)} title="Pendientes de hoy">
+      <BottomSheet open={tasksOpen} onClose={() => setTasksOpen(false)} title="Pendientes">
         <div className="mx-task-list">
+          {missedYesterdaySteps && (
+            <button onClick={() => { setTasksOpen(false); openMeasure('steps', yesterday) }}>
+              <SectionIcon id="actividad" />
+              <span><b>Pasos de ayer</b><small>Pendiente arrastrado</small></span>
+              <i aria-hidden>→</i>
+            </button>
+          )}
           <button
-            data-done={foodCoverage.complete ? '1' : '0'}
+            data-done={foodCoverage.complete ? '1' : foodPendingNow ? '0' : 'later'}
             onClick={() => { setTasksOpen(false); setOpenSec('comidas') }}
           >
             <SectionIcon id="comidas" />
@@ -354,12 +380,12 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
           {traceTasks.map(task => (
             <button
               key={task.id}
-              data-done={task.done ? '1' : '0'}
+              data-done={task.done ? '1' : task.due ? '0' : 'later'}
               onClick={() => { setTasksOpen(false); openTraceTask(task) }}
             >
               <SectionIcon id={task.sec} />
               <span><b>{task.label}</b><small>{task.status}</small></span>
-              <i aria-hidden>{task.done ? '✓' : '→'}</i>
+              <i aria-hidden>{task.done ? '✓' : task.due ? '→' : '·'}</i>
             </button>
           ))}
         </div>
@@ -677,7 +703,9 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
       <BottomSheet
         open={measureField !== null}
         onClose={() => setMeasureField(null)}
-        title={measureField === 'steps' ? 'Registrar pasos' : 'Medir cintura'}
+        title={measureField === 'steps'
+          ? measureDate === today ? 'Registrar pasos' : 'Registrar pasos de ayer'
+          : 'Medir cintura'}
       >
         {measureField && (() => {
           const parsed = Number(measureDraft.replace(',', '.'))
@@ -691,7 +719,7 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
                 </div>
                 <p>
                   {measureField === 'steps'
-                    ? 'Copia el total de hoy desde Salud o tu reloj.'
+                    ? `Copia el total de ${measureDate === today ? 'hoy' : 'ayer'} desde Salud o tu reloj.`
                     : 'Cinta horizontal al nivel del ombligo, abdomen relajado.'}
                 </p>
               </div>
@@ -724,8 +752,8 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
                   data-p="1"
                   onClick={() => {
                     if (!valid) { setMeasureError('Escribe un número mayor que cero.'); return }
-                    if (measureField === 'steps') app.updateRecord({ steps: Math.round(parsed) }, viewDate)
-                    else app.updateRecord({ waist: Math.round(parsed * 10) / 10 }, viewDate)
+                    if (measureField === 'steps') app.updateRecord({ steps: Math.round(parsed) }, measureDate)
+                    else app.updateRecord({ waist: Math.round(parsed * 10) / 10 }, measureDate)
                     setToast(measureField === 'steps' ? 'Pasos guardados' : 'Cintura guardada')
                     setMeasureField(null)
                   }}
