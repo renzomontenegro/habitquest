@@ -641,12 +641,17 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
             {SLOTS.map(s => {
               const logged = mealsInSlot(record, s.id)
               return (
-                <div key={s.id} className="mx-slot">
+                <div key={s.id} className="mx-slot" data-logged={logged.length > 0 ? '1' : '0'}>
                   <div className="mx-slot-h">
                     <div className="mx-eyebrow">{s.label}</div>
                     <div className="mx-slot-acts">
                       {logged.length > 0 && (
-                        <button className="mx-mini" onClick={() => setEstimating(s.id)}>+ Agregar</button>
+                        <button
+                          className="mx-slot-add"
+                          onClick={() => setEstimating(s.id)}
+                          aria-label={`Agregar otra comida en ${s.label}`}
+                          title="Agregar otra"
+                        >+</button>
                       )}
                       <button
                         className="mx-q"

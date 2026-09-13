@@ -440,15 +440,19 @@ button:active { transform: scale(.985); }
   grid-template-columns: repeat(auto-fit, minmax(min(145px, 100%), 1fr));
   gap: 8px; margin-bottom: 8px; }
 
-.mx-slot { container-type: inline-size; background: var(--card); border: 1px solid var(--line); border-radius: 3px;
-  padding: 12px 13px; }
+.mx-slot { container-type: inline-size; min-width: 0; overflow: hidden; background: var(--card);
+  border: 1px solid var(--line); border-radius: 3px; padding: 12px 10px; }
+.mx-slot[data-logged='1'] { grid-column: 1 / -1; }
 .mx-slot-h { display: flex; justify-content: space-between; align-items: center;
-  gap: 10px; min-height: 26px; }
-.mx-slot-acts { display: flex; gap: 6px; align-items: center; }
-.mx-q { width: 24px; height: 24px; flex-shrink: 0; border: 1px solid var(--line);
-  background: var(--paper); color: var(--mute); border-radius: 2px;
-  font-size: 12px; font-family: 'IBM Plex Mono', monospace; cursor: pointer; }
-.mx-q:hover { color: var(--ink); border-color: var(--mute); }
+  gap: 6px; min-width: 0; min-height: 34px; }
+.mx-slot-h > .mx-eyebrow { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mx-slot-acts { display: flex; flex-shrink: 0; gap: 4px; align-items: center; }
+.mx-q, .mx-slot-add { width: 34px; height: 34px; flex-shrink: 0; display: inline-flex;
+  align-items: center; justify-content: center; border: 1px solid var(--line);
+  background: var(--paper); color: var(--ink); border-radius: 50%;
+  font-size: 15px; font-family: 'Inter', sans-serif; cursor: pointer; }
+.mx-slot-add { font-size: 20px; font-weight: 400; line-height: 1; }
+.mx-q:hover, .mx-slot-add:hover { color: var(--signal); border-color: var(--signal); }
 
 /* El estado vacio ES el boton: elegir la comida cuesta un tap. Se mantiene
    grande para el pulgar, pero calmado: en un dia vacio hay cuatro a la vez. */
