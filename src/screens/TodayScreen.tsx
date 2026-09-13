@@ -3,7 +3,7 @@ import type { AppController } from '../hooks/useAppState'
 import type { MealLog, MealSlot } from '../types'
 import {
   addDays, dayMacros, getRecord, headerDate, lastNDates, lastSessionWeight, makeEmptySets, mealMacros, mealName,
-  mealsInSlot, nearestWeight, parseDate, roundMacros, shortDate, slotReference, workoutForDate,
+  mealsInSlot, nearestWeight, parseDate, roundMacros, shortDate, sleepHours, slotReference, workoutForDate,
 } from '../lib/logic'
 import { MACRO_LABEL, PORTIONS, SLOTS, SLOT_LABEL } from '../lib/config'
 import { MealEstimateSheet } from '../components/MealEstimateSheet'
@@ -205,10 +205,11 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
   goToday: () => void
 }) {
   const { state, today } = app
-  const { split, targets } = state.settings
+  const { split, targets, sleepTarget } = state.settings
 
   const record = getRecord(state.records, viewDate)
   const eaten = dayMacros(record)
+  const slept = sleepHours(record?.bedTime, record?.wakeTime)
 
   const [estimating, setEstimating] = useState<MealSlot | null>(null)
   const [ideaSlot, setIdeaSlot] = useState<MealSlot | null>(null)
@@ -362,6 +363,15 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
               )}
             </div>
           </Field>
+          {slept !== null && (
+            <div className="mx-row">
+              <div>
+                <div className="mx-lbl">Total dormido</div>
+                <div className="mx-sub">Meta {sleepTarget} h</div>
+              </div>
+              <div className="mx-sleep mx-mono">{slept} h</div>
+            </div>
+          )}
           </>
         )}
 
