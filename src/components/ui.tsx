@@ -17,7 +17,6 @@ export function BottomSheet({ open, onClose, title, children, wide, center }: {
   const titleId = useId()
   const overlayRef = useRef<HTMLDivElement>(null)
   const sheetRef = useRef<HTMLDivElement>(null)
-  const backdropPress = useRef(false)
   const [viewport, setViewport] = useState<{ height: number; top: number } | null>(null)
 
   // La app usa .app-content como scroller (body ya esta bloqueado). Al abrir un
@@ -140,13 +139,6 @@ export function BottomSheet({ open, onClose, title, children, wide, center }: {
           exit={{ opacity: 0 }}
           className={`mx-sheet-overlay fixed inset-0 z-50 flex justify-center bg-black/40 ${center ? 'items-center' : 'items-end'}`}
           style={viewport ? { height: viewport.height, top: viewport.top, bottom: 'auto' } : undefined}
-          onPointerDown={e => { backdropPress.current = e.target === e.currentTarget }}
-          onPointerCancel={() => { backdropPress.current = false }}
-          onClick={e => {
-            const shouldClose = backdropPress.current && e.target === e.currentTarget
-            backdropPress.current = false
-            if (shouldClose) onClose()
-          }}
         >
           <motion.div
             ref={sheetRef}
