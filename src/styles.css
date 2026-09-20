@@ -728,7 +728,7 @@ button:active { transform: scale(.985); }
   display: flex; align-items: center; justify-content: center; }
 .mx-gear:hover { color: var(--ink); }
 
-html.mx-sheet-open .app-content { overflow-y: hidden; }
+html.mx-sheet-open .app-content { overflow-y: hidden; touch-action: none; }
 .mx-sheet-overlay { overscroll-behavior: none; }
 .mx-sheet { width: 100%; max-width: 512px; background: var(--card);
   border: 1px solid var(--line); border-bottom: 0; border-radius: 8px 8px 0 0;

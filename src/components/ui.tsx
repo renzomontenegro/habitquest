@@ -1,5 +1,6 @@
 import { useId, useEffect, useState, useRef, cloneElement, type ReactElement } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { createPortal } from 'react-dom'
 import type { SaveStatus } from '../lib/sync'
 
 let openSheetCount = 0
@@ -82,7 +83,7 @@ export function BottomSheet({ open, onClose, title, children, wide, center }: {
     }
   }, [open, onClose])
 
-  return (
+  return createPortal(
     <AnimatePresence>
       {open && (
         <motion.div
@@ -117,7 +118,8 @@ export function BottomSheet({ open, onClose, title, children, wide, center }: {
           </motion.div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   )
 }
 
