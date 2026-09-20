@@ -47,12 +47,13 @@ type View = 'capturar' | 'nombrar'
  * Registro directo: descripcion y foto opcional en una sola vista. Las comidas
  * recurrentes se eligen desde el mismo formulario, sin una pantalla intermedia.
  */
-export function MealEstimateSheet({ open, slot, reference, savedMeals, onClose, onUseSaved, onEstimate, onSaveRecurring }: {
+export function MealEstimateSheet({ open, slot, reference, savedMeals, onClose, onSkip, onUseSaved, onEstimate, onSaveRecurring }: {
   open: boolean
   slot: MealSlot
   reference: Macros | null  // que deberia llevar esta comida segun el reparto
   savedMeals: SavedMeal[]
   onClose: () => void
+  onSkip: () => void
   onUseSaved: (saved: SavedMeal) => void
   onEstimate: (custom: { name: string; prot: number; carb: number; grasa: number }, note: string) => void
   onSaveRecurring: (saved: SavedMeal) => void
@@ -235,13 +236,22 @@ export function MealEstimateSheet({ open, slot, reference, savedMeals, onClose, 
                 </button>
               </>
             ) : (
-              <button
-                className="mx-btn" data-p="1"
-                disabled={(photos.length === 0 && !note.trim()) || status === 'working'}
-                onClick={estimar}
-              >
-                {status === 'working' ? 'Estimando...' : 'Estimar macros'}
-              </button>
+              <>
+                <button
+                  className="mx-btn" data-p="1"
+                  disabled={(photos.length === 0 && !note.trim()) || status === 'working'}
+                  onClick={estimar}
+                >
+                  {status === 'working' ? 'Estimando...' : 'Estimar macros'}
+                </button>
+                <button
+                  className="mx-btn"
+                  disabled={status === 'working'}
+                  onClick={() => { onSkip(); onClose() }}
+                >
+                  No comi
+                </button>
+              </>
             )}
           </div>
         </>

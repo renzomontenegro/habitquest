@@ -264,12 +264,18 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
     else setEstimating('extra')
   }
 
+  const markSkipped = (slot: MealSlot) => {
+    const skipped = record?.skipped ?? []
+    if (!skipped.includes(slot)) app.updateRecord({ skipped: [...skipped, slot] }, viewDate)
+    setToast(`No comi ${SLOT_LABEL[slot].toLowerCase()}`)
+  }
+
   const toggleSkip = (slot: MealSlot) => {
     const skipped = record?.skipped ?? []
-    const on = !skipped.includes(slot)
-    const next = on ? [...skipped, slot] : skipped.filter(x => x !== slot)
+    if (!skipped.includes(slot)) { markSkipped(slot); return }
+    const next = skipped.filter(x => x !== slot)
     app.updateRecord({ skipped: next.length > 0 ? next : undefined }, viewDate)
-    setToast(on ? `No comi ${SLOT_LABEL[slot].toLowerCase()}` : `${SLOT_LABEL[slot]} desmarcado`)
+    setToast(`${SLOT_LABEL[slot]} desmarcado`)
   }
 
   return (
@@ -779,6 +785,7 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
           reference={slotReference(state.settings, estimating)}
           savedMeals={state.settings.savedMeals}
           onClose={() => setEstimating(null)}
+          onSkip={() => markSkipped(estimating)}
           onUseSaved={saved => {
             app.logSavedMeal(estimating, saved, 1, viewDate)
             setToast(`${SLOT_LABEL[estimating]} registrado`)
