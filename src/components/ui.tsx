@@ -17,6 +17,7 @@ export function BottomSheet({ open, onClose, title, children, wide, center }: {
   const titleId = useId()
   const overlayRef = useRef<HTMLDivElement>(null)
   const sheetRef = useRef<HTMLDivElement>(null)
+  const backdropPress = useRef(false)
   const [viewport, setViewport] = useState<{ height: number; top: number } | null>(null)
 
   // La app usa .app-content como scroller (body ya esta bloqueado). Al abrir un
@@ -77,14 +78,23 @@ export function BottomSheet({ open, onClose, title, children, wide, center }: {
     }
   }, [open])
 
-  // En iOS el teclado reduce visualViewport. Solo reaccionamos al resize: usar
-  // su evento scroll y llamar scrollIntoView en cada tick creaba un bucle que
-  // movia el fondo y hacia temblar el modal.
+  // En iOS el teclado reduce visualViewport. Consolidamos cada raf y descartamos
+  // medidas transitorias invalidas durante la animacion de abrir/cerrar teclado.
   useEffect(() => {
     if (!open || !window.visualViewport) return
     const visual = window.visualViewport
-    const update = () => setViewport({ height: visual.height, top: visual.offsetTop })
-    const frame = window.requestAnimationFrame(update)
+    let frame = 0
+    const update = () => {
+      window.cancelAnimationFrame(frame)
+      frame = window.requestAnimationFrame(() => {
+        if (visual.height < 120) return
+        const height = Math.round(visual.height)
+        const maxTop = Math.max(0, window.innerHeight - height)
+        const top = Math.max(0, Math.min(Math.round(visual.offsetTop), maxTop))
+        setViewport({ height, top })
+      })
+    }
+    update()
     visual.addEventListener('resize', update)
     return () => {
       window.cancelAnimationFrame(frame)
@@ -130,7 +140,13 @@ export function BottomSheet({ open, onClose, title, children, wide, center }: {
           exit={{ opacity: 0 }}
           className={`mx-sheet-overlay fixed inset-0 z-50 flex justify-center bg-black/40 ${center ? 'items-center' : 'items-end'}`}
           style={viewport ? { height: viewport.height, top: viewport.top, bottom: 'auto' } : undefined}
-          onClick={onClose}
+          onPointerDown={e => { backdropPress.current = e.target === e.currentTarget }}
+          onPointerCancel={() => { backdropPress.current = false }}
+          onClick={e => {
+            const shouldClose = backdropPress.current && e.target === e.currentTarget
+            backdropPress.current = false
+            if (shouldClose) onClose()
+          }}
         >
           <motion.div
             ref={sheetRef}
