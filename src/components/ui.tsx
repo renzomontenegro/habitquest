@@ -2,6 +2,8 @@ import { useId, useEffect, useState, useRef, cloneElement, type ReactElement } f
 import { motion, AnimatePresence } from 'framer-motion'
 import type { SaveStatus } from '../lib/sync'
 
+let openSheetCount = 0
+
 // --- Bottom sheet (modal centrado con `center`) ---
 export function BottomSheet({ open, onClose, title, children, wide, center }: {
   open: boolean
@@ -14,6 +16,19 @@ export function BottomSheet({ open, onClose, title, children, wide, center }: {
   const titleId = useId()
   const sheetRef = useRef<HTMLDivElement>(null)
   const [viewport, setViewport] = useState<{ height: number; top: number } | null>(null)
+
+  // La app usa .app-content como scroller (body ya esta bloqueado). Al abrir un
+  // modal hay que bloquear ese elemento para que un gesto sobre el backdrop o
+  // el limite del sheet no siga moviendo la pantalla de fondo en iOS.
+  useEffect(() => {
+    if (!open) return
+    openSheetCount++
+    document.documentElement.classList.add('mx-sheet-open')
+    return () => {
+      openSheetCount = Math.max(0, openSheetCount - 1)
+      if (openSheetCount === 0) document.documentElement.classList.remove('mx-sheet-open')
+    }
+  }, [open])
 
   // En iOS el teclado reduce visualViewport, pero no siempre el inset de un fixed.
   // Ajustar el overlay a esa area evita que cualquier formulario quede detras del teclado.
@@ -74,7 +89,7 @@ export function BottomSheet({ open, onClose, title, children, wide, center }: {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className={`fixed inset-0 z-50 flex justify-center bg-black/40 ${center ? 'items-center' : 'items-end'}`}
+          className={`mx-sheet-overlay fixed inset-0 z-50 flex justify-center bg-black/40 ${center ? 'items-center' : 'items-end'}`}
           style={viewport ? { height: viewport.height, top: viewport.top, bottom: 'auto' } : undefined}
           onClick={onClose}
         >
