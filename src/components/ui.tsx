@@ -17,7 +17,7 @@ export function BottomSheet({ open, onClose, title, children, wide, center }: {
   const titleId = useId()
   const overlayRef = useRef<HTMLDivElement>(null)
   const sheetRef = useRef<HTMLDivElement>(null)
-  const [viewport, setViewport] = useState<{ height: number; keyboardInset: number } | null>(null)
+  const [viewport, setViewport] = useState<{ height: number; keyboardInset: number; available: number } | null>(null)
 
   // La app usa .app-content como scroller (body ya esta bloqueado). Al abrir un
   // modal hay que bloquear ese elemento para que un gesto sobre el backdrop o
@@ -90,7 +90,11 @@ export function BottomSheet({ open, onClose, title, children, wide, center }: {
         if (visual.height < 120) return
         const height = Math.round(visual.height)
         const keyboardInset = Math.max(0, Math.round(window.innerHeight - visual.height - visual.offsetTop))
-        setViewport({ height, keyboardInset })
+        // Espacio real para el sheet: lo visible menos el teclado. Sin esto,
+        // el maxHeight incluia el relleno del teclado y la parte de arriba
+        // del modal quedaba fuera de la pantalla al enfocar un input.
+        const available = Math.max(180, Math.round(window.innerHeight - keyboardInset))
+        setViewport({ height, keyboardInset, available })
       })
     }
     update()
@@ -154,7 +158,7 @@ export function BottomSheet({ open, onClose, title, children, wide, center }: {
             className="mx-sheet"
             data-wide={wide ? '1' : '0'}
             data-center={center ? '1' : '0'}
-            style={viewport ? { maxHeight: Math.max(180, viewport.height - (center ? 52 : 8)) } : undefined}
+            style={viewport ? { maxHeight: Math.max(180, viewport.available - (center ? 52 : 8)) } : undefined}
             onClick={e => e.stopPropagation()}
           >
             {!center && <div className="mx-sheet-grab" />}
