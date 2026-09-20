@@ -601,10 +601,16 @@ function WeightBody({ initialKg, hasValue, minKg, maxKg, onChange, onClose }: {
     setText(String(Math.round(val * 10) / 10).replace('.', ','))
   }
 
-  const onType = (raw: string) => {
-    setText(raw)
-    const n = parseFloat(raw.replace(',', '.'))
-    if (Number.isFinite(n) && n > 0) setDraftKg(Math.min(999, round1(unit === 'kg' ? n : n / KG_TO_LB)))
+  // El texto se mantiene separado del wheel mientras se escribe. Si se
+  // actualiza draftKg con cada tecla, un valor transitorio como "0" queda por
+  // debajo del rango de la rueda y su scroll lo reemplaza (en lb aparecia 2,2).
+  const onType = (raw: string) => setText(raw)
+
+  const commit = () => {
+    const n = parseFloat(text.replace(',', '.'))
+    if (!Number.isFinite(n) || n <= 0) return
+    onChange(Math.min(999, round1(unit === 'kg' ? n : n / KG_TO_LB)))
+    onClose()
   }
 
   return (
@@ -656,7 +662,7 @@ function WeightBody({ initialKg, hasValue, minKg, maxKg, onChange, onClose }: {
             Borrar
           </button>
         )}
-        <button className="mx-btn" data-p="1" onClick={() => { onChange(round1(draftKg)); onClose() }}>
+        <button className="mx-btn" data-p="1" onClick={commit}>
           Listo
         </button>
       </div>
