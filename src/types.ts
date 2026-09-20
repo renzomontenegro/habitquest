@@ -35,6 +35,14 @@ export interface MealLog {
   note?: string
   /** true si los macros los estimo la IA a partir de una foto. */
   ai?: boolean
+  /**
+   * La comida se guardo rapido y sus macros estan pendientes de la IA.
+   * Mientras tanto suma ceros y muestra "Estimando...". La foto vive solo
+   * en el localStorage del telefono hasta que la estimacion funciona.
+   */
+  aiPending?: boolean
+  /** Ultimo error de estimacion (persiste para el boton Reintentar). */
+  aiError?: string
 }
 
 // --- Entrenamiento ---

@@ -5,9 +5,10 @@ import { ROUTINE_TEMPLATE } from '../lib/config'
 import { todayStr, uid } from '../lib/logic'
 import {
   queueSave, flushSave, retryNow, saveNow, loadFromBackend, isSyncEnabled,
-  subscribeSync, getSyncSnapshot, hasPendingChanges,
+  subscribeSync, getSyncSnapshot, hasPendingChanges, estimateMeal,
   type SyncSnapshot,
 } from '../lib/sync'
+import { savePendingPhotos, loadPendingPhotos, clearPendingPhotos } from '../lib/pendingPhotos'
 
 const PENDING_KEY = 'sistema_pending'
 
@@ -74,6 +75,9 @@ export function useAppState() {
   const [loadingInitial, setLoadingInitial] = useState(isSyncEnabled())
   const marks = useRef<PendingMarks>(readMarks())
   const stateRef = useRef(state)
+  // Estimaciones IA en curso (por id de comida): evita procesar dos veces.
+  const processingEstimates = useRef<Set<string>>(new Set())
+  const processEstimatesRef = useRef<((meal: MealLog, date: string) => Promise<void>) | null>(null)
 
   // Espejo para leer el valor actual desde callbacks y timers sin recrearlos.
   useEffect(() => { stateRef.current = state }, [state])
@@ -111,6 +115,19 @@ export function useAppState() {
     if (remote) {
       const clean = storage.sanitize(remote)
       const merged = mergeStates(clean, stateRef.current, marks.current)
+      // Una comida pendiente de IA nunca la borra la nube: si el merge la
+      // perdio (p. ej. recarga antes de subir), se repone desde lo local.
+      for (const local of stateRef.current.records) {
+        for (const meal of local.meals ?? []) {
+          if (!meal.aiPending) continue
+          const rec = merged.records.find(r => r.date === local.date)
+          if (rec && !(rec.meals ?? []).some(m => m.id === meal.id)) {
+            rec.meals = [...(rec.meals ?? []), meal]
+          } else if (!rec) {
+            merged.records.push({ date: local.date, meals: [meal] })
+          }
+        }
+      }
       // Solo actualiza si el merge trajo algo distinto: evita repeticiones
       // (que encadenarían otro guardado) cuando la nube ya coincide con local.
       if (JSON.stringify(merged) !== JSON.stringify(stateRef.current)) {
@@ -190,6 +207,94 @@ export function useAppState() {
     patchRecord(date, r => ({ ...r, meals: [...(r.meals ?? []), ...meals] }))
   }, [patchRecord])
 
+  /**
+   * Registro rapido: la comida se guarda al instante con macros en cero y la
+   * IA los completa en segundo plano (con o sin internet: si no hay, queda
+   * pendiente y se procesa al reconectar). Las fotos quedan en el telefono
+   * hasta que la estimacion funciona. Devuelve si las fotos se guardaron.
+   */
+  const logPendingMeal = useCallback((slot: MealSlot, note: string, photos: string[], date = todayStr()): boolean => {
+    const id = uid('m')
+    const trimmed = note.trim()
+    const photosSaved = savePendingPhotos(id, photos)
+    const meal: MealLog = {
+      id,
+      slot,
+      portion: 1,
+      at: Date.now(),
+      custom: { name: trimmed ? trimmed.slice(0, 40) : 'Comida por estimar', prot: 0, carb: 0, grasa: 0 },
+      ...(trimmed ? { note: trimmed } : {}),
+      ai: true,
+      aiPending: true,
+    }
+    mark(date)
+    addMeals([meal], date)
+    void processEstimatesRef.current?.(meal, date)
+    return photosSaved
+  }, [addMeals, mark])
+
+  /** Procesa una estimacion pendiente: lo que devuelva la IA es lo que se registra. */
+  const processOneEstimate = useCallback(async (meal: MealLog, date: string) => {
+    const mealId = meal.id
+    if (processingEstimates.current.has(mealId)) return
+    if (!meal.aiPending) return
+    processingEstimates.current.add(mealId)
+    try {
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+        patchRecord(date, r => ({
+          ...r,
+          meals: (r.meals ?? []).map(m => (m.id === mealId ? { ...m, aiError: 'Sin internet. Se reintentara solo.' } : m)),
+        }))
+        return
+      }
+      const stored = loadPendingPhotos(mealId)
+      const images = stored.map(p => p.slice(p.indexOf(',') + 1))
+      const { ok, data, error } = await estimateMeal(meal.slot, meal.note ?? '', images)
+      if (ok && data) {
+        clearPendingPhotos(mealId)
+        mark(date)
+        patchRecord(date, r => ({
+          ...r,
+          meals: (r.meals ?? []).map(m => {
+            if (m.id !== mealId) return m
+            const next = {
+              ...m,
+              custom: { name: data.nombre || 'Comida', prot: data.prot, carb: data.carb, grasa: data.grasa },
+              ai: true as const,
+            }
+            delete next.aiPending
+            delete next.aiError
+            return next
+          }),
+        }))
+      } else {
+        mark(date)
+        patchRecord(date, r => ({
+          ...r,
+          meals: (r.meals ?? []).map(m => (m.id === mealId ? { ...m, aiError: error ?? 'No se pudo estimar.' } : m)),
+        }))
+      }
+    } finally {
+      processingEstimates.current.delete(mealId)
+    }
+  }, [mark, patchRecord])
+
+  // Espejo del procesador para los triggers (online / visible / arranque).
+  useEffect(() => { processEstimatesRef.current = processOneEstimate }, [processOneEstimate])
+
+  /** Reintento manual desde la tarjeta de la comida. */
+  const retryEstimate = useCallback((mealId: string, date = todayStr()) => {
+    const meal = stateRef.current.records.find(r => r.date === date)?.meals?.find(m => m.id === mealId)
+    if (!meal) return
+    const fresh: MealLog = { ...meal, aiPending: true }
+    delete fresh.aiError
+    patchRecord(date, r => ({
+      ...r,
+      meals: (r.meals ?? []).map(m => (m.id === mealId ? fresh : m)),
+    }))
+    void processEstimatesRef.current?.(fresh, date)
+  }, [patchRecord])
+
   /** Registra una comida estimada por la IA: foto + texto -> macros. */
   const logAiMeal = useCallback((slot: MealSlot, name: string, macros: Macros, note?: string, date = todayStr()) => {
     addMeals([{
@@ -210,6 +315,33 @@ export function useAppState() {
     }))
   }, [patchRecord])
 
+  /**
+   * Procesa todas las estimaciones pendientes (arranque, reconexion y vuelta
+   * a la app). Sin pendientes es un no-op barato.
+   */
+  const processPendingEstimates = useCallback(() => {
+    for (const rec of stateRef.current.records) {
+      for (const meal of rec.meals ?? []) {
+        if (meal.aiPending) void processEstimatesRef.current?.(meal, rec.date)
+      }
+    }
+  }, [])
+
+  // Al arrancar con pendientes de otra sesion, al reconectar y al volver al
+  // frente: la IA trabaja sola, sin que el usuario espere mirando el modal.
+  useEffect(() => {
+    const run = () => {
+      if (document.visibilityState === 'visible') processPendingEstimates()
+    }
+    run()
+    window.addEventListener('online', run)
+    document.addEventListener('visibilitychange', run)
+    return () => {
+      window.removeEventListener('online', run)
+      document.removeEventListener('visibilitychange', run)
+    }
+  }, [processPendingEstimates])
+
   /** Registra una comida repetida guardada (sin IA: copia sus macros). */
   const logSavedMeal = useCallback((slot: MealSlot, saved: SavedMeal, portion = 1, date = todayStr()) => {
     addMeals([{
@@ -223,6 +355,7 @@ export function useAppState() {
   }, [addMeals])
 
   const removeMeal = useCallback((mealId: string, date = todayStr()) => {
+    clearPendingPhotos(mealId)
     patchRecord(date, r => ({ ...r, meals: (r.meals ?? []).filter(m => m.id !== mealId) }))
   }, [patchRecord])
 
@@ -355,6 +488,8 @@ export function useAppState() {
     // registro
     updateRecord,
     logAiMeal,
+    logPendingMeal,
+    retryEstimate,
     setPortion,
     logSavedMeal,
     removeMeal,

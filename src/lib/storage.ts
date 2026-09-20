@@ -78,6 +78,8 @@ function cleanMealLog(v: unknown): MealLog | null {
     custom,
     ...(note ? { note } : {}),
     ...(v.ai === true ? { ai: true } : {}),
+    ...(v.aiPending === true ? { aiPending: true as const } : {}),
+    ...(optStr(v.aiError) ? { aiError: optStr(v.aiError) } : {}),
   }
 }
 

@@ -698,13 +698,28 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
                         <div className="mx-logged-n">
                           <span className="mx-logged-name">{mealName(m)}</span>
                           {m.portion !== 1 && <i className="mx-logged-p">× {portionLabel(m.portion)}</i>}
-                          {m.ai && <i className="mx-logged-off">IA</i>}
+                          {m.aiPending
+                            ? <i className="mx-logged-off">Estimando…</i>
+                            : m.ai && <i className="mx-logged-off">IA</i>}
                         </div>
                             {m.note && <div className="mx-logged-note">{m.note}</div>}
-                            <div className="mx-logged-m mx-mono">
-                              <span>{mm.prot}P</span><span>{mm.carb}C</span><span>{mm.grasa}G</span>
-                            </div>
+                            {m.aiPending ? (
+                              m.aiError ? (
+                                <div className="mx-logged-m"><span className="mx-logged-err">{m.aiError}</span></div>
+                              ) : (
+                                <div className="mx-logged-m mx-mono"><span>La IA completa los macros sola</span></div>
+                              )
+                            ) : (
+                              <div className="mx-logged-m mx-mono">
+                                <span>{mm.prot}P</span><span>{mm.carb}C</span><span>{mm.grasa}G</span>
+                              </div>
+                            )}
                           </button>
+                          {m.aiPending && m.aiError && (
+                            <button className="mx-mini" onClick={() => app.retryEstimate(m.id, viewDate)}>
+                              Reintentar
+                            </button>
+                          )}
                           <button className="mx-entry-x" onClick={() => app.removeMeal(m.id, viewDate)} aria-label="Quitar">✕</button>
                         </div>
                       )
@@ -799,14 +814,12 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
             setToast(`${SLOT_LABEL[estimating]} registrado`)
             setEstimating(null)
           }}
-          onEstimate={(custom, note) => {
-            app.logAiMeal(estimating, custom.name, custom, note, viewDate)
-            setToast(`${SLOT_LABEL[estimating]} registrado`)
+          onFastSave={(note, photos) => {
+            const photosSaved = app.logPendingMeal(estimating, note, photos, viewDate)
+            setToast(photosSaved
+              ? `${SLOT_LABEL[estimating]} guardado. La IA estima en segundo plano.`
+              : `${SLOT_LABEL[estimating]} guardado sin foto (sin espacio). Igual se estimara con el texto.`)
             setEstimating(null)
-          }}
-          onSaveRecurring={saved => {
-            app.upsertSavedMeal(saved)
-            setToast('Guardada como recurrente')
           }}
         />
       )}

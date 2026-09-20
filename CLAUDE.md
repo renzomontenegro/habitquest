@@ -65,9 +65,15 @@ que alimentar alguna decision o grafico; si un campo no se lee en ningun lado, s
   `557fa092-410b-4eed-8225-13d6ac771aaa`. Si cambias de cuenta GO, genera otro y actualizalo
   en los dos nodos.
 - **Timeouts**: el nodo HTTP tiene 120 s y el cliente (`estimateMeal`/`suggestIdeas` en
-  `sync.ts`) corta a los 120 s. mimo-v2.5 razona largo y a veces tarda 90-120 s (medido:
-  119 s en la ejecucion 6877); NO bajar el techo del cliente por debajo del servidor o el
+  `sync.ts`) corta a los 120 s. mimo-v2.5 tarda 5-200 s segun el caso (medido 199 s en la
+  ejecucion 7417); NO bajar el techo del cliente por debajo del servidor o el
   usuario vera "se corto" aunque la IA responda bien despues.
+- **Fallas reales (rev. 20/09/2026)**: n8n NO registra ejecuciones fallidas ni 400/502 en
+  este flujo; el fallo tipico es el corte del cliente a los 120 s contra una IA lenta
+  (los clusters de ejecuciones con minutos de diferencia son reintentos manuales).
+  Por eso `estimateMeal()` reintenta hasta 3 veces con backoff (3 s, 8 s) solo ante fallas
+  transitorias (timeout, red, 429/502/503/504 o 200 sin macros); un 400/401/403 nunca se
+  reintenta. La estimacion no tiene efectos en el servidor, asi que reintentar es seguro.
 
 ### Workflow: Ideas de comida (mismo workflow)
 - En el mismo workflow hay un **segundo webhook**: POST `/webhook/habitquest-suggest`
@@ -78,8 +84,9 @@ que alimentar alguna decision o grafico; si un campo no se lee en ningun lado, s
 - Proteina viene de la lista aprobada (config.ts `PROTEINS`); `source` es `cocinar` o `rappi`.
 - **Carb cycling**: la IA recibe gym hoy, carbos restantes del dia y el acumulado semanal;
   por eso pide mas carbos si hay entreno o semana en deficit, y menos si no.
-- `max_tokens: 8192`: mimo-v2.5 razona largo y se cortaba a 4096 (finish_reason=length,
-  content=null -> 502). Si la IA vuelve a fallar por tramo, es el primer lugar que mirar.
+- `max_tokens` en vivo: **4096** (el doc decia 8192; no se observan 502 por tramo,
+  asi que el corte no es la causa actual). Si vuelven los 502 con `finish_reason=length`,
+  subirlo es el primer lugar que mirar (a costa de mas latencia).
 
 ### Credenciales n8n
 - `AQKgx9XV1nvU6bv0` — Header Auth PWA (Bearer token para webhooks)
@@ -112,7 +119,11 @@ que queda en el registro es el resultado estimado.
 
 - `MealLog` — una comida registrada: `slot`, `portion` (1 = porcion normal), `at`,
   `custom` = `{ name, prot, carb, grasa }` (siempre presente), `note` (comentario del usuario
-  que le dio contexto a la IA) y `ai` (true si los macros los estimo la IA).
+  que le dio contexto a la IA), `ai` (true si los macros los estimo la IA),
+  `aiPending` (macros pendientes: suma ceros y muestra "Estimando...") y `aiError`
+  (ultimo error, persiste para el boton Reintentar). Las fotos pendientes viven aparte
+  en `localStorage['sistema_pending_photos']` por id de comida (`src/lib/pendingPhotos.ts`):
+  nunca entran al AppState ni viajan a la nube.
 - `DayLog` — `weight`, `steps`, `waist`, `bedTime`, `wakeTime`, `meals[]`,
   `workoutId` (id de `SplitDay`, `null` = descanso), `sets` (por **id** de ejercicio).
 - `SplitDay` / `Exercise` — el split es **data editable por el usuario**, no constantes.
@@ -230,11 +241,15 @@ frontend, hay que actualizar AMBAS claves en ese Code node.
 - `src/lib/config.ts` — `APP_VERSION`, slots, `SLOT_REFERENCE` + semillas (split, targets), `ROUTINE_TEMPLATE`
 - `src/lib/logic.ts` — fechas, sumas de macros, adherencia, veredicto, helpers de split
 - `src/lib/storage.ts` — localStorage, `sanitize` y la migracion del modelo viejo
-- `src/lib/sync.ts` — cola de guardado, reintentos, flush, `estimateMeal()` (foto -> IA)
+- `src/lib/sync.ts` — cola de guardado, reintentos, flush, `estimateMeal()` (foto -> IA,
+  3 intentos con backoff solo ante fallas transitorias)
 - `src/hooks/useAppState.ts` — estado global, acciones, merge offline (`AppController`)
 - `src/components/ui.tsx` — BottomSheet, Stepper, MacroBar, SaveDot, Toast, ConfirmButton, TimeWheel, WeightWheel.
   `BottomSheet` se ajusta a `visualViewport` para que ningun input quede detras del teclado movil.
-- `src/components/MealEstimateSheet.tsx` — registra comida con foto + texto: la IA estima los macros
+- `src/components/MealEstimateSheet.tsx` — captura rapida (foto + texto -> Guardar al
+  instante); la IA completa los macros en segundo plano (`logPendingMeal` +
+  `processOneEstimate` en `useAppState.ts`: arranque, `online`, al volver a la app y
+  boton Reintentar; la nube nunca borra una comida pendiente)
 - `src/components/MealIdeaSheet.tsx` — asistente de idea: proteina + cocinar/rappi + carb cycling -> la IA sugiere (webhook `habitquest-suggest`)
 - `src/components/charts.tsx` — LineChart, DayBars, PaceBar, Stat (SVG a mano)
 - `src/screens/` — SetupScreen (primer arranque), TodayScreen, WeekScreen, PlanScreen, SettingsSheet
@@ -254,10 +269,12 @@ frontend, hay que actualizar AMBAS claves en ese Code node.
 - **Errores inline y no bloqueantes**: mostrar el problema donde ocurre, sin deshabilitar la UI.
 - **Cada campo que se pide debe usarse**: si un dato del registro diario no alimenta un calculo
   ni un grafico, se elimina. Es la regla que mata la friccion.
-- **Registrar una comida = foto (opcional) + texto, y la IA estima los macros.** Sin foto la IA
-  estima solo con el comentario. El sheet muestra la
-  resultado antes de guardar; la porcion se ajusta despues desde la tarjeta. Un dia sin registro
-  no cuenta. Cualquier paso extra obligatorio (pesar, elegir ingredientes) va contra el producto.
+- **Registrar una comida = foto (opcional) + texto + Guardar, y salir.** La comida se guarda
+  al instante como pendiente y la IA completa los macros en segundo plano (con o sin internet;
+  si falla, las fotos persisten en el telefono y hay boton Reintentar). Sin foto la IA
+  estima solo con el comentario. La porcion se ajusta despues desde la tarjeta. Un dia sin registro
+  no cuenta. Cualquier paso extra obligatorio (pesar, elegir ingredientes, esperar a la IA)
+  va contra el producto.
 - **Nada del plan del usuario se escribe en el codigo.** Si aparece la tentacion de poner una
   comida, una rutina o un objetivo "por defecto" en `config.ts`, va en `AppSettings` y se
   edita desde la app. Sin excepciones: tampoco "de ejemplo" ni "para migrar".

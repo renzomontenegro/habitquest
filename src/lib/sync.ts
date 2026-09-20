@@ -153,62 +153,105 @@ export interface MealEstimate {
   nombre: string
 }
 
+// La IA tarda 5-200 s segun el caso (medido hasta 199 s): el fallo tipico
+// es el corte del cliente a los 120 s, no un error del servidor (n8n no
+// registra ejecuciones fallidas ni 400/502 en este flujo). Por eso se
+// reintenta con backoff; un 400 nunca se reintenta (misma entrada, mismo 400).
+const ESTIMATE_ATTEMPTS = 3
+const ESTIMATE_BACKOFF_MS = [3000, 8000]
+
+type EstimateFail = { retryable: boolean; error: string }
+
+function estimateFail(e: unknown, status?: number): EstimateFail {
+  if (status === 400 || status === 401 || status === 403) {
+    return { retryable: false, error: `El servidor respondio ${status}.` }
+  }
+  if (status === 429 || status === 502 || status === 503 || status === 504) {
+    return { retryable: true, error: `El servidor respondio ${status}.` }
+  }
+  if (e instanceof DOMException && e.name === 'AbortError') {
+    return { retryable: true, error: 'Se corto a los 120 s sin respuesta (la IA suele tardar 1-3 min).' }
+  }
+  const msg = e instanceof Error ? e.message : String(e)
+  const retryable = /network|failed to fetch|load failed|timed out|timeout/i.test(msg)
+  return { retryable, error: friendlyError(e) }
+}
+
+const sleep = (ms: number): Promise<void> => new Promise(r => setTimeout(r, ms))
+
 /**
  * Manda las fotos (base64, ya comprimidas) + la nota al webhook de estimacion.
- * La IA corre en n8n con su propia key: el frontend nunca la ve. Puede tardar
- * ~30 s del lado del servidor.
+ * La IA corre en n8n con su propia key: el frontend nunca la ve. Reintenta
+ * hasta 3 veces con backoff cuando la falla es transitoria (timeout, red,
+ * 502); nunca ante un 400. La estimacion no tiene efectos secundarios en el
+ * servidor, asi que reintentar es seguro.
  */
 export async function estimateMeal(
   slot: string,
   note: string,
   imagesB64: string[],
+  opts?: { onRetry?: (attempt: number, max: number) => void },
 ): Promise<{ ok: boolean; data?: MealEstimate; error?: string }> {
   const url = getUrl('habitquest-estimate')
   if (!url) return { ok: false, error: 'Sin servidor de estimacion configurado.' }
-  try {
-    const ctrl = new AbortController()
-    // La IA a veces tarda 90-120 s (la ultima ejecucion tomo 119 s): el corte
-    // del cliente debe igualar el timeout del nodo HTTP en n8n (120 s).
-    const timer = setTimeout(() => ctrl.abort(), 120_000)
-    let res: Response
+  let lastError = 'Error desconocido'
+  for (let attempt = 1; attempt <= ESTIMATE_ATTEMPTS; attempt++) {
+    if (attempt > 1) {
+      opts?.onRetry?.(attempt, ESTIMATE_ATTEMPTS)
+      await sleep(ESTIMATE_BACKOFF_MS[attempt - 2] ?? 8000)
+    }
     try {
-      res = await fetch(url, {
-        method: 'POST',
-        headers: buildHeaders(),
-        body: JSON.stringify({ slot, note, images: imagesB64 }),
-        signal: ctrl.signal,
-      })
-    } finally {
-      clearTimeout(timer)
+      const ctrl = new AbortController()
+      // El corte del cliente iguala el timeout del nodo HTTP en n8n (120 s).
+      const timer = setTimeout(() => ctrl.abort(), 120_000)
+      let res: Response
+      try {
+        res = await fetch(url, {
+          method: 'POST',
+          headers: buildHeaders(),
+          body: JSON.stringify({ slot, note, images: imagesB64 }),
+          signal: ctrl.signal,
+        })
+      } finally {
+        clearTimeout(timer)
+      }
+      const data = (await res.json().catch(() => ({}))) as {
+        prot?: number
+        carb?: number
+        grasa?: number
+        kcal?: number
+        nombre?: string
+        error?: string
+      }
+      if (!res.ok) {
+        const fail = estimateFail(null, res.status)
+        lastError = data.error ?? fail.error
+        if (!fail.retryable) return { ok: false, error: lastError }
+        continue
+      }
+      if (typeof data.prot !== 'number' || typeof data.carb !== 'number' || typeof data.grasa !== 'number') {
+        // Respuesta 200 sin macros (p. ej. la IA se corto razonando): la
+        // siguiente ejecucion puede salir bien, asi que se reintenta.
+        lastError = 'La estimacion no trajo macros validos.'
+        continue
+      }
+      return {
+        ok: true,
+        data: {
+          prot: data.prot,
+          carb: data.carb,
+          grasa: data.grasa,
+          kcal: typeof data.kcal === 'number' ? data.kcal : 0,
+          nombre: typeof data.nombre === 'string' ? data.nombre : '',
+        },
+      }
+    } catch (e) {
+      const fail = estimateFail(e)
+      lastError = fail.error
+      if (!fail.retryable) return { ok: false, error: lastError }
     }
-    const data = (await res.json().catch(() => ({}))) as {
-      prot?: number
-      carb?: number
-      grasa?: number
-      kcal?: number
-      nombre?: string
-      error?: string
-    }
-    if (!res.ok) return { ok: false, error: data.error ?? `El servidor respondio ${res.status}.` }
-    if (typeof data.prot !== 'number' || typeof data.carb !== 'number' || typeof data.grasa !== 'number') {
-      return { ok: false, error: 'La estimacion no trajo macros validos.' }
-    }
-    return {
-      ok: true,
-      data: {
-        prot: data.prot,
-        carb: data.carb,
-        grasa: data.grasa,
-        kcal: typeof data.kcal === 'number' ? data.kcal : 0,
-        nombre: typeof data.nombre === 'string' ? data.nombre : '',
-      },
-    }
-  } catch (e) {
-    if (e instanceof DOMException && e.name === 'AbortError') {
-      return { ok: false, error: 'Se corto a los 120 s sin respuesta; el servidor puede seguir procesando. Espera y reintenta (no es la VPN).' }
-    }
-    return { ok: false, error: friendlyError(e) }
   }
+  return { ok: false, error: `${lastError} (3 intentos)` }
 }
 
 // --- Carga ---

@@ -524,6 +524,7 @@ button:active { transform: scale(.985); }
 .mx-logged-off { font-style: normal; font-size: 9.5px; font-weight: 500; color: var(--warn);
   text-transform: uppercase; letter-spacing: .07em; font-family: 'IBM Plex Mono', monospace; }
 .mx-logged-m { display: flex; gap: 10px; font-size: 11.5px; color: var(--mute); margin-top: 4px; }
+.mx-logged-err { color: var(--bad); font-size: 10.5px; line-height: 1.4; }
 .mx-entry-x { width: 30px; height: 30px; flex-shrink: 0; border: 1px solid var(--line);
   background: var(--paper); border-radius: 2px; color: var(--mute); cursor: pointer; font-size: 11px; }
 .mx-entry-x:hover { color: var(--bad); border-color: rgba(180, 35, 24, .4); }
