@@ -6,13 +6,15 @@ import type { SaveStatus } from '../lib/sync'
 let openSheetCount = 0
 
 // --- Bottom sheet (modal centrado con `center`) ---
-export function BottomSheet({ open, onClose, title, children, wide, center }: {
+export function BottomSheet({ open, onClose, title, children, wide, center, headExtra }: {
   open: boolean
   onClose: () => void
   title: string
   children: React.ReactNode
   wide?: boolean
   center?: boolean
+  /** Contenido que queda fijo bajo la cabecera (no se rebana al hacer scroll). */
+  headExtra?: React.ReactNode
 }) {
   const titleId = useId()
   const overlayRef = useRef<HTMLDivElement>(null)
@@ -161,10 +163,13 @@ export function BottomSheet({ open, onClose, title, children, wide, center }: {
             style={viewport ? { maxHeight: Math.max(180, viewport.available - (center ? 52 : 8)) } : undefined}
             onClick={e => e.stopPropagation()}
           >
-            {!center && <div className="mx-sheet-grab" />}
-            <div className="mx-sheet-head">
-              <div className="mx-eyebrow" id={titleId}>{title}</div>
-              <button className="mx-sheet-x" onClick={onClose} aria-label="Cerrar">✕</button>
+            <div className="mx-sheet-sticky">
+              {!center && <div className="mx-sheet-grab" />}
+              <div className="mx-sheet-head">
+                <div className="mx-eyebrow" id={titleId}>{title}</div>
+                <button className="mx-sheet-x" onClick={onClose} aria-label="Cerrar">✕</button>
+              </div>
+              {headExtra}
             </div>
             {children}
           </motion.div>

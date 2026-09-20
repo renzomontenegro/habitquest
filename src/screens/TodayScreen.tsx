@@ -482,6 +482,12 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
         onClose={() => setOpenSec(null)}
         title={SECS.find(s => s.id === openSec)?.label ?? ''}
         center
+        headExtra={openSec === 'comidas' && (
+          <div className="mx-food-summary">
+            <div><b className="mx-mono">{eatenKcal}</b><span>de {targetKcal} kcal</span></div>
+            <div className="mx-mono"><span>{Math.round(eaten.prot)}P</span><span>{Math.round(eaten.carb)}C</span><span>{Math.round(eaten.grasa)}G</span></div>
+          </div>
+        )}
       >
         {openSec === 'sueno' && (
           <>
@@ -645,10 +651,6 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
 
       {openSec === 'comidas' && (
         <>
-          <div className="mx-food-summary">
-            <div><b className="mx-mono">{eatenKcal}</b><span>de {targetKcal} kcal</span></div>
-            <div className="mx-mono"><span>{Math.round(eaten.prot)}P</span><span>{Math.round(eaten.carb)}C</span><span>{Math.round(eaten.grasa)}G</span></div>
-          </div>
           <div className="mx-slots">
             {SLOTS.map(s => {
               const logged = mealsInSlot(record, s.id)
