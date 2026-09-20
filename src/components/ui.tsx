@@ -15,6 +15,7 @@ export function BottomSheet({ open, onClose, title, children, wide, center }: {
   center?: boolean
 }) {
   const titleId = useId()
+  const overlayRef = useRef<HTMLDivElement>(null)
   const sheetRef = useRef<HTMLDivElement>(null)
   const [viewport, setViewport] = useState<{ height: number; top: number } | null>(null)
 
@@ -31,27 +32,63 @@ export function BottomSheet({ open, onClose, title, children, wide, center }: {
     }
   }, [open])
 
-  // En iOS el teclado reduce visualViewport, pero no siempre el inset de un fixed.
-  // Ajustar el overlay a esa area evita que cualquier formulario quede detras del teclado.
+  // Contencion tactil explicita para iOS: deja desplazar el sheet (y sus ruedas),
+  // pero cancela el gesto al llegar a un borde en vez de pasarlo a la pagina.
+  useEffect(() => {
+    if (!open) return
+    const overlay = overlayRef.current
+    if (!overlay) return
+    let previousY: number | null = null
+
+    const onTouchStart = (event: TouchEvent) => {
+      previousY = event.touches.length === 1 ? event.touches[0].clientY : null
+    }
+    const onTouchMove = (event: TouchEvent) => {
+      if (previousY == null || event.touches.length !== 1) return
+      const y = event.touches[0].clientY
+      const deltaY = y - previousY
+      previousY = y
+      let el = event.target instanceof HTMLElement ? event.target : null
+      let canScroll = false
+
+      while (el && overlay.contains(el)) {
+        const max = el.scrollHeight - el.clientHeight
+        if (max > 1 && ((deltaY < 0 && el.scrollTop < max - 1) || (deltaY > 0 && el.scrollTop > 1))) {
+          canScroll = true
+          break
+        }
+        if (el === sheetRef.current) break
+        el = el.parentElement
+      }
+
+      if (!canScroll) event.preventDefault()
+    }
+    const endTouch = () => { previousY = null }
+
+    overlay.addEventListener('touchstart', onTouchStart, { passive: true })
+    overlay.addEventListener('touchmove', onTouchMove, { passive: false })
+    overlay.addEventListener('touchend', endTouch, { passive: true })
+    overlay.addEventListener('touchcancel', endTouch, { passive: true })
+    return () => {
+      overlay.removeEventListener('touchstart', onTouchStart)
+      overlay.removeEventListener('touchmove', onTouchMove)
+      overlay.removeEventListener('touchend', endTouch)
+      overlay.removeEventListener('touchcancel', endTouch)
+    }
+  }, [open])
+
+  // En iOS el teclado reduce visualViewport. Solo reaccionamos al resize: usar
+  // su evento scroll y llamar scrollIntoView en cada tick creaba un bucle que
+  // movia el fondo y hacia temblar el modal.
   useEffect(() => {
     if (!open || !window.visualViewport) return
     const visual = window.visualViewport
-    const update = () => {
-      setViewport({ height: visual.height, top: visual.offsetTop })
-      window.setTimeout(() => {
-        const active = document.activeElement as HTMLElement | null
-        if (active && sheetRef.current?.contains(active)) {
-          active.scrollIntoView({ block: 'center', inline: 'nearest' })
-        }
-      }, 60)
-    }
+    const update = () => setViewport({ height: visual.height, top: visual.offsetTop })
     const frame = window.requestAnimationFrame(update)
     visual.addEventListener('resize', update)
-    visual.addEventListener('scroll', update)
     return () => {
       window.cancelAnimationFrame(frame)
       visual.removeEventListener('resize', update)
-      visual.removeEventListener('scroll', update)
     }
   }, [open])
 
@@ -87,6 +124,7 @@ export function BottomSheet({ open, onClose, title, children, wide, center }: {
     <AnimatePresence>
       {open && (
         <motion.div
+          ref={overlayRef}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}

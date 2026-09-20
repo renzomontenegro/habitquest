@@ -127,7 +127,6 @@ export function MealEstimateSheet({ open, slot, reference, savedMeals, onClose, 
               onChange={updateNote}
               placeholder="Ej: hamburguesa doble con papas"
               className="mx-in-full"
-              autoFocus
             />
             <button
               className="mx-camera-trigger"
