@@ -14,6 +14,9 @@
   --warn: #935700;
   --good: #087A46;
   --bad: #B42318;
+  --good-bright: #48C78E;
+  --warn-bright: #FFB44A;
+  --bad-bright: #FF6B5A;
 }
 
 *,
@@ -825,6 +828,58 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .mx-food-summary > div:first-child b { font-size: 21px; }
 .mx-food-summary > div:first-child span { margin-left: 5px; color: rgba(255,255,255,.6); font-size: 9px; }
 .mx-food-summary > div:last-child { display: flex; gap: 9px; color: rgba(255,255,255,.72); font-size: 10px; }
+
+/* Portada: puntuacion, datos y pendientes siempre visibles. */
+.mx-rumbo { padding: 18px 16px 15px; margin-bottom: 10px; border-radius: 18px; background: var(--card); }
+.mx-rumbo-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.mx-rumbo-head h2 { margin: 4px 0 3px; font-family: 'Archivo', sans-serif; font-size: 22px; line-height: 1.05; letter-spacing: -.04em; }
+.mx-rumbo-head p { margin: 0; color: var(--mute); font-size: 10px; }
+.mx-rumbo-score { font-size: 36px; line-height: 1; letter-spacing: -.05em; }
+.mx-rumbo-score[data-tone='good'] { color: var(--good); }
+.mx-rumbo-score[data-tone='warn'] { color: var(--warn); }
+.mx-rumbo-score[data-tone='bad'] { color: var(--bad); }
+.mx-rumbo .mx-svg { margin-top: 8px; }
+.mx-rumbo .mx-now-primary { margin-top: 7px; }
+
+.mx-daily-numbers { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; margin-bottom: 10px;
+  overflow: hidden; border-radius: 14px; background: var(--line); }
+.mx-daily-numbers > div { min-width: 0; padding: 11px 7px; background: var(--card); text-align: center; }
+.mx-daily-numbers small, .mx-daily-numbers b, .mx-daily-numbers span { display: block; }
+.mx-daily-numbers small { color: var(--mute); font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
+.mx-daily-numbers b { margin-top: 4px; font-size: 16px; }
+.mx-daily-numbers span { margin-top: 1px; color: var(--mute); font-size: 8px; white-space: nowrap; }
+
+.mx-home-pending { margin-bottom: 10px; padding: 15px 16px; border-radius: 16px; background: var(--card); }
+.mx-home-section-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.mx-home-section-head b { display: block; margin-top: 3px; font-size: 14px; }
+.mx-home-section-head button { min-height: 32px; border: 0; background: transparent; color: var(--ink); font-size: 10px; font-weight: 700; text-decoration: underline; }
+.mx-home-pending-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 11px; }
+.mx-home-pending-list button { min-height: 40px; padding: 8px 11px; border: 0; border-radius: 10px;
+  background: var(--paper); color: var(--ink); font-size: 10px; font-weight: 650; }
+.mx-home-pending-list i { margin-left: 5px; color: var(--signal); font-style: normal; }
+
+.mx-wedding-progress { position: relative; width: 100%; min-height: 88px; display: grid;
+  grid-template-columns: .8fr 1fr 1fr; gap: 10px; padding: 15px 16px 18px; margin-bottom: 10px;
+  overflow: hidden; border: 0; border-radius: 18px; background: var(--ink); color: var(--card); text-align: left; }
+.mx-wedding-progress span { min-width: 0; }
+.mx-wedding-progress small, .mx-wedding-progress b { display: block; }
+.mx-wedding-progress small { color: rgba(255,255,255,.58); font-size: 8px; text-transform: uppercase; letter-spacing: .08em; }
+.mx-wedding-progress b { margin-top: 5px; font-size: 13px; white-space: nowrap; }
+.mx-wedding-progress span:first-child b { font-size: 24px; line-height: 1; }
+.mx-wedding-progress span:nth-child(2) b { color: var(--bad-bright); }
+.mx-wedding-progress[data-tone='warn'] span:nth-child(2) b { color: var(--warn-bright); }
+.mx-wedding-progress[data-tone='good'] span:nth-child(2) b { color: var(--good-bright); }
+.mx-wedding-progress-bar { position: absolute; left: 0; bottom: 0; height: 5px; background: var(--bad-bright); transition: width .2s ease-out, background-color .2s ease-out; }
+.mx-wedding-progress[data-tone='warn'] .mx-wedding-progress-bar { background: var(--warn-bright); }
+.mx-wedding-progress[data-tone='good'] .mx-wedding-progress-bar { background: var(--good-bright); }
+
+.mx-score-rules { border-top: 1px solid var(--line); }
+.mx-score-rules > div { display: grid; grid-template-columns: 1fr 42px 42px; align-items: center; gap: 6px;
+  min-height: 44px; border-bottom: 1px solid var(--line); }
+.mx-score-rules b { font-size: 11px; }
+.mx-score-rules span, .mx-score-rules i { font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-style: normal; font-weight: 600; text-align: right; }
+.mx-score-rules span { color: var(--good); }
+.mx-score-rules i { color: var(--bad); }
 
 /* ===== DIRECCION VISUAL: ATLETICA / EDITORIAL =====
    Monocromo de alto contraste, geometria firme y naranja solo como impulso.

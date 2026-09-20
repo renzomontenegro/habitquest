@@ -3,7 +3,7 @@ import type { AppController } from '../hooks/useAppState'
 import type { MealLog, MealSlot } from '../types'
 import {
   addDays, dayMacros, daysBetween, foodLogCoverage, getRecord, headerDate, kcal, lastNDates, lastSessionWeight,
-  makeEmptySets, mealMacros, mealName, mealsInSlot, nearestWeight, parseDate, roundMacros, shortDate, sleepHours,
+  makeEmptySets, mealMacros, mealName, mealsInSlot, nearestWeight, parseDate, roundMacros, rumboWeek, shortDate, sleepHours,
   slotReference, weightAvg, weightTrendAt, workoutForDate,
 } from '../lib/logic'
 import { PORTIONS, SLOTS, SLOT_LABEL } from '../lib/config'
@@ -11,6 +11,7 @@ import { MealEstimateSheet } from '../components/MealEstimateSheet'
 import { MealIdeaSheet } from '../components/MealIdeaSheet'
 import { WeekScreen } from './WeekScreen'
 import { BottomSheet, ConfirmButton, Field, RepsWheel, Seg, Stepper, TimeWheel, Toast, WeightWheel } from '../components/ui'
+import { LineChart } from '../components/charts'
 
 function portionLabel(p: number): string {
   if (p === 0.5) return '½'
@@ -115,7 +116,6 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
   const weightStart = record?.weight ?? nearestWeight(state.records, viewDate) ?? 100
   const eatenKcal = kcal(eaten)
   const targetKcal = kcal(targets)
-  const kcalLeft = targetKcal - eatenKcal
   const foodCoverage = foodLogCoverage(record)
   const missingSlots = SLOTS.filter(s =>
     mealsInSlot(record, s.id).length === 0 && !(record?.skipped ?? []).includes(s.id),
@@ -130,14 +130,19 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
   const avg7 = weightAvg(state.records, addDays(viewDate, -6), viewDate)
   const goalDays = state.settings.targetDate ? daysBetween(viewDate, state.settings.targetDate) : null
   const goalWeight = state.settings.targetWeight
-  const goalLeft = avg7 != null && goalWeight != null ? Math.max(0, avg7 - goalWeight) : null
-  const requiredPerWeek = goalLeft != null && goalDays != null && goalDays > 0
-    ? goalLeft / (goalDays / 7)
-    : null
   const actualTrend = weightTrendAt(state.records, viewDate)?.delta ?? null
   const projectedGoalWeight = avg7 != null && actualTrend != null && goalDays != null && goalDays > 0
     ? avg7 + actualTrend * (goalDays / 7)
     : null
+  const rumbo = rumboWeek(state.records, state.settings, viewDate)
+  const rumboPoints = rumbo.days.map(day => ({ date: day.date, value: day.cumulative }))
+  const firstWeight = state.records
+    .filter(r => r.weight != null && r.date >= state.settings.startDate && r.date <= viewDate)
+    .sort((a, b) => a.date.localeCompare(b.date))[0]?.weight
+  const weightProgress = firstWeight != null && avg7 != null && goalWeight != null && firstWeight !== goalWeight
+    ? Math.max(0, Math.min(1, (firstWeight - avg7) / (firstWeight - goalWeight)))
+    : 0
+  const weightTone = weightProgress >= 0.75 ? 'good' : weightProgress >= 0.33 ? 'warn' : 'bad'
   const recentWaist = state.records
     .filter(r => r.waist != null && r.date <= viewDate)
     .sort((a, b) => b.date.localeCompare(a.date))[0]
@@ -231,16 +236,6 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
       : primaryTask
         ? `Registrar ${primaryTask.label.toLowerCase()}`
         : 'Registrar algo más'
-  const primaryHeadline = primaryKey === 'yesterdaySteps'
-    ? 'Ayer quedó sin pasos'
-    : primaryKey === 'meal' && dueMealSlot
-      ? `${SLOT_LABEL[dueMealSlot]} pendiente`
-      : primaryKey === 'closeFood'
-        ? 'Comidas sin cerrar'
-      : primaryTask
-        ? `${primaryTask.label} pendiente`
-        : 'Hoy está completo'
-
   const openMeasure = (field: 'steps' | 'waist', date = viewDate) => {
     const source = getRecord(state.records, date)
     setMeasureDate(date)
@@ -302,67 +297,52 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
         )}
       </div>
 
-      <section className="mx-now" data-complete={pendingTrace === 0 ? '1' : '0'} aria-label="Siguiente accion">
-        <div className="mx-now-copy">
-          <div className="mx-eyebrow">Ahora</div>
-          <h2>{pendingTrace === 0 ? 'Hoy está completo' : primaryHeadline}</h2>
-          <p>
-            {pendingTrace === 0
-              ? 'Todo lo necesario quedó trazado.'
-              : missedYesterdaySteps
-                ? `${pendingToday} de hoy · 1 pendiente de ayer.`
-                : `${pendingToday} ${pendingToday === 1 ? 'registro pendiente' : 'registros pendientes'} hoy.`}
-          </p>
+      <section className="mx-rumbo" aria-label="Puntuacion semanal">
+        <div className="mx-rumbo-head">
+          <div>
+            <div className="mx-eyebrow">Puntos de rumbo</div>
+            <h2>{rumbo.score >= 40 ? 'Vas ganando terreno' : rumbo.score >= 0 ? 'Semana en juego' : 'Toca recuperar terreno'}</h2>
+            <p>Acciones {rumbo.daily >= 0 ? `+${rumbo.daily}` : rumbo.daily} · peso {rumbo.weight >= 0 ? `+${rumbo.weight}` : rumbo.weight}</p>
+          </div>
+          <b className="mx-rumbo-score mx-mono" data-tone={rumbo.score >= 40 ? 'good' : rumbo.score >= 0 ? 'warn' : 'bad'}>
+            {rumbo.score > 0 ? '+' : ''}{rumbo.score}
+          </b>
         </div>
+        <LineChart points={rumboPoints} unit="puntos" band={0} height={112} />
         <button className="mx-now-primary" onClick={runPrimaryTrace}>
           {pendingTrace === 0 ? 'Registrar algo más' : primaryTraceLabel}
         </button>
-        <div className="mx-now-status">
-          <span data-over={kcalLeft < 0 ? '1' : '0'}>
-            <b className="mx-mono">{kcalLeft >= 0 ? kcalLeft : `+${Math.abs(kcalLeft)}`}</b> kcal {kcalLeft >= 0 ? 'disponibles' : 'de más'}
-          </span>
-          <span><b>{foodCoverage.covered}/{foodCoverage.total}</b> comidas</span>
-          <button onClick={() => setTasksOpen(true)}>Ver pendientes</button>
+      </section>
+
+      <section className="mx-daily-numbers" aria-label="Calorias y macros de hoy">
+        <div><small>Kcal</small><b className="mx-mono">{eatenKcal}</b><span>/ {targetKcal}</span></div>
+        <div><small>Proteina</small><b className="mx-mono">{Math.round(eaten.prot)}</b><span>/ {targets.prot} g</span></div>
+        <div><small>Carbo</small><b className="mx-mono">{Math.round(eaten.carb)}</b><span>/ {targets.carb} g</span></div>
+        <div><small>Grasa</small><b className="mx-mono">{Math.round(eaten.grasa)}</b><span>/ {targets.grasa} g</span></div>
+      </section>
+
+      <section className="mx-home-pending" aria-label="Pendientes visibles">
+        <div className="mx-home-section-head">
+          <div><div className="mx-eyebrow">Pendientes</div><b>{pendingTrace === 0 ? 'Todo listo' : `${pendingTrace} por completar`}</b></div>
+          {pendingTrace > 0 && <button onClick={() => setTasksOpen(true)}>Ver detalle</button>}
         </div>
-      </section>
-
-      <section className="mx-goal-strip" aria-label="Meta de boda">
-        {goalWeight != null && state.settings.targetDate ? (
-          <>
-            <div className="mx-goal-strip-days">
-              <b className="mx-mono">{goalDays != null ? Math.max(0, goalDays) : '—'}</b>
-              <span>días para la boda</span>
-            </div>
-            <div className="mx-goal-strip-line">
-              <span>Actual <b>{avg7 != null ? `${avg7.toFixed(1)} kg` : 'sin promedio'}</b></span>
-              <i aria-hidden>→</i>
-              <span>Meta <b>{goalWeight} kg</b></span>
-            </div>
-          </>
-        ) : (
-          <div className="mx-goal-strip-empty">Define tu meta para la boda.</div>
+        {pendingTrace > 0 && (
+          <div className="mx-home-pending-list">
+            {missedYesterdaySteps && <button onClick={() => openMeasure('steps', yesterday)}>Pasos de ayer <i>→</i></button>}
+            {foodPendingNow && <button onClick={() => dueMealSlot ? setEstimating(dueMealSlot) : setClosingDay(true)}>Comidas <i>→</i></button>}
+            {traceTasks.filter(task => task.due && !task.done).map(task => (
+              <button key={task.id} onClick={() => openTraceTask(task)}>{task.label} <i>→</i></button>
+            ))}
+          </div>
         )}
-        <button onClick={() => setGoalEditor(true)} aria-label="Editar meta">Editar</button>
       </section>
 
-      <button
-        className="mx-progress-entry"
-        onClick={() => actualTrend == null && record?.weight == null ? setWeightPicker(true) : setProgressOpen(true)}
-      >
-        <span>
-          <small>Progreso</small>
-          <b>{actualTrend != null ? `${actualTrend > 0 ? '+' : ''}${actualTrend.toFixed(1)} kg/sem` : 'Necesita más pesajes'}</b>
-        </span>
-        <span>
-          {projectedGoalWeight != null
-            ? `Proyección boda: ${projectedGoalWeight.toFixed(1)} kg`
-            : requiredPerWeek != null
-              ? `Necesitas -${requiredPerWeek.toFixed(1)} kg/sem`
-              : record?.weight == null
-                ? 'Registra tu peso para empezar la tendencia'
-                : 'Ver tendencia y días incompletos'}
-        </span>
-        <i aria-hidden>→</i>
+      <button className="mx-wedding-progress" data-tone={weightTone}
+        onClick={() => actualTrend == null && record?.weight == null ? setWeightPicker(true) : setProgressOpen(true)}>
+        <span><small>Dias para la boda</small><b className="mx-mono">{goalDays != null ? Math.max(0, goalDays) : '—'}</b></span>
+        <span><small>Peso actual</small><b>{avg7 != null ? `${avg7.toFixed(1)} kg` : 'Sin promedio'}</b></span>
+        <span><small>Proyeccion</small><b>{projectedGoalWeight != null ? `${projectedGoalWeight.toFixed(1)} kg` : 'Faltan datos'}</b></span>
+        <i className="mx-wedding-progress-bar" style={{ width: `${Math.max(4, weightProgress * 100)}%` }} />
       </button>
 
       {/* Los detalles aparecen solo cuando ayudan a completar una accion. */}

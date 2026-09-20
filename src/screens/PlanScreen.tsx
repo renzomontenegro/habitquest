@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { AppController } from '../hooks/useAppState'
 import type { Exercise, Macros, SplitDay } from '../types'
-import { kcal, shortDate, slotReference, uid } from '../lib/logic'
+import { kcal, rumboWeek, shortDate, slotReference, uid } from '../lib/logic'
 import { MACRO_LABEL, SLOTS, WEEKDAY_NAMES } from '../lib/config'
 import { BottomSheet, ConfirmButton, MonoInput, Stepper, Toast } from '../components/ui'
 
@@ -36,6 +36,7 @@ export function PlanScreen({ app }: { app: AppController }) {
     objetivo: false,
     finos: false,
     meta: settings.targetWeight == null,
+    puntuacion: false,
     entreno: split.length === 0,
   }))
   const [toast, setToast] = useState<string | null>(null)
@@ -48,6 +49,7 @@ export function PlanScreen({ app }: { app: AppController }) {
   }
 
   const weekly = { prot: targets.prot * 7, carb: targets.carb * 7, grasa: targets.grasa * 7 }
+  const rumbo = rumboWeek(app.state.records, settings, app.today)
 
   return (
     <>
@@ -186,6 +188,30 @@ export function PlanScreen({ app }: { app: AppController }) {
             value={settings.targetDate ?? ''}
             onChange={e => app.updateSettings({ targetDate: e.target.value || undefined })}
           />
+        </div>
+      </Fold>
+
+      <Fold
+        title="Puntuacion de rumbo"
+        meta={`${rumbo.score > 0 ? '+' : ''}${rumbo.score} puntos esta semana`}
+        open={open.puntuacion}
+        onToggle={() => toggle('puntuacion')}
+      >
+        <div className="mx-sub" style={{ marginBottom: 10, lineHeight: 1.5 }}>
+          La semana empieza en cero. Un dia sin cerrar queda como hueco y no suma ni resta.
+          La tendencia de peso valida el resultado, pero no manda sobre un solo pesaje.
+        </div>
+        <div className="mx-score-rules" role="table" aria-label="Reglas de puntuacion">
+          <div role="row"><b role="cell">Calorias en ±{Math.round(settings.tolerance * 100)}%</b><span role="cell">+4</span><i role="cell">−4</i></div>
+          <div role="row"><b role="cell">Proteina al menos {Math.round((1 - settings.tolerance) * 100)}%</b><span role="cell">+2</span><i role="cell">−2</i></div>
+          <div role="row"><b role="cell">Entreno o descanso segun plan</b><span role="cell">+2</span><i role="cell">−2</i></div>
+          <div role="row"><b role="cell">Objetivo de pasos</b><span role="cell">+1</span><i role="cell">−1</i></div>
+          <div role="row"><b role="cell">Objetivo de sueno</b><span role="cell">+1</span><i role="cell">−1</i></div>
+          <div role="row"><b role="cell">Peso al ritmo necesario</b><span role="cell">+30</span><i role="cell">−20</i></div>
+        </div>
+        <div className="mx-sub" style={{ marginTop: 10, lineHeight: 1.5 }}>
+          Peso: +30 si vas al ritmo necesario, +15 si bajas mas lento, −20 si subes
+          y −10 si bajas demasiado rapido. Sin suficientes pesajes no se ajusta.
         </div>
       </Fold>
 

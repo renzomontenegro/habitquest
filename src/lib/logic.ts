@@ -197,6 +197,79 @@ export function adherence(records: DayLog[], dates: string[], settings: AppSetti
   return { onTarget, logged, total: dates.length }
 }
 
+export interface RumboDay {
+  date: string
+  points: number | null
+  cumulative: number | null
+}
+
+export interface RumboWeek {
+  score: number
+  daily: number
+  weight: number
+  days: RumboDay[]
+}
+
+/**
+ * Puntuacion semanal explicable: acciones controlables dan +/-10 por dia
+ * cerrado y la tendencia de peso valida el resultado con un ajuste semanal.
+ * Un dia sin cierre queda como hueco y no se interpreta como fracaso.
+ */
+export function rumboWeek(records: DayLog[], settings: AppSettings, endDate = todayStr()): RumboWeek {
+  const dates = weekDates(endDate)
+  let cumulative = 0
+  const days: RumboDay[] = dates.map(date => {
+    if (date > endDate) return { date, points: null, cumulative: null }
+    const r = getRecord(records, date)
+    if (!hasCompleteFoodLog(r)) return { date, points: null, cumulative: null }
+
+    const eaten = dayMacros(r)
+    const calorieRatio = ratio(kcal(eaten), kcal(settings.targets))
+    const calorieOk = calorieRatio >= 1 - settings.tolerance && calorieRatio <= 1 + settings.tolerance
+    const proteinOk = ratio(eaten.prot, settings.targets.prot) >= 1 - settings.tolerance
+    const slept = sleepHours(r?.bedTime, r?.wakeTime)
+    const sleepOk = slept != null && slept >= settings.sleepTarget
+    const stepsOk = r?.steps != null && r.steps >= settings.stepsTarget
+
+    const planned = splitDayForDate(settings.split, date)
+    let planOk = false
+    if (!planned) {
+      planOk = r?.workoutId == null
+    } else if (r?.workoutId === planned.id) {
+      const expected = planned.exercises.reduce((sum, ex) => sum + ex.sets, 0)
+      const completed = planned.exercises.reduce((sum, ex) =>
+        sum + (r.sets?.[ex.id] ?? []).filter(set => set.weight || set.reps).length, 0)
+      planOk = expected > 0 && completed >= expected
+    }
+
+    const points = (calorieOk ? 4 : -4)
+      + (proteinOk ? 2 : -2)
+      + (planOk ? 2 : -2)
+      + (stepsOk ? 1 : -1)
+      + (sleepOk ? 1 : -1)
+    cumulative += points
+    return { date, points, cumulative }
+  })
+
+  let weight = 0
+  const recentWeights = records.filter(r => r.weight != null && r.date >= addDays(endDate, -6) && r.date <= endDate).length
+  const previousWeights = records.filter(r => r.weight != null && r.date >= addDays(endDate, -13) && r.date <= addDays(endDate, -7)).length
+  const trend = weightTrendAt(records, endDate)
+  const daysLeft = settings.targetDate ? daysBetween(endDate, settings.targetDate) : 0
+  if (trend && recentWeights >= 2 && previousWeights >= 2 && settings.targetWeight && daysLeft > 0) {
+    const requiredLoss = Math.max(0, trend.recent - settings.targetWeight) / (daysLeft / 7)
+    const actualLoss = -trend.delta
+    if (actualLoss < -0.1) weight = -20
+    else if (requiredLoss > 0 && actualLoss > requiredLoss * 1.25) weight = -10
+    else if (requiredLoss > 0 && actualLoss >= requiredLoss * 0.8) weight = 30
+    else if (actualLoss > 0.1) weight = 15
+  }
+
+  const lastScored = [...days].reverse().find(day => day.cumulative != null)
+  if (lastScored) lastScored.cumulative = (lastScored.cumulative as number) + weight
+  return { score: cumulative + weight, daily: cumulative, weight, days }
+}
+
 // --- Peso ---
 export function getRecord(records: DayLog[], date: string): DayLog | undefined {
   return records.find(r => r.date === date)
