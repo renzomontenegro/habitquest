@@ -838,8 +838,20 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .mx-rumbo-score[data-tone='good'] { color: var(--good); }
 .mx-rumbo-score[data-tone='warn'] { color: var(--warn); }
 .mx-rumbo-score[data-tone='bad'] { color: var(--bad); }
-.mx-rumbo .mx-svg { margin-top: 8px; }
-.mx-rumbo .mx-now-primary { margin-top: 7px; }
+.mx-rumbo .mx-now-primary { margin-top: 10px; }
+.mx-rumbo-chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.mx-score-zero { stroke: var(--line); stroke-width: 1; stroke-dasharray: 3 4; }
+.mx-score-line { fill: none; stroke: var(--signal); stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.mx-score-bridge { fill: none; stroke: var(--signal); stroke-width: 1.6; stroke-linecap: round; stroke-dasharray: 3 4; opacity: .55; }
+.mx-score-dot { fill: var(--card); stroke: var(--signal); stroke-width: 2; }
+.mx-score-value { font-family: 'IBM Plex Mono', monospace; font-size: 9px; font-weight: 600; fill: var(--ink); }
+.mx-rumbo-daylabels { display: grid; grid-template-columns: repeat(7, 1fr); margin-top: 2px; }
+.mx-rumbo-daylabels span { min-width: 0; text-align: center; }
+.mx-rumbo-daylabels b, .mx-rumbo-daylabels i { display: block; font-style: normal; }
+.mx-rumbo-daylabels b { color: var(--mute); font-size: 8px; font-weight: 700; }
+.mx-rumbo-daylabels i { margin-top: 1px; color: var(--ink); font-family: 'IBM Plex Mono', monospace; font-size: 8px; font-weight: 600; }
+.mx-score-breakdown { display: flex; justify-content: space-between; gap: 10px; margin-top: 9px; padding-top: 9px; border-top: 1px solid var(--line); color: var(--mute); font-size: 9.5px; }
+.mx-score-breakdown b { margin-left: 4px; color: var(--ink); font-family: 'IBM Plex Mono', monospace; }
 
 .mx-daily-numbers { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; margin-bottom: 10px;
   overflow: hidden; border-radius: 14px; background: var(--line); }
@@ -848,6 +860,8 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .mx-daily-numbers small { color: var(--mute); font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
 .mx-daily-numbers b { margin-top: 4px; font-size: 16px; }
 .mx-daily-numbers span { margin-top: 1px; color: var(--mute); font-size: 8px; white-space: nowrap; }
+.mx-daily-numbers > div[data-over='1'] b { color: var(--bad); }
+.mx-wedding-progress-first { margin-bottom: 10px; }
 
 .mx-home-pending { margin-bottom: 10px; padding: 15px 16px; border-radius: 16px; background: var(--card); }
 .mx-home-section-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }

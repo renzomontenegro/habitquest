@@ -11,7 +11,7 @@ import { MealEstimateSheet } from '../components/MealEstimateSheet'
 import { MealIdeaSheet } from '../components/MealIdeaSheet'
 import { WeekScreen } from './WeekScreen'
 import { BottomSheet, ConfirmButton, Field, RepsWheel, Seg, Stepper, TimeWheel, Toast, WeightWheel } from '../components/ui'
-import { LineChart } from '../components/charts'
+import { RumboChart } from '../components/charts'
 
 function portionLabel(p: number): string {
   if (p === 0.5) return '½'
@@ -135,7 +135,13 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
     ? avg7 + actualTrend * (goalDays / 7)
     : null
   const rumbo = rumboWeek(state.records, state.settings, viewDate)
-  const rumboPoints = rumbo.days.map(day => ({ date: day.date, value: day.cumulative }))
+  const scoredDays = rumbo.days.filter(day => day.points != null).length
+  const nutrientDelta = {
+    kcal: targetKcal - eatenKcal,
+    prot: targets.prot - eaten.prot,
+    carb: targets.carb - eaten.carb,
+    grasa: targets.grasa - eaten.grasa,
+  }
   const firstWeight = state.records
     .filter(r => r.weight != null && r.date >= state.settings.startDate && r.date <= viewDate)
     .sort((a, b) => a.date.localeCompare(b.date))[0]?.weight
@@ -197,19 +203,20 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
     return { delta: Math.round(delta), days }
   })()
 
-  const traceTasks: { id: string; sec: Sec; label: string; status: string; done: boolean; due: boolean }[] = [
-    { id: 'peso', sec: 'peso', label: 'Peso', status: record?.weight != null ? `${record.weight} kg` : 'Falta', done: record?.weight != null, due: true },
+  const traceTasks: { id: string; sec: Sec; label: string; status: string; consequence: string; done: boolean; due: boolean }[] = [
+    { id: 'peso', sec: 'peso', label: 'Peso', status: record?.weight != null ? `${record.weight} kg` : 'Falta', consequence: 'Sin peso no hay ajuste semanal', done: record?.weight != null, due: true },
     {
       id: 'pasos', sec: 'actividad', label: 'Pasos',
       status: record?.steps != null
         ? `${record.steps.toLocaleString('es-PE')} / ${stepsTarget.toLocaleString('es-PE')}`
         : hour >= 23 ? 'Falta' : 'A las 11 p. m.',
+      consequence: 'Si queda sin registrar: −1',
       done: record?.steps != null,
       due: hour >= 23,
     },
-    { id: 'entreno', sec: 'entreno', label: 'Entreno', status: progress.entreno >= 1 ? 'Listo' : 'Falta', done: progress.entreno >= 1, due: true },
-    { id: 'sueno', sec: 'sueno', label: 'Sueno', status: progress.sueno >= 1 ? `${slept?.toFixed(1) ?? '—'} h` : 'Falta', done: progress.sueno >= 1, due: true },
-    { id: 'cintura', sec: 'actividad', label: 'Cintura', status: waistDue ? 'Medición semanal' : `${recentWaist?.waist} cm`, done: !waistDue, due: waistDue },
+    { id: 'entreno', sec: 'entreno', label: 'Entreno', status: progress.entreno >= 1 ? 'Listo' : 'Falta', consequence: 'Si no completas el plan: −2', done: progress.entreno >= 1, due: true },
+    { id: 'sueno', sec: 'sueno', label: 'Sueno', status: progress.sueno >= 1 ? `${slept?.toFixed(1) ?? '—'} h` : 'Falta', consequence: 'Si queda sin registrar: −1', done: progress.sueno >= 1, due: true },
+    { id: 'cintura', sec: 'actividad', label: 'Cintura', status: waistDue ? 'Medicion semanal' : `${recentWaist?.waist} cm`, consequence: 'No cambia la puntuacion', done: !waistDue, due: waistDue },
   ]
   const foodPendingNow = dueMealSlot !== null || (hour >= 21 && !foodCoverage.complete)
   const pendingToday = traceTasks.filter(t => t.due && !t.done).length + (foodPendingNow ? 1 : 0)
@@ -297,28 +304,40 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
         )}
       </div>
 
+      <button className="mx-wedding-progress mx-wedding-progress-first" data-tone={weightTone}
+        onClick={() => actualTrend == null && record?.weight == null ? setWeightPicker(true) : setProgressOpen(true)}>
+        <span><small>Dias para la boda</small><b className="mx-mono">{goalDays != null ? Math.max(0, goalDays) : '—'}</b></span>
+        <span><small>Peso actual</small><b>{avg7 != null ? `${avg7.toFixed(1)} kg` : 'Sin promedio'}</b></span>
+        <span><small>Proyeccion</small><b>{projectedGoalWeight != null ? `${projectedGoalWeight.toFixed(1)} kg` : 'Faltan datos'}</b></span>
+        <i className="mx-wedding-progress-bar" style={{ width: `${Math.max(4, weightProgress * 100)}%` }} />
+      </button>
+
       <section className="mx-rumbo" aria-label="Puntuacion semanal">
         <div className="mx-rumbo-head">
           <div>
-            <div className="mx-eyebrow">Puntos de rumbo</div>
-            <h2>{rumbo.score >= 40 ? 'Vas ganando terreno' : rumbo.score >= 0 ? 'Semana en juego' : 'Toca recuperar terreno'}</h2>
-            <p>Acciones {rumbo.daily >= 0 ? `+${rumbo.daily}` : rumbo.daily} · peso {rumbo.weight >= 0 ? `+${rumbo.weight}` : rumbo.weight}</p>
+            <div className="mx-eyebrow">Progreso semanal</div>
+            <h2>{rumbo.score > 0 ? `+${rumbo.score}` : rumbo.score} puntos</h2>
+            <p>{scoredDays} {scoredDays === 1 ? 'dia puntuado' : 'dias puntuados'} · tendencia {actualTrend != null ? `${actualTrend > 0 ? '+' : ''}${actualTrend.toFixed(1)} kg/sem` : 'sin calcular'}</p>
           </div>
           <b className="mx-rumbo-score mx-mono" data-tone={rumbo.score >= 40 ? 'good' : rumbo.score >= 0 ? 'warn' : 'bad'}>
-            {rumbo.score > 0 ? '+' : ''}{rumbo.score}
+            {rumbo.score >= 40 ? '↑' : rumbo.score >= 0 ? '→' : '↓'}
           </b>
         </div>
-        <LineChart points={rumboPoints} unit="puntos" band={0} height={112} />
+        <RumboChart days={rumbo.days} />
+        <div className="mx-score-breakdown">
+          <span>Registros y habitos <b>{rumbo.daily > 0 ? '+' : ''}{rumbo.daily}</b></span>
+          <span>Peso semanal <b>{rumbo.weight > 0 ? '+' : ''}{rumbo.weight}</b></span>
+        </div>
         <button className="mx-now-primary" onClick={runPrimaryTrace}>
           {pendingTrace === 0 ? 'Registrar algo más' : primaryTraceLabel}
         </button>
       </section>
 
-      <section className="mx-daily-numbers" aria-label="Calorias y macros de hoy">
-        <div><small>Kcal</small><b className="mx-mono">{eatenKcal}</b><span>/ {targetKcal}</span></div>
-        <div><small>Proteina</small><b className="mx-mono">{Math.round(eaten.prot)}</b><span>/ {targets.prot} g</span></div>
-        <div><small>Carbo</small><b className="mx-mono">{Math.round(eaten.carb)}</b><span>/ {targets.carb} g</span></div>
-        <div><small>Grasa</small><b className="mx-mono">{Math.round(eaten.grasa)}</b><span>/ {targets.grasa} g</span></div>
+      <section className="mx-daily-numbers" aria-label="Lo que falta o sobra hoy">
+        <div data-over={nutrientDelta.kcal < 0 ? '1' : '0'}><small>Kcal</small><b className="mx-mono">{Math.abs(Math.round(nutrientDelta.kcal))}</b><span>{nutrientDelta.kcal >= 0 ? 'faltan' : 'sobran'}</span></div>
+        <div data-over={nutrientDelta.prot < 0 ? '1' : '0'}><small>Proteina</small><b className="mx-mono">{Math.abs(Math.round(nutrientDelta.prot))}g</b><span>{nutrientDelta.prot >= 0 ? 'faltan' : 'sobran'}</span></div>
+        <div data-over={nutrientDelta.carb < 0 ? '1' : '0'}><small>Carbo</small><b className="mx-mono">{Math.abs(Math.round(nutrientDelta.carb))}g</b><span>{nutrientDelta.carb >= 0 ? 'faltan' : 'sobran'}</span></div>
+        <div data-over={nutrientDelta.grasa < 0 ? '1' : '0'}><small>Grasa</small><b className="mx-mono">{Math.abs(Math.round(nutrientDelta.grasa))}g</b><span>{nutrientDelta.grasa >= 0 ? 'faltan' : 'sobran'}</span></div>
       </section>
 
       <section className="mx-home-pending" aria-label="Pendientes visibles">
@@ -329,14 +348,14 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
         <div className="mx-home-pending-list">
           {missedYesterdaySteps && (
             <button data-done="0" onClick={() => openMeasure('steps', yesterday)}>
-              <span><b>Pasos de ayer</b><small>Pendiente arrastrado</small></span><i>→</i>
+              <span><b>Pasos de ayer</b><small>Si queda sin registrar: −1</small></span><i>→</i>
             </button>
           )}
           <button
             data-done={foodCoverage.complete ? '1' : foodPendingNow ? '0' : 'later'}
             onClick={() => setOpenSec('comidas')}
           >
-            <span><b>Comidas</b><small>{foodCoverage.covered}/{foodCoverage.total} confirmadas</small></span>
+            <span><b>Comidas</b><small>{foodCoverage.complete ? 'Dia listo para puntuar' : 'Cierra el dia para puntuar'}</small></span>
             <i>{foodCoverage.complete ? '✓' : '→'}</i>
           </button>
           {traceTasks.map(task => (
@@ -345,20 +364,12 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
               data-done={task.done ? '1' : task.due ? '0' : 'later'}
               onClick={() => openTraceTask(task)}
             >
-              <span><b>{task.label}</b><small>{task.status}</small></span>
+              <span><b>{task.label}</b><small>{task.done ? task.status : task.consequence}</small></span>
               <i>{task.done ? '✓' : task.due ? '→' : '·'}</i>
             </button>
           ))}
         </div>
       </section>
-
-      <button className="mx-wedding-progress" data-tone={weightTone}
-        onClick={() => actualTrend == null && record?.weight == null ? setWeightPicker(true) : setProgressOpen(true)}>
-        <span><small>Dias para la boda</small><b className="mx-mono">{goalDays != null ? Math.max(0, goalDays) : '—'}</b></span>
-        <span><small>Peso actual</small><b>{avg7 != null ? `${avg7.toFixed(1)} kg` : 'Sin promedio'}</b></span>
-        <span><small>Proyeccion</small><b>{projectedGoalWeight != null ? `${projectedGoalWeight.toFixed(1)} kg` : 'Faltan datos'}</b></span>
-        <i className="mx-wedding-progress-bar" style={{ width: `${Math.max(4, weightProgress * 100)}%` }} />
-      </button>
 
       {/* Los detalles aparecen solo cuando ayudan a completar una accion. */}
       <BottomSheet open={tasksOpen} onClose={() => setTasksOpen(false)} title="Pendientes">
@@ -385,7 +396,7 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
               onClick={() => { setTasksOpen(false); openTraceTask(task) }}
             >
               <SectionIcon id={task.sec} />
-              <span><b>{task.label}</b><small>{task.status}</small></span>
+              <span><b>{task.label}</b><small>{task.done ? task.status : task.consequence}</small></span>
               <i aria-hidden>{task.done ? '✓' : task.due ? '→' : '·'}</i>
             </button>
           ))}

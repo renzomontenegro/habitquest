@@ -1,4 +1,4 @@
-import { WEEKDAY_MIN, shortDate, weekdayOf } from '../lib/logic'
+import { WEEKDAY_MIN, shortDate, weekdayOf, type RumboDay } from '../lib/logic'
 
 /**
  * Grafico de linea con escala real. `values` puede tener huecos (null): la
@@ -74,6 +74,62 @@ export function LineChart({ points, unit, height = 96, band }: {
       <text x={padL} y={H - 3} className="mx-axis">{shortDate(points[0].date)}</text>
       <text x={W - 4} y={H - 3} className="mx-axis" textAnchor="end">{shortDate(points[points.length - 1].date)}</text>
     </svg>
+  )
+}
+
+/** Progreso semanal de puntos: enteros, dias visibles y puentes punteados sobre huecos. */
+export function RumboChart({ days }: { days: RumboDay[] }) {
+  const known = days.map((d, i) => d.cumulative == null ? null : { i, value: d.cumulative })
+    .filter((d): d is { i: number; value: number } => d !== null)
+  if (known.length === 0) return <div className="mx-empty">Cierra un dia para iniciar la linea.</div>
+
+  const W = 320, H = 112, left = 24, right = 8, top = 17, bottom = 24
+  const vals = [0, ...known.map(d => d.value)]
+  const min = Math.floor((Math.min(...vals) - 5) / 10) * 10
+  const max = Math.ceil((Math.max(...vals) + 5) / 10) * 10
+  const span = Math.max(10, max - min)
+  const x = (i: number) => left + (i / 6) * (W - left - right)
+  const y = (v: number) => top + (1 - (v - min) / span) * (H - top - bottom)
+  const consecutive: string[] = []
+  const bridges: string[] = []
+  let current: string[] = []
+  days.forEach((day, i) => {
+    if (day.cumulative == null) {
+      if (current.length > 1) consecutive.push(current.join(' '))
+      current = []
+      return
+    }
+    current.push(`${x(i)},${y(day.cumulative)}`)
+  })
+  if (current.length > 1) consecutive.push(current.join(' '))
+  for (let i = 1; i < known.length; i++) {
+    if (known[i].i - known[i - 1].i > 1) bridges.push(`${x(known[i - 1].i)},${y(known[i - 1].value)} ${x(known[i].i)},${y(known[i].value)}`)
+  }
+
+  return (
+    <div className="mx-rumbo-chart">
+      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Puntos acumulados de esta semana">
+        <line x1={left} x2={W - right} y1={y(0)} y2={y(0)} className="mx-score-zero" />
+        <text x={left - 4} y={y(max) + 3} className="mx-axis" textAnchor="end">{max > 0 ? `+${max}` : max}</text>
+        <text x={left - 4} y={y(0) + 3} className="mx-axis" textAnchor="end">0</text>
+        <text x={left - 4} y={y(min) + 3} className="mx-axis" textAnchor="end">{min}</text>
+        {consecutive.map((points, i) => <polyline key={i} points={points} className="mx-score-line" />)}
+        {bridges.map((points, i) => <polyline key={i} points={points} className="mx-score-bridge" />)}
+        {known.map(point => (
+          <g key={point.i}>
+            <circle cx={x(point.i)} cy={y(point.value)} r="3.5" className="mx-score-dot" />
+            <text x={x(point.i)} y={y(point.value) - 8} className="mx-score-value" textAnchor="middle">
+              {point.value > 0 ? `+${point.value}` : point.value}
+            </text>
+          </g>
+        ))}
+      </svg>
+      <div className="mx-rumbo-daylabels">
+        {days.map(day => (
+          <span key={day.date}><b>{WEEKDAY_MIN[weekdayOf(day.date)]}</b><i>{day.points == null ? '—' : day.points > 0 ? `+${day.points}` : day.points}</i></span>
+        ))}
+      </div>
+    </div>
   )
 }
 
