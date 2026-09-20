@@ -17,7 +17,7 @@ export function BottomSheet({ open, onClose, title, children, wide, center }: {
   const titleId = useId()
   const overlayRef = useRef<HTMLDivElement>(null)
   const sheetRef = useRef<HTMLDivElement>(null)
-  const [viewport, setViewport] = useState<{ height: number; top: number } | null>(null)
+  const [viewport, setViewport] = useState<{ height: number; keyboardInset: number } | null>(null)
 
   // La app usa .app-content como scroller (body ya esta bloqueado). Al abrir un
   // modal hay que bloquear ese elemento para que un gesto sobre el backdrop o
@@ -77,8 +77,9 @@ export function BottomSheet({ open, onClose, title, children, wide, center }: {
     }
   }, [open])
 
-  // En iOS el teclado reduce visualViewport. Consolidamos cada raf y descartamos
-  // medidas transitorias invalidas durante la animacion de abrir/cerrar teclado.
+  // El overlay permanece fijo al viewport de layout. Moverlo a offsetTop hacia
+  // que desapareciera en iOS al enfocar un input. Solo usamos visualViewport
+  // para reservar abajo el espacio realmente ocupado por el teclado.
   useEffect(() => {
     if (!open || !window.visualViewport) return
     const visual = window.visualViewport
@@ -88,16 +89,17 @@ export function BottomSheet({ open, onClose, title, children, wide, center }: {
       frame = window.requestAnimationFrame(() => {
         if (visual.height < 120) return
         const height = Math.round(visual.height)
-        const maxTop = Math.max(0, window.innerHeight - height)
-        const top = Math.max(0, Math.min(Math.round(visual.offsetTop), maxTop))
-        setViewport({ height, top })
+        const keyboardInset = Math.max(0, Math.round(window.innerHeight - visual.height - visual.offsetTop))
+        setViewport({ height, keyboardInset })
       })
     }
     update()
     visual.addEventListener('resize', update)
+    visual.addEventListener('scroll', update)
     return () => {
       window.cancelAnimationFrame(frame)
       visual.removeEventListener('resize', update)
+      visual.removeEventListener('scroll', update)
     }
   }, [open])
 
@@ -138,16 +140,16 @@ export function BottomSheet({ open, onClose, title, children, wide, center }: {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           className={`mx-sheet-overlay fixed inset-0 z-50 flex justify-center bg-black/40 ${center ? 'items-center' : 'items-end'}`}
-          style={viewport ? { height: viewport.height, top: viewport.top, bottom: 'auto' } : undefined}
+          style={viewport?.keyboardInset ? { paddingBottom: viewport.keyboardInset } : undefined}
         >
           <motion.div
             ref={sheetRef}
             role="dialog"
             aria-modal="true"
             aria-labelledby={titleId}
-            initial={center ? { y: 40, opacity: 0.6 } : { y: 420 }}
-            animate={center ? { y: 0, opacity: 1 } : { y: 0 }}
-            exit={center ? { y: 40, opacity: 0.6 } : { y: 420 }}
+            initial={center ? { y: 40, opacity: 0.6 } : false}
+            animate={center ? { y: 0, opacity: 1 } : { y: 0, opacity: 1 }}
+            exit={center ? { y: 40, opacity: 0.6 } : { opacity: 0 }}
             transition={{ type: 'spring', damping: 30, stiffness: 320 }}
             className="mx-sheet"
             data-wide={wide ? '1' : '0'}
