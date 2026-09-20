@@ -113,7 +113,7 @@ button, input, select {
 }
 button:active { transform: scale(.985); }
 .mx-mini:active, .mx-entry-x:active, .mx-sheet-x:active, .mx-gear:active,
-.mx-btn:active, .mx-opt-add:active, .mx-exed-mv button:active, .mx-fold:active {
+.mx-btn:active, .mx-opt-add:active, .mx-exed-mv button:active {
   background: var(--ink); color: var(--card); border-color: var(--ink);
 }
 .mx-btn[data-p="1"]:active { background: var(--ink); color: var(--card); border-color: var(--ink); }
@@ -285,9 +285,14 @@ button:active { transform: scale(.985); }
 .mx-fold { width: 100%; text-align: left; border: 0; background: transparent; cursor: pointer;
   padding: 0; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
 
-/* Seccion colapsable de Hoy: cabecera chica en una linea */
-.mx-fold { width: 100%; text-align: left; border: 0; background: transparent; cursor: pointer;
-  padding: 0; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+/* Seccion colapsable: respuesta discreta, no el negro de una accion primaria. */
+.mx-fold { width: calc(100% + 12px); margin: -6px; text-align: left; border: 0;
+  border-radius: 10px; background: transparent; cursor: pointer;
+  padding: 6px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.mx-fold:active { background: var(--paper); color: var(--ink); }
+@media (hover: hover) and (pointer: fine) {
+  .mx-fold:hover { background: var(--paper); }
+}
 .mx-fold-emo { font-size: 13px; line-height: 1; flex-shrink: 0; }
 .mx-fold-title { display: flex; align-items: baseline; gap: 7px; min-width: 0; flex: 1; }
 .mx-fold-hint { font-style: normal; font-size: 11px; color: var(--mute);
