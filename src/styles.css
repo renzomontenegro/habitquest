@@ -746,6 +746,9 @@ html.mx-sheet-open .app-content { overflow-y: hidden; touch-action: none; }
 .mx-sheet[data-wide="1"] { max-height: 90vh; }
 .mx-sheet[data-center="1"] { margin: 20px; border-radius: 10px; border-bottom: 1px solid var(--line);
   max-height: min(72vh, calc(100dvh - 120px)); padding-bottom: 26px; }
+/* Safari iOS colapsa el padding-bottom al llegar al final del scroll: este
+   separador garantiza que el ultimo elemento nunca quede pegado al borde. */
+.mx-sheet::after { content: ''; display: block; height: 4px; flex: none; }
 .mx-sheet-grab { width: 36px; height: 4px; border-radius: 2px; background: var(--line); margin: 0 auto 12px; }
 .mx-sheet-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;
   position: sticky; top: 0; background: var(--card); z-index: 2; padding-top: 2px; }
