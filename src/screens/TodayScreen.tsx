@@ -326,15 +326,30 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
           <div><div className="mx-eyebrow">Pendientes</div><b>{pendingTrace === 0 ? 'Todo listo' : `${pendingTrace} por completar`}</b></div>
           {pendingTrace > 0 && <button onClick={() => setTasksOpen(true)}>Ver detalle</button>}
         </div>
-        {pendingTrace > 0 && (
-          <div className="mx-home-pending-list">
-            {missedYesterdaySteps && <button onClick={() => openMeasure('steps', yesterday)}>Pasos de ayer <i>→</i></button>}
-            {foodPendingNow && <button onClick={() => dueMealSlot ? setEstimating(dueMealSlot) : setClosingDay(true)}>Comidas <i>→</i></button>}
-            {traceTasks.filter(task => task.due && !task.done).map(task => (
-              <button key={task.id} onClick={() => openTraceTask(task)}>{task.label} <i>→</i></button>
-            ))}
-          </div>
-        )}
+        <div className="mx-home-pending-list">
+          {missedYesterdaySteps && (
+            <button data-done="0" onClick={() => openMeasure('steps', yesterday)}>
+              <span><b>Pasos de ayer</b><small>Pendiente arrastrado</small></span><i>→</i>
+            </button>
+          )}
+          <button
+            data-done={foodCoverage.complete ? '1' : foodPendingNow ? '0' : 'later'}
+            onClick={() => setOpenSec('comidas')}
+          >
+            <span><b>Comidas</b><small>{foodCoverage.covered}/{foodCoverage.total} confirmadas</small></span>
+            <i>{foodCoverage.complete ? '✓' : '→'}</i>
+          </button>
+          {traceTasks.map(task => (
+            <button
+              key={task.id}
+              data-done={task.done ? '1' : task.due ? '0' : 'later'}
+              onClick={() => openTraceTask(task)}
+            >
+              <span><b>{task.label}</b><small>{task.status}</small></span>
+              <i>{task.done ? '✓' : task.due ? '→' : '·'}</i>
+            </button>
+          ))}
+        </div>
       </section>
 
       <button className="mx-wedding-progress" data-tone={weightTone}

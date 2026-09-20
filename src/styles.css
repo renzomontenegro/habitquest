@@ -853,10 +853,18 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px s
 .mx-home-section-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .mx-home-section-head b { display: block; margin-top: 3px; font-size: 14px; }
 .mx-home-section-head button { min-height: 32px; border: 0; background: transparent; color: var(--ink); font-size: 10px; font-weight: 700; text-decoration: underline; }
-.mx-home-pending-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 11px; }
-.mx-home-pending-list button { min-height: 40px; padding: 8px 11px; border: 0; border-radius: 10px;
-  background: var(--paper); color: var(--ink); font-size: 10px; font-weight: 650; }
-.mx-home-pending-list i { margin-left: 5px; color: var(--signal); font-style: normal; }
+.mx-home-pending-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-top: 11px; }
+.mx-home-pending-list button { min-width: 0; min-height: 52px; display: grid; grid-template-columns: 1fr auto;
+  align-items: center; gap: 6px; padding: 8px 10px; border: 0; border-radius: 10px;
+  background: var(--paper); color: var(--ink); text-align: left; }
+.mx-home-pending-list b, .mx-home-pending-list small { display: block; }
+.mx-home-pending-list b { font-size: 10px; }
+.mx-home-pending-list small { margin-top: 2px; overflow: hidden; color: var(--signal); font-size: 8px;
+  text-overflow: ellipsis; white-space: nowrap; }
+.mx-home-pending-list i { color: var(--signal); font-style: normal; }
+.mx-home-pending-list button[data-done='1'] { background: #EAF3EE; }
+.mx-home-pending-list button[data-done='1'] small, .mx-home-pending-list button[data-done='1'] i { color: var(--good); }
+.mx-home-pending-list button[data-done='later'] small, .mx-home-pending-list button[data-done='later'] i { color: var(--mute); }
 
 .mx-wedding-progress { position: relative; width: 100%; min-height: 88px; display: grid;
   grid-template-columns: .8fr 1fr 1fr; gap: 10px; padding: 15px 16px 18px; margin-bottom: 10px;
