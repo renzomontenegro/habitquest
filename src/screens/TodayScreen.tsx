@@ -713,7 +713,7 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
                               <div className="mx-logged-m mx-mono">
                                 <span>{mm.prot}P</span><span>{mm.carb}C</span><span>{mm.grasa}G</span><span>{kcal(mealMacros(m))} kcal</span>
                               </div>
-                            )}}
+                            )}
                           </button>
                           {m.aiPending && (m.aiError || Date.now() - m.at > 120_000) && (
                             <button className="mx-mini" onClick={() => app.retryEstimate(m.id, viewDate)}>
