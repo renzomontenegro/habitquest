@@ -715,7 +715,7 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
                               </div>
                             )}
                           </button>
-                          {m.aiPending && m.aiError && (
+                          {m.aiPending && (m.aiError || Date.now() - m.at > 120_000) && (
                             <button className="mx-mini" onClick={() => app.retryEstimate(m.id, viewDate)}>
                               Reintentar
                             </button>

@@ -197,6 +197,9 @@ function cleanSavedMeals(v: unknown): SavedMeal[] {
   if (!Array.isArray(v)) return []
   return v
     .filter(isObj)
+    // Purga del dato de prueba que se colo a la nube el 13/09/2026 (dia con
+    // comidas "ui-test"): ese id fijo nunca lo genera la app.
+    .filter(m => str(m.id) !== 'rec-test')
     .map(m => {
       const name = str(m.name).trim()
       if (!name) return null

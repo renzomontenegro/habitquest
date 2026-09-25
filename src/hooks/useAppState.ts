@@ -12,6 +12,14 @@ import { savePendingPhotos, loadPendingPhotos, clearPendingPhotos } from '../lib
 
 const PENDING_KEY = 'sistema_pending'
 
+/**
+ * Candado anti-duplicados de estimaciones con vencimiento. Estimar no tiene
+ * efectos en el servidor, asi que un duplicado ocasional es inofensivo; en
+ * cambio un candado eterno deja la comida en "Estimando..." para siempre.
+ * Cubre un intento completo (120 s) con margen.
+ */
+const ESTIMATE_LOCK_MS = 150_000
+
 /** Fechas y ajustes tocados sin confirmacion de la nube (para no perderlos al reconectar). */
 interface PendingMarks { dates: string[]; settings: boolean }
 
@@ -75,8 +83,8 @@ export function useAppState() {
   const [loadingInitial, setLoadingInitial] = useState(isSyncEnabled())
   const marks = useRef<PendingMarks>(readMarks())
   const stateRef = useRef(state)
-  // Estimaciones IA en curso (por id de comida): evita procesar dos veces.
-  const processingEstimates = useRef<Set<string>>(new Set())
+  // Estimaciones IA en curso (por id de comida + inicio): evita procesar dos veces.
+  const processingEstimates = useRef<Map<string, number>>(new Map())
   const processEstimatesRef = useRef<((meal: MealLog, date: string) => Promise<void>) | null>(null)
 
   // Espejo para leer el valor actual desde callbacks y timers sin recrearlos.
@@ -236,9 +244,14 @@ export function useAppState() {
   /** Procesa una estimacion pendiente: lo que devuelva la IA es lo que se registra. */
   const processOneEstimate = useCallback(async (meal: MealLog, date: string) => {
     const mealId = meal.id
-    if (processingEstimates.current.has(mealId)) return
     if (!meal.aiPending) return
-    processingEstimates.current.add(mealId)
+    // Si el telefono se fue a segundo plano a mitad de un fetch, iOS suspende
+    // los timers (el AbortController nunca dispara) y la promesa queda colgada
+    // con el candado puesto. Sin vencimiento, los reintentos automaticos
+    // rebotan y la comida queda en "Estimando..." para siempre.
+    const started = processingEstimates.current.get(mealId)
+    if (started != null && Date.now() - started < ESTIMATE_LOCK_MS) return
+    processingEstimates.current.set(mealId, Date.now())
     try {
       if (typeof navigator !== 'undefined' && navigator.onLine === false) {
         patchRecord(date, r => ({
@@ -282,10 +295,11 @@ export function useAppState() {
   // Espejo del procesador para los triggers (online / visible / arranque).
   useEffect(() => { processEstimatesRef.current = processOneEstimate }, [processOneEstimate])
 
-  /** Reintento manual desde la tarjeta de la comida. */
+  /** Reintento manual desde la tarjeta de la comida: rompe el candado. */
   const retryEstimate = useCallback((mealId: string, date = todayStr()) => {
     const meal = stateRef.current.records.find(r => r.date === date)?.meals?.find(m => m.id === mealId)
     if (!meal) return
+    processingEstimates.current.delete(mealId)
     const fresh: MealLog = { ...meal, aiPending: true }
     delete fresh.aiError
     patchRecord(date, r => ({

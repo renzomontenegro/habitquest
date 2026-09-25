@@ -35,6 +35,7 @@ export function PlanScreen({ app }: { app: AppController }) {
   const [open, setOpen] = useState<Record<string, boolean>>(() => ({
     objetivo: false,
     finos: false,
+    frecuentes: settings.savedMeals.length > 0,
     meta: settings.targetWeight == null,
     puntuacion: false,
     entreno: split.length === 0,
@@ -149,6 +150,36 @@ export function PlanScreen({ app }: { app: AppController }) {
             suffix="%"
           />
         </div>
+      </Fold>
+
+      {/* --- Comidas frecuentes --- */}
+      <Fold
+        title="Comidas frecuentes"
+        meta={settings.savedMeals.length === 0
+          ? 'Sin guardadas: se usan sin gastar IA'
+          : `${settings.savedMeals.length} guardadas`}
+        open={open.frecuentes}
+        onToggle={() => toggle('frecuentes')}
+      >
+        <div className="mx-sub" style={{ marginBottom: 10, lineHeight: 1.5 }}>
+          Al registrarlas no se llama a la IA: se copian sus macros. Se guardan
+          desde Hoy → Ajustar comida → Guardar como recurrente.
+        </div>
+        {settings.savedMeals.length === 0 ? (
+          <div className="mx-empty">Todavia no guardaste ninguna.</div>
+        ) : settings.savedMeals.map(m => (
+          <div key={m.id} className="mx-row">
+            <div style={{ flex: 1 }}>
+              <div className="mx-lbl">{m.name}</div>
+              <div className="mx-sub mx-mono">{m.prot}P · {m.carb}C · {m.grasa}G</div>
+            </div>
+            <ConfirmButton
+              label="Quitar"
+              confirmLabel="Confirmar"
+              onConfirm={() => { app.removeSavedMeal(m.id); setToast('Comida eliminada') }}
+            />
+          </div>
+        ))}
       </Fold>
 
       {/* --- Meta de peso --- */}
