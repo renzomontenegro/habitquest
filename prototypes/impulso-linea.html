@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <link rel="icon" href="data:,">
+  <title>Prototipo · Impulso semanal</title>
+  <style>
+    :root {
+      --paper:#F3F3EF;
+      --card:#FFFFFF;
+      --ink:#111111;
+      --mute:#666661;
+      --line:#D9D9D3;
+      --soft:#E5E5E0;
+      --signal:#C9360C;
+      --signal-soft:#F5DED6;
+      --good:#087A46;
+      --bad:#B42318;
+      --radius-sm:.625rem;
+      --radius-md:1rem;
+      --radius-pill:999px;
+      --space-1:.375rem;
+      --space-2:.625rem;
+      --space-3:.875rem;
+      --space-4:1rem;
+      --space-5:1.5rem;
+      --control:2.75rem;
+      --motion-fast:140ms ease-out;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--paper);color:var(--ink);font-family:Inter,ui-sans-serif,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}
+    button{font:inherit}
+    .page{min-height:100vh;display:grid;grid-template-columns:minmax(0,26rem) minmax(18rem,24rem);justify-content:center;gap:var(--space-5);padding:var(--space-5)}
+    .phone{min-height:50rem;background:var(--paper);padding:var(--space-4);border:1px solid var(--line);border-radius:1.75rem}
+    .head{display:flex;align-items:center;justify-content:space-between;margin-block-end:var(--space-3)}
+    .overline{font-size:.625rem;line-height:1.2;font-weight:750;letter-spacing:.14em;text-transform:uppercase;color:var(--mute)}
+    h1{font-size:1.5rem;line-height:1;margin:.2rem 0 0;letter-spacing:-.045em}
+    .gear{inline-size:2.5rem;block-size:2.5rem;border:0;border-radius:50%;background:var(--card);font-weight:700}
+    .tabs{display:flex;gap:.25rem;background:var(--soft);padding:.25rem;border-radius:var(--radius-pill);margin-block-end:1.35rem}
+    .tabs span{flex:1;text-align:center;padding:.65rem;border-radius:var(--radius-pill);font-size:.65rem;font-weight:750;text-transform:uppercase;letter-spacing:.08em;color:var(--mute)}
+    .tabs span:first-child{background:var(--ink);color:var(--card)}
+
+    .momentum{padding:.2rem 0 1.2rem;border-bottom:1px solid var(--line)}
+    .momentum-head{display:flex;align-items:flex-end;justify-content:space-between;gap:var(--space-3)}
+    .momentum-title h2{font-size:1.6rem;line-height:1.05;letter-spacing:-.045em;margin:.25rem 0 .35rem}
+    .momentum-title p{margin:0;color:var(--mute);font-size:.75rem;line-height:1.45}
+    .score{text-align:right;flex:none}
+    .score b{display:block;font-size:2.4rem;line-height:.9;letter-spacing:-.06em;font-variant-numeric:tabular-nums}
+    .score span{font-size:.65rem;color:var(--good);font-weight:750}
+    .chart-wrap{position:relative;margin-top:var(--space-4);background:linear-gradient(to bottom,transparent 49%,var(--line) 50%,transparent 51%)}
+    svg{display:block;inline-size:100%;block-size:auto;overflow:visible}
+    .zone{fill:var(--signal-soft);opacity:.7}
+    .grid{stroke:var(--line);stroke-width:1;stroke-dasharray:2 5}
+    .target{stroke:var(--mute);stroke-width:1;stroke-dasharray:3 5}
+    .trace{fill:none;stroke:var(--signal);stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+    .trace-preview{fill:none;stroke:var(--signal);stroke-width:2;stroke-linecap:round;stroke-dasharray:4 5;opacity:.5}
+    .dot{fill:var(--paper);stroke:var(--signal);stroke-width:3}
+    .dot.today{fill:var(--signal)}
+    .axis-label{font-size:9px;fill:var(--mute);font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+    .days{display:grid;grid-template-columns:repeat(7,1fr);gap:.2rem;margin-top:.1rem}
+    .day{min-inline-size:0;min-block-size:2.5rem;border:0;border-radius:var(--radius-sm);background:transparent;color:var(--mute);font-size:.65rem;font-weight:700;cursor:pointer;transition:background var(--motion-fast),color var(--motion-fast)}
+    .day[aria-pressed="true"]{background:var(--ink);color:var(--card)}
+    .day:focus-visible,.primary:focus-visible,.scenario button:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+    .readout{display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);min-height:3.4rem;margin-top:var(--space-2);padding:var(--space-2) var(--space-3);background:var(--card);border-radius:var(--radius-md)}
+    .readout b{display:block;font-size:.8rem}
+    .readout small{display:block;margin-top:.15rem;color:var(--mute);font-size:.68rem;line-height:1.35}
+    .delta{font-size:1rem;font-weight:800;color:var(--good);font-variant-numeric:tabular-nums}
+    .delta.down{color:var(--bad)}
+    .primary{inline-size:100%;min-block-size:3.35rem;margin-top:var(--space-3);border:0;border-radius:var(--radius-pill);background:var(--ink);color:var(--card);font-weight:750;cursor:pointer}
+    .primary:active{background:var(--signal)}
+    .micro{display:flex;justify-content:space-between;margin-top:var(--space-2);font-size:.65rem;color:var(--mute)}
+    .next{margin-top:1.35rem;padding-top:1.2rem;border-top:4px solid var(--ink)}
+    .next h3{font-size:1rem;margin:.35rem 0 .2rem}
+    .next p{font-size:.72rem;color:var(--mute);margin:0}
+
+    .rules{align-self:start;background:var(--card);border-radius:1.25rem;padding:1.25rem;position:sticky;top:var(--space-5)}
+    .rules h2{font-size:1.3rem;letter-spacing:-.035em;margin:.3rem 0 .5rem}
+    .rules>p{font-size:.78rem;line-height:1.55;color:var(--mute);margin:0 0 var(--space-4)}
+    .rule{display:grid;grid-template-columns:3.1rem 1fr;gap:var(--space-3);padding:.8rem 0;border-top:1px solid var(--line)}
+    .pts{font:750 .78rem/1.2 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--good)}
+    .pts.minus{color:var(--bad)}
+    .rule b{display:block;font-size:.78rem}
+    .rule span{display:block;color:var(--mute);font-size:.7rem;line-height:1.45;margin-top:.16rem}
+    .guardrail{margin-top:var(--space-3);padding:var(--space-3);border-radius:var(--radius-sm);background:var(--paper);font-size:.7rem;line-height:1.5}
+    .scenario{margin-top:var(--space-4)}
+    .scenario p{font-size:.7rem;color:var(--mute)}
+    .scenario div{display:flex;gap:var(--space-1);flex-wrap:wrap}
+    .scenario button{min-height:2.5rem;padding:0 .8rem;border:0;border-radius:var(--radius-pill);background:var(--soft);font-size:.68rem;font-weight:700;cursor:pointer}
+    .scenario button:hover{background:var(--ink);color:var(--card)}
+    @media(max-width:47rem){.page{display:block;padding:0}.phone{min-height:100vh;border:0;border-radius:0}.rules{border-radius:0;border-top:1px solid var(--line);position:static}}
+    @media(prefers-reduced-motion:reduce){*{transition:none!important}}
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="phone" aria-label="Vista previa de Hoy">
+      <header class="head">
+        <div><div class="overline">Dom 20 sep · semana 38</div><h1>Traza</h1></div>
+        <button class="gear" aria-label="Abrir ajustes">···</button>
+      </header>
+      <nav class="tabs" aria-label="Secciones"><span>Hoy</span><span>Mi plan</span></nav>
+
+      <section class="momentum" aria-labelledby="momentum-title">
+        <div class="momentum-head">
+          <div class="momentum-title">
+            <div class="overline">Impulso semanal</div>
+            <h2 id="momentum-title">Vas ganando terreno</h2>
+            <p>La línea premia consistencia, no pasar hambre.</p>
+          </div>
+          <div class="score"><b id="score">81</b><span id="score-label">+7 hoy</span></div>
+        </div>
+
+        <div class="chart-wrap">
+          <svg id="chart" viewBox="0 0 356 154" role="img" aria-label="Impulso semanal: sube de 50 a 81 puntos">
+            <rect class="zone" x="0" y="18" width="356" height="35" rx="8"/>
+            <line class="grid" x1="0" x2="356" y1="53" y2="53"/>
+            <line class="target" x1="0" x2="356" y1="105" y2="105"/>
+            <text class="axis-label" x="3" y="30">80</text>
+            <text class="axis-label" x="3" y="101">50</text>
+            <path id="trace" class="trace" d="M 16 105 L 70 93 L 124 74 L 178 84 L 232 63 L 286 45 L 340 38"/>
+            <circle class="dot" cx="16" cy="105" r="5"/>
+            <circle class="dot" cx="70" cy="93" r="5"/>
+            <circle class="dot" cx="124" cy="74" r="5"/>
+            <circle class="dot" cx="178" cy="84" r="5"/>
+            <circle class="dot" cx="232" cy="63" r="5"/>
+            <circle class="dot" cx="286" cy="45" r="5"/>
+            <circle id="today-dot" class="dot today" cx="340" cy="38" r="6"/>
+          </svg>
+          <div class="days" aria-label="Detalle por día">
+            <button class="day" data-index="0" aria-pressed="false">L</button>
+            <button class="day" data-index="1" aria-pressed="false">M</button>
+            <button class="day" data-index="2" aria-pressed="false">X</button>
+            <button class="day" data-index="3" aria-pressed="false">J</button>
+            <button class="day" data-index="4" aria-pressed="false">V</button>
+            <button class="day" data-index="5" aria-pressed="false">S</button>
+            <button class="day" data-index="6" aria-pressed="true">D</button>
+          </div>
+        </div>
+
+        <div class="readout" aria-live="polite">
+          <div><b id="reason-title">Hoy · nutrición alineada</b><small id="reason-copy">Déficit moderado, proteína completa y comidas cerradas.</small></div>
+          <span id="delta" class="delta">+7</span>
+        </div>
+        <button class="primary">Registrar desayuno</button>
+        <div class="micro"><span>3 registros pendientes</span><span>583 kcal disponibles</span></div>
+      </section>
+
+      <section class="next">
+        <div class="overline">Meta de boda</div>
+        <h3>76 días para llegar</h3>
+        <p>Actual 111.5 kg · Meta 95 kg</p>
+      </section>
+    </section>
+
+    <aside class="rules" aria-labelledby="rules-title">
+      <div class="overline">Reglas propuestas</div>
+      <h2 id="rules-title">Cómo se mueve la línea</h2>
+      <p>Empieza en 50 cada lunes. Cada día completo suma o resta hasta 10. El domingo queda el resultado de la semana.</p>
+      <div class="rule"><div class="pts">+4</div><div><b>Calorías en zona útil</b><span>Entre 88% y 100% del objetivo. Un déficit moderado suma.</span></div></div>
+      <div class="rule"><div class="pts">+2</div><div><b>Proteína cubierta</b><span>Al menos 90% del objetivo diario.</span></div></div>
+      <div class="rule"><div class="pts">+1</div><div><b>Comidas cerradas</b><span>Cada slot tiene comida o “No comí”.</span></div></div>
+      <div class="rule"><div class="pts">+1</div><div><b>Entrenamiento correcto</b><span>Rutina completada o descanso planificado.</span></div></div>
+      <div class="rule"><div class="pts">+1</div><div><b>Pasos cumplidos</b><span>Se alcanza el objetivo configurado.</span></div></div>
+      <div class="rule"><div class="pts">+1</div><div><b>Sueño cumplido</b><span>Se alcanza la meta de horas.</span></div></div>
+      <div class="rule"><div class="pts minus">−2/−4</div><div><b>Fuera de zona</b><span>Más de 12% por encima resta 2; más de 25% resta 4.</span></div></div>
+      <div class="rule"><div class="pts minus">−3</div><div><b>Déficit excesivo</b><span>Comer menos de 75% también baja la línea.</span></div></div>
+      <div class="guardrail"><b>Regla clave:</b> un día incompleto no baja. Se dibuja como hueco hasta cerrarlo. Así no se confunde falta de datos con un mal día.</div>
+      <div class="scenario">
+        <p>Simular el resultado de hoy:</p>
+        <div>
+          <button data-scenario="good">Día alineado</button>
+          <button data-scenario="low">Muy pocas kcal</button>
+          <button data-scenario="high">Me pasé</button>
+        </div>
+      </div>
+    </aside>
+  </main>
+  <script>
+    const days = [
+      ['Lunes · punto de partida','Semana iniciada con registro completo','+0',50],
+      ['Martes · buen cierre','Proteína, pasos y sueño cumplidos.','+4',56],
+      ['Miércoles · día alineado','Déficit moderado y entrenamiento completo.','+8',65],
+      ['Jueves · fuera de zona','Calorías 18% por encima del objetivo.','−4',61],
+      ['Viernes · recuperación','Nutrición y pasos dentro del plan.','+7',69],
+      ['Sábado · consistente','Todos los registros completos.','+5',74],
+      ['Hoy · nutrición alineada','Déficit moderado, proteína completa y comidas cerradas.','+7',81]
+    ];
+    const buttons = [...document.querySelectorAll('.day')];
+    const title = document.querySelector('#reason-title');
+    const copy = document.querySelector('#reason-copy');
+    const delta = document.querySelector('#delta');
+    const score = document.querySelector('#score');
+    const scoreLabel = document.querySelector('#score-label');
+    function selectDay(index){
+      buttons.forEach((b,i)=>b.setAttribute('aria-pressed',String(i===index)));
+      const d=days[index]; title.textContent=d[0]; copy.textContent=d[1]; delta.textContent=d[2];
+      delta.classList.toggle('down',d[2].includes('−')); score.textContent=d[3];
+      scoreLabel.textContent=index===6?`${d[2]} hoy`:`${d[2]} ese día`;
+    }
+    buttons.forEach((button)=>button.addEventListener('click',()=>selectDay(Number(button.dataset.index))));
+    const scenarios={
+      good:{score:81,delta:'+7',title:'Hoy · nutrición alineada',copy:'Déficit moderado, proteína completa y comidas cerradas.',y:28},
+      low:{score:70,delta:'−4',title:'Hoy · déficit excesivo',copy:'Comer demasiado poco no da ventaja. Falta energía para sostener el plan.',y:55},
+      high:{score:68,delta:'−6',title:'Hoy · fuera de zona',copy:'Calorías altas y proteína por debajo del objetivo.',y:62}
+    };
+    document.querySelectorAll('[data-scenario]').forEach(button=>button.addEventListener('click',()=>{
+      const s=scenarios[button.dataset.scenario]; score.textContent=s.score; scoreLabel.textContent=`${s.delta} hoy`;
+      title.textContent=s.title; copy.textContent=s.copy; delta.textContent=s.delta;
+      delta.classList.toggle('down',s.delta.includes('−'));
+      const dot=document.querySelector('#today-dot'); dot.setAttribute('cy',s.y);
+      const trace=document.querySelector('#trace'); trace.setAttribute('d',`M 16 105 L 70 93 L 124 74 L 178 84 L 232 63 L 286 45 L 340 ${s.y}`);
+      selectDay(6); score.textContent=s.score; scoreLabel.textContent=`${s.delta} hoy`; title.textContent=s.title; copy.textContent=s.copy; delta.textContent=s.delta; delta.classList.toggle('down',s.delta.includes('−'));
+    }));
+  </script>
+</body>
+</html>

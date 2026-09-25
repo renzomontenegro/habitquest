@@ -1,6 +1,6 @@
 import type { Macros, MealSlot } from '../types'
 
-export const APP_VERSION = '3.99'
+export const APP_VERSION = '4.00'
 
 // ---------------------------------------------------------------------------
 // Valores iniciales

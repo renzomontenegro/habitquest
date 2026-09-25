@@ -711,9 +711,9 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
                               )
                             ) : (
                               <div className="mx-logged-m mx-mono">
-                                <span>{mm.prot}P</span><span>{mm.carb}C</span><span>{mm.grasa}G</span>
+                                <span>{mm.prot}P</span><span>{mm.carb}C</span><span>{mm.grasa}G</span><span>{kcal(mealMacros(m))} kcal</span>
                               </div>
-                            )}
+                            )}}
                           </button>
                           {m.aiPending && (m.aiError || Date.now() - m.at > 120_000) && (
                             <button className="mx-mini" onClick={() => app.retryEstimate(m.id, viewDate)}>
@@ -854,7 +854,7 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
             <div className="mx-sub" style={{ marginBottom: 14 }}>
               {(() => {
                 const m = roundMacros(mealMacros(editing))
-                return `${m.prot} g proteina · ${m.carb} g carbo · ${m.grasa} g grasa`
+                return `${m.prot} g proteina · ${m.carb} g carbo · ${m.grasa} g grasa · ${kcal(mealMacros(editing))} kcal`
               })()}
             </div>
             <Field label="Porcion" sub="Cuanto comiste respecto a la porcion normal">

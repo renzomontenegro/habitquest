@@ -171,7 +171,7 @@ export function PlanScreen({ app }: { app: AppController }) {
           <div key={m.id} className="mx-row">
             <div style={{ flex: 1 }}>
               <div className="mx-lbl">{m.name}</div>
-              <div className="mx-sub mx-mono">{m.prot}P · {m.carb}C · {m.grasa}G</div>
+              <div className="mx-sub mx-mono">{m.prot}P · {m.carb}C · {m.grasa}G · {kcal(m)} kcal</div>
             </div>
             <ConfirmButton
               label="Quitar"
