@@ -1,6 +1,6 @@
 import type { Macros, MealSlot } from '../types'
 
-export const APP_VERSION = '4.01'
+export const APP_VERSION = '4.02'
 
 // ---------------------------------------------------------------------------
 // Valores iniciales
@@ -83,6 +83,9 @@ export const RULES = {
   waistChartDays: 90,
   /** Ventana para comparar fuerza contra la semana anterior. */
   strengthWindowDays: 7,
+  /** Fraccion minima de series del plan para dar el entreno por cumplido.
+   *  0.75 = vale con que falte un ejercicio en un dia de 4. */
+  workoutCompleteShare: 0.75,
 } as const
 
 /**

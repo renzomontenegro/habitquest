@@ -237,7 +237,7 @@ export function PlanScreen({ app }: { app: AppController }) {
         <div className="mx-score-rules" role="table" aria-label="Reglas de puntuacion">
           <div role="row"><b role="cell">Calorias en ±{Math.round(settings.tolerance * 100)}%</b><span role="cell">+4</span><i role="cell">−4</i></div>
           <div role="row"><b role="cell">Proteina al menos {Math.round((1 - settings.tolerance) * 100)}%</b><span role="cell">+2</span><i role="cell">−2</i></div>
-          <div role="row"><b role="cell">Entreno o descanso segun plan</b><span role="cell">+2</span><i role="cell">−2</i></div>
+          <div role="row"><b role="cell">Entreno o descanso segun plan (75% vale)</b><span role="cell">+2</span><i role="cell">−2</i></div>
           <div role="row"><b role="cell">Objetivo de pasos</b><span role="cell">+1</span><i role="cell">−1</i></div>
           <div role="row"><b role="cell">Objetivo de sueno</b><span role="cell">+1</span><i role="cell">−1</i></div>
           <div role="row"><b role="cell">Peso al ritmo necesario</b><span role="cell">+30</span><i role="cell">−20</i></div>

@@ -239,7 +239,8 @@ export function rumboWeek(records: DayLog[], settings: AppSettings, endDate = to
       const expected = planned.exercises.reduce((sum, ex) => sum + ex.sets, 0)
       const completed = planned.exercises.reduce((sum, ex) =>
         sum + (r.sets?.[ex.id] ?? []).filter(set => set.weight || set.reps).length, 0)
-      planOk = expected > 0 && completed >= expected
+      // Basta con 3/4 del plan: faltar a un ejercicio no borra la sesion.
+      planOk = expected > 0 && completed / expected >= RULES.workoutCompleteShare
     }
 
     const points = (calorieOk ? 4 : -4)
