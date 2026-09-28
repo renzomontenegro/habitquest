@@ -3,14 +3,14 @@ import type { AppController } from '../hooks/useAppState'
 import type { MealLog, MealSlot } from '../types'
 import {
   addDays, dayMacros, daysBetween, foodLogCoverage, getRecord, headerDate, kcal, lastNDates, lastSessionWeight,
-  makeEmptySets, mealMacros, mealName, mealsInSlot, nearestWeight, parseDate, roundMacros, rumboWeek, shortDate, sleepHours,
+  makeEmptySets, mealMacros, mealName, mealsInSlot, nearestGoal, nearestWeight, parseDate, roundMacros, rumboWeek, shortDate, sleepHours,
   slotReference, weightAvg, weightTrendAt, workoutForDate,
 } from '../lib/logic'
 import { PORTIONS, SLOTS, SLOT_LABEL } from '../lib/config'
 import { MealEstimateSheet } from '../components/MealEstimateSheet'
 import { MealIdeaSheet } from '../components/MealIdeaSheet'
 import { WeekScreen } from './WeekScreen'
-import { BottomSheet, ConfirmButton, Field, RepsWheel, Seg, Stepper, TimeWheel, Toast, WeightWheel } from '../components/ui'
+import { BottomSheet, ConfirmButton, Field, RepsWheel, Seg, TimeWheel, Toast, WeightWheel } from '../components/ui'
 import { RumboChart } from '../components/charts'
 
 function portionLabel(p: number): string {
@@ -102,7 +102,6 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
   const [exWheel, setExWheel] = useState<null | { exId: string; index: number }>(null)
   const [repsWheel, setRepsWheel] = useState<null | { exId: string; index: number }>(null)
   const [openSec, setOpenSec] = useState<Sec | null>(null)
-  const [goalEditor, setGoalEditor] = useState(false)
   const [closingDay, setClosingDay] = useState(false)
   const [tasksOpen, setTasksOpen] = useState(false)
   const [progressOpen, setProgressOpen] = useState(false)
@@ -128,8 +127,9 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
       : ['cena', 'almuerzo', 'desayuno']
   const dueMealSlot = dueMealIds.find(id => missingSlots.some(s => s.id === id)) ?? null
   const avg7 = weightAvg(state.records, addDays(viewDate, -6), viewDate)
-  const goalDays = state.settings.targetDate ? daysBetween(viewDate, state.settings.targetDate) : null
-  const goalWeight = state.settings.targetWeight
+  const goal = nearestGoal(state.settings.goals, viewDate)
+  const goalDays = goal ? daysBetween(viewDate, goal.date) : null
+  const goalWeight = goal?.targetWeight
   const actualTrend = weightTrendAt(state.records, viewDate)?.delta ?? null
   const projectedGoalWeight = avg7 != null && actualTrend != null && goalDays != null && goalDays > 0
     ? avg7 + actualTrend * (goalDays / 7)
@@ -306,7 +306,7 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
 
       <button className="mx-wedding-progress mx-wedding-progress-first" data-tone={weightTone}
         onClick={() => actualTrend == null && record?.weight == null ? setWeightPicker(true) : setProgressOpen(true)}>
-        <span><small>Dias para la boda</small><b className="mx-mono">{goalDays != null ? Math.max(0, goalDays) : '—'}</b></span>
+        <span><small>{goal ? `${goal.name} · ${shortDate(goal.date)}` : 'Sin metas'}</small><b className="mx-mono">{goalDays != null ? `${Math.max(0, goalDays)} dias` : '—'}</b></span>
         <span><small>Peso actual</small><b>{avg7 != null ? `${avg7.toFixed(1)} kg` : 'Sin promedio'}</b></span>
         <span><small>Proyeccion</small><b>{projectedGoalWeight != null ? `${projectedGoalWeight.toFixed(1)} kg` : 'Faltan datos'}</b></span>
         <i className="mx-wedding-progress-bar" style={{ width: `${Math.max(4, weightProgress * 100)}%` }} />
@@ -415,41 +415,6 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
         />
       </BottomSheet>
 
-      <BottomSheet open={goalEditor} onClose={() => setGoalEditor(false)} title="Editar meta">
-        <div className="mx-sub" style={{ marginBottom: 10 }}>
-          La portada usa estos datos para mostrar los días restantes y el ritmo necesario.
-        </div>
-        <Field label="Peso objetivo">
-          <Stepper
-            value={state.settings.targetWeight ?? 95}
-            onChange={v => app.updateSettings({ targetWeight: Math.max(30, v) })}
-            step={0.5}
-            ariaLabel="Peso objetivo en kilogramos"
-            min={30}
-            suffix="kg"
-          />
-        </Field>
-        <Field label="Fecha objetivo">
-          <input
-            className="mx-in mx-date"
-            type="date"
-            value={state.settings.targetDate ?? ''}
-            onChange={e => app.updateSettings({ targetDate: e.target.value || undefined })}
-          />
-        </Field>
-        <div className="mx-acts">
-          <button
-            className="mx-btn"
-            data-p="1"
-            onClick={() => {
-              if (state.settings.targetWeight == null) app.updateSettings({ targetWeight: 95 })
-              setGoalEditor(false)
-            }}
-          >
-            Guardar meta
-          </button>
-        </div>
-      </BottomSheet>
 
       <BottomSheet open={closingDay} onClose={() => setClosingDay(false)} title="Cerrar comidas">
         <div className="mx-close-summary">

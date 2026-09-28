@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
-import type { AppSettings, AppState, DayLog, Macros, MealLog, MealSlot, SavedMeal, SplitDay } from '../types'
+import type { AppSettings, AppState, DayLog, Goal, Macros, MealLog, MealSlot, SavedMeal, SplitDay } from '../types'
 import { storage } from '../lib/storage'
 import { ROUTINE_TEMPLATE } from '../lib/config'
 import { todayStr, uid } from '../lib/logic'
@@ -409,6 +409,27 @@ export function useAppState() {
     })
   }, [mark])
 
+  /** Guarda (o actualiza) una meta de peso por evento. */
+  const upsertGoal = useCallback((goal: Goal) => {
+    mark()
+    setState(prev => {
+      const exists = prev.settings.goals.some(g => g.id === goal.id)
+      const goals = exists
+        ? prev.settings.goals.map(g => (g.id === goal.id ? goal : g))
+        : [...prev.settings.goals, goal].slice(0, 20)
+      goals.sort((a, b) => a.date.localeCompare(b.date))
+      return { ...prev, settings: { ...prev.settings, goals } }
+    })
+  }, [mark])
+
+  const removeGoal = useCallback((id: string) => {
+    mark()
+    setState(prev => ({
+      ...prev,
+      settings: { ...prev.settings, goals: prev.settings.goals.filter(g => g.id !== id) },
+    }))
+  }, [mark])
+
   const removeSavedMeal = useCallback((id: string) => {
     mark()
     setState(prev => ({
@@ -514,6 +535,8 @@ export function useAppState() {
     setTargets,
     upsertSavedMeal,
     removeSavedMeal,
+    upsertGoal,
+    removeGoal,
     upsertSplitDay,
     removeSplitDay,
     loadRoutineTemplate,

@@ -1,4 +1,4 @@
-import type { AppSettings, AppState, DayLog, Macros, MealLog, MealSlot, SavedMeal, SetEntry, SplitDay } from '../types'
+import type { AppSettings, AppState, DayLog, Goal, Macros, MealLog, MealSlot, SavedMeal, SetEntry, SplitDay } from '../types'
 import {
   DEFAULT_SLEEP_TARGET, DEFAULT_SLOT_SHARE, DEFAULT_STEPS_TARGET, DEFAULT_TARGETS, DEFAULT_TOLERANCE,
 } from './config'
@@ -16,6 +16,7 @@ const defaultSettings = (): AppSettings => ({
   slotShare: { ...DEFAULT_SLOT_SHARE },
   savedMeals: [],
   split: [],
+  goals: [],
   sleepTarget: DEFAULT_SLEEP_TARGET,
   stepsTarget: DEFAULT_STEPS_TARGET,
   tolerance: DEFAULT_TOLERANCE,
@@ -192,6 +193,45 @@ function cleanShare(v: unknown): Record<MealSlot, number> {
   return out
 }
 
+/** Metas por evento: solo las del usuario, top 20 para no crecer sin limite. */
+function cleanGoal(v: unknown): Goal | null {
+  if (!isObj(v)) return null
+  const name = str(v.name).trim()
+  const date = str(v.date)
+  const w = num(v.targetWeight, 0)
+  if (!name || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !(w > 0)) return null
+  return { id: str(v.id) || uid('g'), name, date, targetWeight: Math.round(w * 10) / 10 }
+}
+
+/**
+ * Migra la meta unica del modelo anterior a la lista. Si es la combinacion
+ * original (95 kg al 05/12/2026) se expande a los 4 eventos del usuario con
+ * metas realistas (~0.7 kg/sem desde ~110 kg). Dispara una sola vez: la
+ * migracion consume los campos viejos, asi que borrar todas las metas
+ * despues no las resucita.
+ */
+function cleanGoals(v: unknown, legacyWeight: unknown, legacyDate: unknown): Goal[] {
+  if (Array.isArray(v)) {
+    return v
+      .map(cleanGoal)
+      .filter((g): g is Goal => g !== null)
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .slice(0, 20)
+  }
+  const w = num(legacyWeight, 0)
+  const d = optStr(legacyDate)
+  if (!(w > 0) || !d || !/^\d{4}-\d{2}-\d{2}$/.test(d)) return []
+  if (w === 95 && d === '2026-12-05') {
+    return [
+      { id: uid('g'), name: 'Cumple Andrea', date: '2026-10-22', targetWeight: 107.5 },
+      { id: uid('g'), name: 'Reu familiar Andrea', date: '2026-11-05', targetWeight: 106 },
+      { id: uid('g'), name: 'Boda Anggie', date: '2026-12-05', targetWeight: 103 },
+      { id: uid('g'), name: 'Boda Lucia', date: '2026-12-17', targetWeight: 102 },
+    ]
+  }
+  return [{ id: uid('g'), name: 'Meta', date: d, targetWeight: Math.round(w * 10) / 10 }]
+}
+
 /** Comidas repetidas: solo las del usuario, top 30 para no crecer sin limite. */
 function cleanSavedMeals(v: unknown): SavedMeal[] {
   if (!Array.isArray(v)) return []
@@ -233,12 +273,10 @@ function sanitize(value: unknown): AppState {
     slotShare: cleanShare(s.slotShare),
     savedMeals: cleanSavedMeals(s.savedMeals),
     split,
+    goals: cleanGoals(s.goals, s.targetWeight, s.targetDate),
     sleepTarget: Math.min(14, Math.max(1, num(s.sleepTarget, DEFAULT_SLEEP_TARGET))),
     stepsTarget: Math.min(50000, Math.max(1000, Math.round(num(s.stepsTarget, DEFAULT_STEPS_TARGET)))),
     tolerance: Math.min(0.5, Math.max(0.01, num(s.tolerance, DEFAULT_TOLERANCE))),
-    // Meta de peso opcional: peso > 0 y fecha con formato valido, o no va.
-    ...(num(s.targetWeight, 0) > 0 ? { targetWeight: num(s.targetWeight, 0) } : {}),
-    ...(optStr(s.targetDate) ? { targetDate: optStr(s.targetDate) as string } : {}),
     startDate: optStr(s.startDate) ?? base.settings.startDate,
     // Solo se salta el onboarding quien ya definio objetivos en esta version.
     setupDone: s.setupDone === true,

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { AppController } from '../hooks/useAppState'
-import type { Exercise, Macros, SplitDay } from '../types'
-import { kcal, rumboWeek, shortDate, slotReference, uid } from '../lib/logic'
+import type { Exercise, Goal, Macros, SplitDay } from '../types'
+import { daysBetween, kcal, nearestGoal, rumboWeek, shortDate, slotReference, uid } from '../lib/logic'
 import { MACRO_LABEL, SLOTS, WEEKDAY_NAMES } from '../lib/config'
 import { BottomSheet, ConfirmButton, MonoInput, Stepper, Toast } from '../components/ui'
 
@@ -36,12 +36,14 @@ export function PlanScreen({ app }: { app: AppController }) {
     objetivo: false,
     finos: false,
     frecuentes: settings.savedMeals.length > 0,
-    meta: settings.targetWeight == null,
+    meta: settings.goals.length === 0,
     puntuacion: false,
     entreno: split.length === 0,
   }))
   const [toast, setToast] = useState<string | null>(null)
   const [dayEditor, setDayEditor] = useState<SplitDay | null>(null)
+  const [goalEditor, setGoalEditor] = useState<Goal | null>(null)
+  const nextGoal = nearestGoal(settings.goals, app.today)
 
   const toggle = (id: string) => setOpen(o => ({ ...o, [id]: !o[id] }))
 
@@ -182,44 +184,44 @@ export function PlanScreen({ app }: { app: AppController }) {
         ))}
       </Fold>
 
-      {/* --- Meta de peso --- */}
+      {/* --- Metas de peso --- */}
       <Fold
-        title="Meta de peso"
-        meta={settings.targetWeight != null && settings.targetDate
-          ? `Bajar a ${settings.targetWeight} kg para ${shortDate(settings.targetDate)}`
-          : 'Sin meta: fija a donde vas y para cuando'}
+        title="Metas de peso"
+        meta={settings.goals.length === 0
+          ? 'Sin metas: fija a donde vas y para cuando'
+          : nextGoal
+            ? `${nextGoal.name} en ${Math.max(0, daysBetween(app.today, nextGoal.date))} dias`
+            : `${settings.goals.length} metas pasadas`}
         open={open.meta}
         onToggle={() => toggle('meta')}
       >
         <div className="mx-sub" style={{ marginBottom: 12, lineHeight: 1.5 }}>
-          La semana te dice si vas a llegar al ritmo actual. Con la tendencia de peso y esta meta,
-          calcula cuantos kilos te faltan y cuanto te pasas o te quedas corto.
+          El home muestra la mas proxima con los dias que faltan, y la semana
+          te dice si vas al ritmo necesario para cada una.
         </div>
-        <div className="mx-row">
-          <div style={{ flex: 1 }}>
-            <div className="mx-lbl">Peso objetivo</div>
-            <div className="mx-sub">A donde quieres llegar</div>
+        {settings.goals.length === 0 && (
+          <div className="mx-empty">Todavia no tienes metas.</div>
+        )}
+        {settings.goals.map(g => (
+          <div key={g.id} className="mx-row">
+            <div style={{ flex: 1 }}>
+              <div className="mx-lbl">{g.name}</div>
+              <div className="mx-sub mx-mono">{g.targetWeight} kg · {shortDate(g.date)}</div>
+            </div>
+            <button
+              className="mx-mini"
+              onClick={() => setGoalEditor({ ...g })}
+            >
+              Editar
+            </button>
           </div>
-          <Stepper
-            value={settings.targetWeight ?? 0}
-            onChange={v => app.updateSettings({ targetWeight: v > 0 ? v : undefined })}
-            step={0.5}
-            min={0}
-            suffix="kg"
-          />
-        </div>
-        <div className="mx-row">
-          <div style={{ flex: 1 }}>
-            <div className="mx-lbl">Fecha objetivo</div>
-            <div className="mx-sub">La semana la usa para proyectar tu peso</div>
-          </div>
-          <input
-            className="mx-in mx-date"
-            type="date"
-            value={settings.targetDate ?? ''}
-            onChange={e => app.updateSettings({ targetDate: e.target.value || undefined })}
-          />
-        </div>
+        ))}
+        <button
+          className="mx-add"
+          onClick={() => setGoalEditor({ id: uid('g'), name: '', date: app.today, targetWeight: 100 })}
+        >
+          + Agregar meta
+        </button>
       </Fold>
 
       <Fold
@@ -313,6 +315,17 @@ export function PlanScreen({ app }: { app: AppController }) {
         )}
       </Fold>
 
+      {goalEditor && (
+        <GoalEditorSheet
+          goal={goalEditor}
+          existing={settings.goals.some(g => g.id === goalEditor.id)}
+          onChange={setGoalEditor}
+          onClose={() => setGoalEditor(null)}
+          onSave={g => { app.upsertGoal(g); setGoalEditor(null); setToast('Meta guardada') }}
+          onDelete={id => { app.removeGoal(id); setGoalEditor(null); setToast('Meta eliminada') }}
+        />
+      )}
+
       {dayEditor && (
         <SplitEditorSheet
           day={dayEditor}
@@ -326,6 +339,63 @@ export function PlanScreen({ app }: { app: AppController }) {
 
       <Toast message={toast} onDone={() => setToast(null)} />
     </>
+  )
+}
+
+// --- Editor de meta ---
+function GoalEditorSheet({ goal, existing, onChange, onClose, onSave, onDelete }: {
+  goal: Goal
+  existing: boolean
+  onChange: (g: Goal) => void
+  onClose: () => void
+  onSave: (g: Goal) => void
+  onDelete: (id: string) => void
+}) {
+  const valid = goal.name.trim().length > 0 && /^\d{4}-\d{2}-\d{2}$/.test(goal.date) && goal.targetWeight > 0
+
+  return (
+    <BottomSheet open onClose={onClose} title={existing ? 'Editar meta' : 'Nueva meta'} wide>
+      <div className="mx-lbl" style={{ marginBottom: 4 }}>Nombre del evento</div>
+      <MonoInput value={goal.name} onChange={v => onChange({ ...goal, name: v })} placeholder="Ej: Boda Lucia" className="mx-in-full" />
+
+      <div className="mx-row" style={{ marginTop: 12 }}>
+        <div style={{ flex: 1 }}>
+          <div className="mx-lbl">Fecha</div>
+          <div className="mx-sub">El home muestra la mas proxima</div>
+        </div>
+        <input
+          className="mx-in mx-date"
+          type="date"
+          value={goal.date}
+          onChange={e => onChange({ ...goal, date: e.target.value })}
+        />
+      </div>
+
+      <div className="mx-row" style={{ marginTop: 12 }}>
+        <div style={{ flex: 1 }}>
+          <div className="mx-lbl">Peso objetivo</div>
+          <div className="mx-sub">A donde quieres llegar ese dia</div>
+        </div>
+        <Stepper
+          value={goal.targetWeight}
+          onChange={v => onChange({ ...goal, targetWeight: Math.max(30, v) })}
+          step={0.5}
+          min={30}
+          suffix="kg"
+        />
+      </div>
+
+      <div className="mx-acts">
+        <button
+          className="mx-btn" data-p="1" disabled={!valid}
+          onClick={() => onSave({ ...goal, name: goal.name.trim() })}
+        >
+          Guardar
+        </button>
+        {existing && <ConfirmButton label="Eliminar meta" confirmLabel="Confirmar" onConfirm={() => onDelete(goal.id)} />}
+        <button className="mx-btn" onClick={onClose}>Cancelar</button>
+      </div>
+    </BottomSheet>
   )
 }
 

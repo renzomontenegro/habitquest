@@ -66,6 +66,14 @@ export interface SetEntry {
   reps: string
 }
 
+/** Una fecha objetivo: nombre del evento, dia y peso al que llegar. */
+export interface Goal {
+  id: string
+  name: string
+  date: string // YYYY-MM-DD
+  targetWeight: number
+}
+
 // --- Registro diario ---
 export interface DayLog {
   date: string // YYYY-MM-DD
@@ -89,14 +97,13 @@ export interface AppSettings {
   savedMeals: SavedMeal[]
   split: SplitDay[]
   /** Horas de sueno objetivo. */
+  /** Metas de peso por evento (cumples, bodas...). El home muestra la mas proxima. */
+  goals: Goal[]
   sleepTarget: number
   /** Pasos diarios: convierte el registro en una decision, no solo en un dato. */
   stepsTarget: number
   /** Margen para dar un dia por cumplido (0.12 = ±12%). */
   tolerance: number
-  /** Meta de peso: hacia donde va la tendencia. Sin estos no hay proyeccion. */
-  targetWeight?: number
-  targetDate?: string
   startDate: string
   /** false hasta que el usuario define sus objetivos por primera vez. */
   setupDone: boolean

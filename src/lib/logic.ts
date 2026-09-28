@@ -1,4 +1,4 @@
-import type { AppSettings, DayLog, Macros, MealLog, MealSlot, SetEntry, SplitDay } from '../types'
+import type { AppSettings, DayLog, Goal, Macros, MealLog, MealSlot, SetEntry, SplitDay } from '../types'
 import { KCAL_PER_G, RULES } from './config'
 
 // --- Ids ---
@@ -255,9 +255,10 @@ export function rumboWeek(records: DayLog[], settings: AppSettings, endDate = to
   const recentWeights = records.filter(r => r.weight != null && r.date >= addDays(endDate, -6) && r.date <= endDate).length
   const previousWeights = records.filter(r => r.weight != null && r.date >= addDays(endDate, -13) && r.date <= addDays(endDate, -7)).length
   const trend = weightTrendAt(records, endDate)
-  const daysLeft = settings.targetDate ? daysBetween(endDate, settings.targetDate) : 0
-  if (trend && recentWeights >= 2 && previousWeights >= 2 && settings.targetWeight && daysLeft > 0) {
-    const requiredLoss = Math.max(0, trend.recent - settings.targetWeight) / (daysLeft / 7)
+  const goal = nearestGoal(settings.goals, endDate)
+  const daysLeft = goal ? daysBetween(endDate, goal.date) : 0
+  if (trend && recentWeights >= 2 && previousWeights >= 2 && goal && daysLeft > 0) {
+    const requiredLoss = Math.max(0, trend.recent - goal.targetWeight) / (daysLeft / 7)
     const actualLoss = -trend.delta
     if (actualLoss < -0.1) weight = -20
     else if (requiredLoss > 0 && actualLoss > requiredLoss * 1.25) weight = -10
@@ -268,6 +269,14 @@ export function rumboWeek(records: DayLog[], settings: AppSettings, endDate = to
   const lastScored = [...days].reverse().find(day => day.cumulative != null)
   if (lastScored) lastScored.cumulative = (lastScored.cumulative as number) + weight
   return { score: cumulative + weight, daily: cumulative, weight, days }
+}
+
+/** La meta mas proxima sin pasar (la que muestra el home). */
+export function nearestGoal(goals: Goal[], from = todayStr()): Goal | null {
+  const upcoming = goals
+    .filter(g => g.date >= from)
+    .sort((a, b) => a.date.localeCompare(b.date))
+  return upcoming[0] ?? null
 }
 
 // --- Peso ---
@@ -347,26 +356,24 @@ export interface WeightProjection {
 }
 
 /**
- * Proyecta el peso a una fecha objetivo usando la tendencia semanal
- * (kg/semana de weightTrend). Devuelve null si falta la meta, si la fecha ya
- * paso o si no hay dos ventanas de datos para medir el ritmo.
+ * Proyecta el peso a la fecha de una meta usando la tendencia semanal
+ * (kg/semana de weightTrend). Devuelve null si la fecha ya paso o si no hay
+ * dos ventanas de datos para medir el ritmo.
  */
-export function weightProjection(records: DayLog[], settings: AppSettings): WeightProjection | null {
-  const { targetWeight, targetDate } = settings
-  if (!targetWeight || !targetDate) return null
-  const daysLeft = daysBetween(todayStr(), targetDate)
+export function weightProjection(records: DayLog[], goal: Goal, refDate = todayStr()): WeightProjection | null {
+  const daysLeft = daysBetween(refDate, goal.date)
   if (daysLeft < 0) return null
   const trend = weightTrend(records)
   if (!trend) return null
   const projected = trend.recent + trend.delta * (daysLeft / 7)
   return {
     projected: Math.round(projected * 10) / 10,
-    gap: Math.round((targetWeight - projected) * 10) / 10,
+    gap: Math.round((goal.targetWeight - projected) * 10) / 10,
     recent: trend.recent,
     perWeek: trend.delta,
     daysLeft,
-    targetDate,
-    targetWeight,
+    targetDate: goal.date,
+    targetWeight: goal.targetWeight,
   }
 }
 

@@ -128,8 +128,10 @@ que queda en el registro es el resultado estimado.
   `workoutId` (id de `SplitDay`, `null` = descanso), `sets` (por **id** de ejercicio).
 - `SplitDay` / `Exercise` — el split es **data editable por el usuario**, no constantes.
   `weekday` 0-6 fija el dia; `null` = solo aparece si se elige a mano.
-- `AppSettings` — `targets`, `slotShare`, `split`, `sleepTarget`, `stepsTarget`,
-  `tolerance`, `startDate`, `setupDone`. (Ya no hay `options`.)
+- `AppSettings` — `targets`, `slotShare`, `split`, `goals`, `sleepTarget`, `stepsTarget`,
+  `tolerance`, `startDate`, `setupDone`. (Ya no hay `options` ni meta unica:
+  `goals` es la lista de eventos con fecha y peso objetivo, y el home muestra
+  la mas proxima con los dias restantes.)
 
 ### El plan NO vive en el codigo
 `config.ts` no contiene comidas ni rutina del usuario. Una instalacion nueva arranca con
