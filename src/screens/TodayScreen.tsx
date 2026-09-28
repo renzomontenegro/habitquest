@@ -6,7 +6,7 @@ import {
   makeEmptySets, mealMacros, mealName, mealsInSlot, nearestGoal, nearestWeight, parseDate, roundMacros, rumboWeek, shortDate, sleepHours,
   slotReference, weightAvg, weightTrendAt, workoutForDate,
 } from '../lib/logic'
-import { PORTIONS, SLOTS, SLOT_LABEL } from '../lib/config'
+import { PORTIONS, RULES, SLOTS, SLOT_LABEL } from '../lib/config'
 import { MealEstimateSheet } from '../components/MealEstimateSheet'
 import { MealIdeaSheet } from '../components/MealIdeaSheet'
 import { WeekScreen } from './WeekScreen'
@@ -214,7 +214,7 @@ export function TodayScreen({ app, viewDate, setViewDate, goToday }: {
       done: record?.steps != null,
       due: hour >= 23,
     },
-    { id: 'entreno', sec: 'entreno', label: 'Entreno', status: progress.entreno >= 1 ? 'Listo' : 'Falta', consequence: 'Si no completas el plan: −2', done: progress.entreno >= 1, due: true },
+    { id: 'entreno', sec: 'entreno', label: 'Entreno', status: progress.entreno >= RULES.workoutCompleteShare ? 'Listo' : 'Falta', consequence: `Si bajas del ${Math.round(RULES.workoutCompleteShare * 100)}% del plan: −2`, done: progress.entreno >= RULES.workoutCompleteShare, due: true },
     { id: 'sueno', sec: 'sueno', label: 'Sueno', status: progress.sueno >= 1 ? `${slept?.toFixed(1) ?? '—'} h` : 'Falta', consequence: 'Si queda sin registrar: −1', done: progress.sueno >= 1, due: true },
     { id: 'cintura', sec: 'actividad', label: 'Cintura', status: waistDue ? 'Medicion semanal' : `${recentWaist?.waist} cm`, consequence: 'No cambia la puntuacion', done: !waistDue, due: waistDue },
   ]
