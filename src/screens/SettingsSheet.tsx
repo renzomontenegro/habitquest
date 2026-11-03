@@ -181,7 +181,7 @@ export function SettingsSheet({ open, onClose, app }: {
         <div>
           <div className="mx-lbl" style={{ marginBottom: 4 }}>Notificaciones push</div>
           <div className="mx-sub" style={{ marginBottom: 10, lineHeight: 1.5 }}>
-            Los avisos pueden llegar aun con la app cerrada. En iPhone requiere la PWA instalada.
+            Cada dia te llega un aviso con los dias que quedan para tu meta, aun con la app cerrada. En iPhone requiere la PWA instalada.
             Ademas del permiso, este dispositivo tiene que quedar registrado en el servidor.
           </div>
           <div className="mx-acts">
@@ -196,22 +196,9 @@ export function SettingsSheet({ open, onClose, app }: {
         </div>
 
         <div>
-          <div className="mx-lbl" style={{ marginBottom: 4 }}>Vaciar mi plan</div>
-          <div className="mx-sub" style={{ marginBottom: 10, lineHeight: 1.5 }}>
-            Borra tu rutina para empezar de cero. Tus registros de peso, pasos, sueno,
-            comidas y series NO se tocan.
-          </div>
-          <ConfirmButton
-            label="Vaciar plan"
-            confirmLabel="Toca otra vez para vaciar"
-            onConfirm={() => { app.clearPlan(); setMsg({ text: 'Rutina vaciada.', ok: true }) }}
-          />
-        </div>
-
-        <div>
           <div className="mx-lbl" style={{ marginBottom: 4 }}>Zona peligrosa</div>
           <div className="mx-sub" style={{ marginBottom: 10 }}>
-            Borra registros, objetivos y rutina. No se puede deshacer.
+            Borra pesos y metas. No se puede deshacer.
           </div>
           <ConfirmButton
             label="Resetear todo"

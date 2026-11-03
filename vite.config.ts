@@ -24,9 +24,9 @@ export default defineConfig({
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
       },
       manifest: {
-        name: 'Traza - Control metabolico',
+        name: 'Traza - Cuenta regresiva',
         short_name: 'Traza',
-        description: 'Traza: registra comida por macros, peso, pasos, sueno y entrenamiento',
+        description: 'Traza: dias que faltan para tu meta y el seguimiento de tu peso',
         theme_color: '#F3F3EF',
         background_color: '#F3F3EF',
         display: 'standalone',

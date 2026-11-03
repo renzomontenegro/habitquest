@@ -1,24 +1,14 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
-import type { AppSettings, AppState, DayLog, Goal, Macros, MealLog, MealSlot, SavedMeal, SplitDay } from '../types'
+import type { AppState, DayLog, Goal } from '../types'
 import { storage } from '../lib/storage'
-import { ROUTINE_TEMPLATE } from '../lib/config'
-import { todayStr, uid } from '../lib/logic'
+import { todayStr } from '../lib/logic'
 import {
   queueSave, flushSave, retryNow, saveNow, loadFromBackend, isSyncEnabled,
-  subscribeSync, getSyncSnapshot, hasPendingChanges, estimateMeal,
+  subscribeSync, getSyncSnapshot, hasPendingChanges,
   type SyncSnapshot,
 } from '../lib/sync'
-import { savePendingPhotos, loadPendingPhotos, clearPendingPhotos } from '../lib/pendingPhotos'
 
 const PENDING_KEY = 'sistema_pending'
-
-/**
- * Candado anti-duplicados de estimaciones con vencimiento. Estimar no tiene
- * efectos en el servidor, asi que un duplicado ocasional es inofensivo; en
- * cambio un candado eterno deja la comida en "Estimando..." para siempre.
- * Cubre un intento completo (120 s) con margen.
- */
-const ESTIMATE_LOCK_MS = 150_000
 
 /** Fechas y ajustes tocados sin confirmacion de la nube (para no perderlos al reconectar). */
 interface PendingMarks { dates: string[]; settings: boolean }
@@ -83,9 +73,6 @@ export function useAppState() {
   const [loadingInitial, setLoadingInitial] = useState(isSyncEnabled())
   const marks = useRef<PendingMarks>(readMarks())
   const stateRef = useRef(state)
-  // Estimaciones IA en curso (por id de comida + inicio): evita procesar dos veces.
-  const processingEstimates = useRef<Map<string, number>>(new Map())
-  const processEstimatesRef = useRef<((meal: MealLog, date: string) => Promise<void>) | null>(null)
 
   // Espejo para leer el valor actual desde callbacks y timers sin recrearlos.
   useEffect(() => { stateRef.current = state }, [state])
@@ -123,19 +110,6 @@ export function useAppState() {
     if (remote) {
       const clean = storage.sanitize(remote)
       const merged = mergeStates(clean, stateRef.current, marks.current)
-      // Una comida pendiente de IA nunca la borra la nube: si el merge la
-      // perdio (p. ej. recarga antes de subir), se repone desde lo local.
-      for (const local of stateRef.current.records) {
-        for (const meal of local.meals ?? []) {
-          if (!meal.aiPending) continue
-          const rec = merged.records.find(r => r.date === local.date)
-          if (rec && !(rec.meals ?? []).some(m => m.id === meal.id)) {
-            rec.meals = [...(rec.meals ?? []), meal]
-          } else if (!rec) {
-            merged.records.push({ date: local.date, meals: [meal] })
-          }
-        }
-      }
       // Solo actualiza si el merge trajo algo distinto: evita repeticiones
       // (que encadenarían otro guardado) cuando la nube ya coincide con local.
       if (JSON.stringify(merged) !== JSON.stringify(stateRef.current)) {
@@ -205,210 +179,17 @@ export function useAppState() {
     })
   }, [mark])
 
-  const updateRecord = useCallback((patch: Partial<DayLog>, date = todayStr()) => {
-    patchRecord(date, r => ({ ...r, ...patch }))
-  }, [patchRecord])
-
-  // --- Comidas ---
-  const addMeals = useCallback((meals: MealLog[], date = todayStr()) => {
-    if (meals.length === 0) return
-    patchRecord(date, r => ({ ...r, meals: [...(r.meals ?? []), ...meals] }))
-  }, [patchRecord])
-
-  /**
-   * Registro rapido: la comida se guarda al instante con macros en cero y la
-   * IA los completa en segundo plano (con o sin internet: si no hay, queda
-   * pendiente y se procesa al reconectar). Las fotos quedan en el telefono
-   * hasta que la estimacion funciona. Devuelve si las fotos se guardaron.
-   */
-  const logPendingMeal = useCallback((slot: MealSlot, note: string, photos: string[], date = todayStr()): boolean => {
-    const id = uid('m')
-    const trimmed = note.trim()
-    const photosSaved = savePendingPhotos(id, photos)
-    const meal: MealLog = {
-      id,
-      slot,
-      portion: 1,
-      at: Date.now(),
-      custom: { name: trimmed ? trimmed.slice(0, 40) : 'Comida por estimar', prot: 0, carb: 0, grasa: 0 },
-      ...(trimmed ? { note: trimmed } : {}),
-      ai: true,
-      aiPending: true,
-    }
-    mark(date)
-    addMeals([meal], date)
-    void processEstimatesRef.current?.(meal, date)
-    return photosSaved
-  }, [addMeals, mark])
-
-  /** Procesa una estimacion pendiente: lo que devuelva la IA es lo que se registra. */
-  const processOneEstimate = useCallback(async (meal: MealLog, date: string) => {
-    const mealId = meal.id
-    if (!meal.aiPending) return
-    // Si el telefono se fue a segundo plano a mitad de un fetch, iOS suspende
-    // los timers (el AbortController nunca dispara) y la promesa queda colgada
-    // con el candado puesto. Sin vencimiento, los reintentos automaticos
-    // rebotan y la comida queda en "Estimando..." para siempre.
-    const started = processingEstimates.current.get(mealId)
-    if (started != null && Date.now() - started < ESTIMATE_LOCK_MS) return
-    processingEstimates.current.set(mealId, Date.now())
-    try {
-      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
-        patchRecord(date, r => ({
-          ...r,
-          meals: (r.meals ?? []).map(m => (m.id === mealId ? { ...m, aiError: 'Sin internet. Se reintentara solo.' } : m)),
-        }))
-        return
-      }
-      const stored = loadPendingPhotos(mealId)
-      const images = stored.map(p => p.slice(p.indexOf(',') + 1))
-      const { ok, data, error } = await estimateMeal(meal.slot, meal.note ?? '', images)
-      if (ok && data) {
-        clearPendingPhotos(mealId)
-        mark(date)
-        patchRecord(date, r => ({
-          ...r,
-          meals: (r.meals ?? []).map(m => {
-            if (m.id !== mealId) return m
-            const next = {
-              ...m,
-              custom: { name: data.nombre || 'Comida', prot: data.prot, carb: data.carb, grasa: data.grasa },
-              ai: true as const,
-            }
-            delete next.aiPending
-            delete next.aiError
-            return next
-          }),
-        }))
-      } else {
-        mark(date)
-        patchRecord(date, r => ({
-          ...r,
-          meals: (r.meals ?? []).map(m => (m.id === mealId ? { ...m, aiError: error ?? 'No se pudo estimar.' } : m)),
-        }))
-      }
-    } finally {
-      processingEstimates.current.delete(mealId)
-    }
-  }, [mark, patchRecord])
-
-  // Espejo del procesador para los triggers (online / visible / arranque).
-  useEffect(() => { processEstimatesRef.current = processOneEstimate }, [processOneEstimate])
-
-  /** Reintento manual desde la tarjeta de la comida: rompe el candado. */
-  const retryEstimate = useCallback((mealId: string, date = todayStr()) => {
-    const meal = stateRef.current.records.find(r => r.date === date)?.meals?.find(m => m.id === mealId)
-    if (!meal) return
-    processingEstimates.current.delete(mealId)
-    const fresh: MealLog = { ...meal, aiPending: true }
-    delete fresh.aiError
-    patchRecord(date, r => ({
-      ...r,
-      meals: (r.meals ?? []).map(m => (m.id === mealId ? fresh : m)),
-    }))
-    void processEstimatesRef.current?.(fresh, date)
-  }, [patchRecord])
-
-  /** Registra una comida estimada por la IA: foto + texto -> macros. */
-  const logAiMeal = useCallback((slot: MealSlot, name: string, macros: Macros, note?: string, date = todayStr()) => {
-    addMeals([{
-      id: uid('m'),
-      slot,
-      portion: 1,
-      at: Date.now(),
-      custom: { name, prot: macros.prot, carb: macros.carb, grasa: macros.grasa },
-      ...(note ? { note } : {}),
-      ai: true,
-    }], date)
-  }, [addMeals])
-
-  const setPortion = useCallback((mealId: string, portion: number, date = todayStr()) => {
-    patchRecord(date, r => ({
-      ...r,
-      meals: (r.meals ?? []).map(m => (m.id === mealId ? { ...m, portion } : m)),
-    }))
-  }, [patchRecord])
-
-  /**
-   * Procesa todas las estimaciones pendientes (arranque, reconexion y vuelta
-   * a la app). Sin pendientes es un no-op barato.
-   */
-  const processPendingEstimates = useCallback(() => {
-    for (const rec of stateRef.current.records) {
-      for (const meal of rec.meals ?? []) {
-        if (meal.aiPending) void processEstimatesRef.current?.(meal, rec.date)
-      }
-    }
-  }, [])
-
-  // Al arrancar con pendientes de otra sesion, al reconectar y al volver al
-  // frente: la IA trabaja sola, sin que el usuario espere mirando el modal.
-  useEffect(() => {
-    const run = () => {
-      if (document.visibilityState === 'visible') processPendingEstimates()
-    }
-    run()
-    window.addEventListener('online', run)
-    document.addEventListener('visibilitychange', run)
-    return () => {
-      window.removeEventListener('online', run)
-      document.removeEventListener('visibilitychange', run)
-    }
-  }, [processPendingEstimates])
-
-  /** Registra una comida repetida guardada (sin IA: copia sus macros). */
-  const logSavedMeal = useCallback((slot: MealSlot, saved: SavedMeal, portion = 1, date = todayStr()) => {
-    addMeals([{
-      id: uid('m'),
-      slot,
-      portion,
-      at: Date.now(),
-      custom: { name: saved.name, prot: saved.prot, carb: saved.carb, grasa: saved.grasa },
-      ...(saved.note ? { note: saved.note } : {}),
-    }], date)
-  }, [addMeals])
-
-  const removeMeal = useCallback((mealId: string, date = todayStr()) => {
-    clearPendingPhotos(mealId)
-    patchRecord(date, r => ({ ...r, meals: (r.meals ?? []).filter(m => m.id !== mealId) }))
-  }, [patchRecord])
-
-  // --- Entrenamiento ---
-  const setWorkout = useCallback((workoutId: string | null, date = todayStr()) => {
-    patchRecord(date, r => ({ ...r, workoutId }))
-  }, [patchRecord])
-
-  const setSet = useCallback((exerciseId: string, index: number, field: 'weight' | 'reps', value: string, date = todayStr()) => {
+  /** Registra (o borra, con undefined) el peso de un dia. */
+  const setWeight = useCallback((weight: number | undefined, date = todayStr()) => {
     patchRecord(date, r => {
-      const sets = { ...(r.sets ?? {}) }
-      const list = [...(sets[exerciseId] ?? [])]
-      while (list.length <= index) list.push({ weight: '', reps: '' })
-      list[index] = { ...list[index], [field]: value }
-      sets[exerciseId] = list
-      return { ...r, sets }
+      const next = { ...r }
+      if (weight === undefined) delete next.weight
+      else next.weight = weight
+      return next
     })
   }, [patchRecord])
 
-  // --- Ajustes ---
-  const updateSettings = useCallback((patch: Partial<AppSettings>) => {
-    mark()
-    setState(prev => ({ ...prev, settings: { ...prev.settings, ...patch } }))
-  }, [mark])
-
-  const setTargets = useCallback((targets: Macros) => updateSettings({ targets }), [updateSettings])
-
-  /** Guarda (o actualiza) una comida como repetida en Mi plan. */
-  const upsertSavedMeal = useCallback((saved: SavedMeal) => {
-    mark()
-    setState(prev => {
-      const exists = prev.settings.savedMeals.some(m => m.id === saved.id)
-      const savedMeals = exists
-        ? prev.settings.savedMeals.map(m => (m.id === saved.id ? saved : m))
-        : [...prev.settings.savedMeals, saved].slice(0, 30)
-      return { ...prev, settings: { ...prev.settings, savedMeals } }
-    })
-  }, [mark])
-
+  // --- Metas ---
   /** Guarda (o actualiza) una meta de peso por evento. */
   const upsertGoal = useCallback((goal: Goal) => {
     mark()
@@ -428,61 +209,6 @@ export function useAppState() {
       ...prev,
       settings: { ...prev.settings, goals: prev.settings.goals.filter(g => g.id !== id) },
     }))
-  }, [mark])
-
-  const removeSavedMeal = useCallback((id: string) => {
-    mark()
-    setState(prev => ({
-      ...prev,
-      settings: { ...prev.settings, savedMeals: prev.settings.savedMeals.filter(m => m.id !== id) },
-    }))
-  }, [mark])
-
-  const upsertSplitDay = useCallback((day: SplitDay) => {
-    mark()
-    setState(prev => {
-      const exists = prev.settings.split.some(d => d.id === day.id)
-      const split = exists
-        ? prev.settings.split.map(d => (d.id === day.id ? day : d))
-        : [...prev.settings.split, day]
-      return { ...prev, settings: { ...prev.settings, split } }
-    })
-  }, [mark])
-
-  const removeSplitDay = useCallback((dayId: string) => {
-    mark()
-    setState(prev => ({
-      ...prev,
-      settings: { ...prev.settings, split: prev.settings.split.filter(d => d.id !== dayId) },
-    }))
-  }, [mark])
-
-  /**
-   * Materializa la plantilla de rutina como dias del usuario. Se AGREGA a lo
-   * que ya exista, nunca lo reemplaza. Los ejercicios toman el nombre como id
-   * para reconectar el historial de series del modelo viejo.
-   */
-  const loadRoutineTemplate = useCallback(() => {
-    mark()
-    setState(prev => {
-      const existing = new Set(prev.settings.split.map(d => d.name.toLowerCase()))
-      const nuevos: SplitDay[] = ROUTINE_TEMPLATE
-        .filter(d => !existing.has(d.name.toLowerCase()))
-        .map(d => ({
-          id: uid('s'),
-          name: d.name,
-          weekday: d.weekday,
-          exercises: d.exercises.map(e => ({ id: e.name, name: e.name, sets: e.sets, reps: e.reps })),
-        }))
-      if (nuevos.length === 0) return prev
-      return { ...prev, settings: { ...prev.settings, split: [...prev.settings.split, ...nuevos] } }
-    })
-  }, [mark])
-
-  /** Deja la rutina en blanco sin tocar el historial de registros. */
-  const clearPlan = useCallback(() => {
-    mark()
-    setState(prev => ({ ...prev, settings: { ...prev.settings, split: [] } }))
   }, [mark])
 
   // --- Import / Export / Reset ---
@@ -520,27 +246,10 @@ export function useAppState() {
     refreshing,
     refreshFromCloud,
     retrySave: retryNow,
-    // registro
-    updateRecord,
-    logAiMeal,
-    logPendingMeal,
-    retryEstimate,
-    setPortion,
-    logSavedMeal,
-    removeMeal,
-    setWorkout,
-    setSet,
-    // ajustes
-    updateSettings,
-    setTargets,
-    upsertSavedMeal,
-    removeSavedMeal,
+    // peso y metas
+    setWeight,
     upsertGoal,
     removeGoal,
-    upsertSplitDay,
-    removeSplitDay,
-    loadRoutineTemplate,
-    clearPlan,
     // datos
     importState,
     exportState,

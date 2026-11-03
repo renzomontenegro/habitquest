@@ -1,34 +1,16 @@
 import { useState, useCallback, useRef } from 'react'
-import { TodayScreen } from './screens/TodayScreen'
-import { PlanScreen } from './screens/PlanScreen'
+import { HomeScreen } from './screens/HomeScreen'
 import { SettingsSheet } from './screens/SettingsSheet'
-import { SetupScreen } from './screens/SetupScreen'
 import { useAppState } from './hooks/useAppState'
 import { usePWAUpdate } from './hooks/usePWAUpdate'
-import { headerDate, isoWeek, parseDate } from './lib/logic'
+import { headerDate, parseDate } from './lib/logic'
 import { APP_VERSION } from './lib/config'
 import { SaveDot } from './components/ui'
 
-type Tab = 'hoy' | 'plan'
-
-const TABS: [Tab, string][] = [['hoy', 'Hoy'], ['plan', 'Mi plan']]
-
 export default function App() {
-  const [tab, setTab] = useState<Tab>('hoy')
   const [settingsOpen, setSettingsOpen] = useState(false)
   const app = useAppState()
   const update = usePWAUpdate()
-
-  // Dia visible en Hoy. Arranca en hoy; el calendario navega hacia atras.
-  const [viewDate, setViewDate] = useState(app.today)
-  // Si pasan las 0:00, lo que era hoy pasa a ser ayer: no se mueve nada, el
-  // usuario sigue viendo el mismo dia real hasta que toque "Hoy".
-  const goToday = useCallback(() => setViewDate(app.today), [app.today])
-
-  const handleTabChange = useCallback((newTab: Tab) => {
-    if (newTab === tab) void app.refreshFromCloud()
-    setTab(newTab)
-  }, [tab, app])
 
   // Pull-to-refresh: sincroniza, no recarga la app (recargar perdia el scroll
   // y en iOS forzaba una revalidacion completa del service worker). El
@@ -100,25 +82,6 @@ export default function App() {
   }, [app, resetPull])
 
   const todayDate = parseDate(app.today) ?? new Date()
-  const viewDateObj = parseDate(viewDate) ?? todayDate
-  const viewingToday = viewDate === app.today
-
-  // Primer arranque: no se muestra nada mas hasta tener objetivos. Se espera a
-  // la nube para no pedirselos a alguien que ya los tiene guardados.
-  if (!app.state.settings.setupDone && !app.loadingInitial) {
-    return (
-      <div className="app-shell">
-        <div className="app-header-safe" />
-        <main className="app-content">
-          <div className="mx-root">
-            <div className="mx-shell">
-              <SetupScreen onDone={targets => app.updateSettings({ targets, setupDone: true })} />
-            </div>
-          </div>
-        </main>
-      </div>
-    )
-  }
 
   return (
     <div className="app-shell">
@@ -136,13 +99,13 @@ export default function App() {
           </span>
         </div>
 
-        {/* La app NUNCA se bloquea por un fallo de red: se registra igual y se
-            sube al reconectar. El banner solo informa. */}
+        {/* La app NUNCA se bloquea por un fallo de red: el peso se guarda en el
+            telefono y se sube al reconectar. El banner solo informa. */}
         {app.offline && (
           <div className="mx-banner" data-tone="warn">
             <span>⚠</span>
             <span>
-              {app.loadError ?? 'Sin conexion con tu nube.'} Puedes seguir registrando: se guarda
+              {app.loadError ?? 'Sin conexion con tu nube.'} Puedes seguir pesandote: se guarda
               en el telefono y se sube solo al reconectar.
             </span>
           </div>
@@ -163,12 +126,7 @@ export default function App() {
           <div className="mx-shell">
             <div className="mx-head">
               <div>
-                <div className="mx-eyebrow">
-                  {headerDate(viewDateObj)} · semana {String(isoWeek(viewDateObj)).padStart(2, '0')}
-                  {!viewingToday && (
-                    <button className="mx-mini mx-go-today" onClick={goToday}>Hoy</button>
-                  )}
-                </div>
+                <div className="mx-eyebrow">{headerDate(todayDate)}</div>
                 <h1>Traza <span className="mx-ver">v{APP_VERSION}</span></h1>
                 <SaveDot
                   status={app.saveStatus}
@@ -184,21 +142,7 @@ export default function App() {
               </button>
             </div>
 
-            <div className="mx-tabs">
-              {TABS.map(([k, l]) => (
-                <button
-                  key={k}
-                  className="mx-tab"
-                  data-on={tab === k ? '1' : '0'}
-                  onClick={() => handleTabChange(k)}
-                >
-                  {l}
-                </button>
-              ))}
-            </div>
-
-            {tab === 'hoy' && <TodayScreen app={app} viewDate={viewDate} setViewDate={setViewDate} goToday={goToday} />}
-            {tab === 'plan' && <PlanScreen app={app} />}
+            <HomeScreen app={app} />
           </div>
         </div>
       </main>

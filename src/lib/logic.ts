@@ -1,5 +1,4 @@
-import type { AppSettings, DayLog, Goal, Macros, MealLog, MealSlot, SetEntry, SplitDay } from '../types'
-import { KCAL_PER_G, RULES } from './config'
+import type { DayLog, Goal } from '../types'
 
 // --- Ids ---
 export function uid(prefix = ''): string {
@@ -45,26 +44,7 @@ export function lastNDates(n: number, end = todayStr()): string[] {
   return Array.from({ length: n }, (_, i) => addDays(end, i - (n - 1)))
 }
 
-export function weekdayOf(date: string): number {
-  return parseDate(date)?.getDay() ?? 0
-}
-
-/** Los 7 dias de la semana calendario (lunes a domingo) que contiene `date`. */
-export function weekDates(date = todayStr()): string[] {
-  const wd = weekdayOf(date)
-  const monday = addDays(date, wd === 0 ? -6 : 1 - wd)
-  return Array.from({ length: 7 }, (_, i) => addDays(monday, i))
-}
-
-/** Fraccion de la semana ya transcurrida contando hoy como completo. */
-export function weekPace(dates: string[], today = todayStr()): number {
-  const i = dates.indexOf(today)
-  if (i < 0) return today > dates[dates.length - 1] ? 1 : 0
-  return (i + 1) / dates.length
-}
-
 export const WEEKDAY_SHORT = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
-export const WEEKDAY_MIN = ['D', 'L', 'M', 'M', 'J', 'V', 'S']
 export const MONTH_SHORT = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
 
 export function headerDate(d: Date): string {
@@ -77,202 +57,8 @@ export function shortDate(date: string): string {
   return `${d.getDate()} ${MONTH_SHORT[d.getMonth()]}`
 }
 
-export function isoWeek(d: Date): number {
-  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()))
-  const dayNum = date.getUTCDay() || 7
-  date.setUTCDate(date.getUTCDate() + 4 - dayNum)
-  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1))
-  return Math.ceil((((date.getTime() - yearStart.getTime()) / 86400000) + 1) / 7)
-}
-
-// --- Macros ---
-export const ZERO: Macros = { prot: 0, carb: 0, grasa: 0 }
-
-export function addMacros(a: Macros, b: Macros): Macros {
-  return { prot: a.prot + b.prot, carb: a.carb + b.carb, grasa: a.grasa + b.grasa }
-}
-
-export function scaleMacros(m: Macros, f: number): Macros {
-  return { prot: m.prot * f, carb: m.carb * f, grasa: m.grasa * f }
-}
-
-export function roundMacros(m: Macros): Macros {
-  return { prot: Math.round(m.prot), carb: Math.round(m.carb), grasa: Math.round(m.grasa) }
-}
-
-export function kcal(m: Macros): number {
-  return Math.round(m.prot * KCAL_PER_G.prot + m.carb * KCAL_PER_G.carb + m.grasa * KCAL_PER_G.grasa)
-}
-
-/**
- * Macros de referencia de una comida: la fraccion del objetivo diario que le
- * toca. Es la guia que muestra el registro con foto, asi que salen de los
- * numeros del usuario, no de una tabla fija.
- */
-export function slotReference(settings: AppSettings, slot: MealSlot): Macros {
-  return roundMacros(scaleMacros(settings.targets, settings.slotShare[slot] ?? 0))
-}
-
-/** Macros de una comida registrada, ya escalados por la porcion. */
-export function mealMacros(log: MealLog): Macros {
-  if (!log.custom) return ZERO
-  return scaleMacros({ prot: log.custom.prot, carb: log.custom.carb, grasa: log.custom.grasa }, log.portion)
-}
-
-export function mealName(log: MealLog): string {
-  return log.custom?.name || 'Comida'
-}
-
-/** Suma de todo lo comido en un dia. */
-export function dayMacros(record: DayLog | undefined): Macros {
-  if (!record?.meals?.length) return ZERO
-  return record.meals.reduce((acc, m) => addMacros(acc, mealMacros(m)), ZERO)
-}
-
-export function macrosForDate(records: DayLog[], date: string): Macros {
-  return dayMacros(getRecord(records, date))
-}
-
-/** Lo que falta para llegar al objetivo (puede ser negativo = te pasaste). */
-export function remaining(target: Macros, eaten: Macros): Macros {
-  return { prot: target.prot - eaten.prot, carb: target.carb - eaten.carb, grasa: target.grasa - eaten.grasa }
-}
-
-export function sumMacrosOver(records: DayLog[], dates: string[]): Macros {
-  return dates.reduce((acc, d) => addMacros(acc, macrosForDate(records, d)), ZERO)
-}
-
-/** Lo registrado en una comida concreta del dia. */
-export function mealsInSlot(record: DayLog | undefined, slot: MealSlot): MealLog[] {
-  return (record?.meals ?? []).filter(m => m.slot === slot).sort((a, b) => a.at - b.at)
-}
-
-// --- Adherencia ---
-/** Un dia tiene algun registro de comida, aunque todavia pueda estar incompleto. */
-export function hasFoodLog(r: DayLog | undefined): boolean {
-  return !!r?.meals?.length
-}
-
-/** Slots confirmados con comida o marcados como no consumidos. */
-export function foodLogCoverage(r: DayLog | undefined): { covered: number; total: number; complete: boolean } {
-  const slots: MealSlot[] = ['desayuno', 'almuerzo', 'cena', 'extra']
-  const covered = slots.filter(slot =>
-    (r?.meals ?? []).some(m => m.slot === slot) || (r?.skipped ?? []).includes(slot),
-  ).length
-  return { covered, total: slots.length, complete: covered === slots.length }
-}
-
-/** Solo un dia cerrado permite evaluar si se cumplio el objetivo. */
-export function hasCompleteFoodLog(r: DayLog | undefined): boolean {
-  return foodLogCoverage(r).complete
-}
-
-export function loggedDays(records: DayLog[], dates: string[]): number {
-  return dates.filter(d => hasCompleteFoodLog(getRecord(records, d))).length
-}
-
-/** Ratio consumido/objetivo por macro, acotado para la barra. */
-export function ratio(eaten: number, target: number): number {
-  if (target <= 0) return 0
-  return eaten / target
-}
-
-/** Un dia esta en objetivo si los tres macros caen dentro de la tolerancia. */
-export function dayOnTarget(eaten: Macros, target: Macros, tol: number): boolean {
-  return (['prot', 'carb', 'grasa'] as const).every(k => {
-    const r = ratio(eaten[k], target[k])
-    return r >= 1 - tol && r <= 1 + tol
-  })
-}
-
-export function adherence(records: DayLog[], dates: string[], settings: AppSettings): { onTarget: number; logged: number; total: number } {
-  let onTarget = 0
-  let logged = 0
-  for (const d of dates) {
-    const r = getRecord(records, d)
-    if (!hasCompleteFoodLog(r)) continue
-    logged++
-    if (dayOnTarget(dayMacros(r), settings.targets, settings.tolerance)) onTarget++
-  }
-  return { onTarget, logged, total: dates.length }
-}
-
-export interface RumboDay {
-  date: string
-  points: number | null
-  cumulative: number | null
-}
-
-export interface RumboWeek {
-  score: number
-  daily: number
-  weight: number
-  days: RumboDay[]
-}
-
-/**
- * Puntuacion semanal explicable: acciones controlables dan +/-10 por dia
- * cerrado y la tendencia de peso valida el resultado con un ajuste semanal.
- * Un dia sin cierre queda como hueco y no se interpreta como fracaso.
- */
-export function rumboWeek(records: DayLog[], settings: AppSettings, endDate = todayStr()): RumboWeek {
-  const dates = weekDates(endDate)
-  let cumulative = 0
-  const days: RumboDay[] = dates.map(date => {
-    if (date > endDate) return { date, points: null, cumulative: null }
-    const r = getRecord(records, date)
-    if (!hasCompleteFoodLog(r)) return { date, points: null, cumulative: null }
-
-    const eaten = dayMacros(r)
-    const calorieRatio = ratio(kcal(eaten), kcal(settings.targets))
-    const calorieOk = calorieRatio >= 1 - settings.tolerance && calorieRatio <= 1 + settings.tolerance
-    const proteinOk = ratio(eaten.prot, settings.targets.prot) >= 1 - settings.tolerance
-    const slept = sleepHours(r?.bedTime, r?.wakeTime)
-    const sleepOk = slept != null && slept >= settings.sleepTarget
-    const stepsOk = r?.steps != null && r.steps >= settings.stepsTarget
-
-    const planned = splitDayForDate(settings.split, date)
-    let planOk = false
-    if (!planned) {
-      planOk = r?.workoutId == null
-    } else if (r?.workoutId === planned.id) {
-      const expected = planned.exercises.reduce((sum, ex) => sum + ex.sets, 0)
-      const completed = planned.exercises.reduce((sum, ex) =>
-        sum + (r.sets?.[ex.id] ?? []).filter(set => set.weight || set.reps).length, 0)
-      // Basta con 3/4 del plan: faltar a un ejercicio no borra la sesion.
-      planOk = expected > 0 && completed / expected >= RULES.workoutCompleteShare
-    }
-
-    const points = (calorieOk ? 4 : -4)
-      + (proteinOk ? 2 : -2)
-      + (planOk ? 2 : -2)
-      + (stepsOk ? 1 : -1)
-      + (sleepOk ? 1 : -1)
-    cumulative += points
-    return { date, points, cumulative }
-  })
-
-  let weight = 0
-  const recentWeights = records.filter(r => r.weight != null && r.date >= addDays(endDate, -6) && r.date <= endDate).length
-  const previousWeights = records.filter(r => r.weight != null && r.date >= addDays(endDate, -13) && r.date <= addDays(endDate, -7)).length
-  const trend = weightTrendAt(records, endDate)
-  const goal = nearestGoal(settings.goals, endDate)
-  const daysLeft = goal ? daysBetween(endDate, goal.date) : 0
-  if (trend && recentWeights >= 2 && previousWeights >= 2 && goal && daysLeft > 0) {
-    const requiredLoss = Math.max(0, trend.recent - goal.targetWeight) / (daysLeft / 7)
-    const actualLoss = -trend.delta
-    if (actualLoss < -0.1) weight = -20
-    else if (requiredLoss > 0 && actualLoss > requiredLoss * 1.25) weight = -10
-    else if (requiredLoss > 0 && actualLoss >= requiredLoss * 0.8) weight = 30
-    else if (actualLoss > 0.1) weight = 15
-  }
-
-  const lastScored = [...days].reverse().find(day => day.cumulative != null)
-  if (lastScored) lastScored.cumulative = (lastScored.cumulative as number) + weight
-  return { score: cumulative + weight, daily: cumulative, weight, days }
-}
-
-/** La meta mas proxima sin pasar (la que muestra el home). */
+// --- Metas ---
+/** La meta mas proxima sin pasar (la que manda en el home). */
 export function nearestGoal(goals: Goal[], from = todayStr()): Goal | null {
   const upcoming = goals
     .filter(g => g.date >= from)
@@ -285,23 +71,20 @@ export function getRecord(records: DayLog[], date: string): DayLog | undefined {
   return records.find(r => r.date === date)
 }
 
-export function lastActiveDate(records: DayLog[]): string | null {
-  let last: string | null = null
-  for (const r of records) if (!last || r.date > last) last = r.date
-  return last
+/** Ultimo pesaje hasta `to` (inclusive). */
+export function latestWeigh(records: DayLog[], to = todayStr()): { date: string; weight: number } | null {
+  let best: { date: string; weight: number } | null = null
+  for (const r of records) {
+    if (r.weight == null || r.date > to) continue
+    if (!best || r.date > best.date) best = { date: r.date, weight: r.weight }
+  }
+  return best
 }
 
-/**
- * Peso del registro mas cercano a `date`. Para el pesaje del dia: arrancas en
- * el peso de ayer (si lo hay) o del registro con peso mas proximo.
- */
+/** Peso del registro mas cercano a `date` (para arrancar la rueda de pesaje). */
 export function nearestWeight(records: DayLog[], date: string, span = 60): number | null {
   for (let i = 1; i <= span; i++) {
     const w = getRecord(records, addDays(date, -i))?.weight
-    if (w != null) return w
-  }
-  for (let i = 1; i <= span; i++) {
-    const w = getRecord(records, addDays(date, i))?.weight
     if (w != null) return w
   }
   return null
@@ -313,217 +96,42 @@ export function weightAvg(records: DayLog[], from: string, to: string): number |
   return vals.reduce((a, b) => a + b, 0) / vals.length
 }
 
-export function weightTrend(records: DayLog[]): { delta: number; recent: number; prev: number } | null {
-  const t = todayStr()
-  const recent = weightAvg(records, addDays(t, -6), t)
-  if (recent === null) return null
-  const prev = weightAvg(records, addDays(t, -13), addDays(t, -7))
-  if (prev === null) return null
-  return { delta: Math.round((recent - prev) * 10) / 10, recent, prev }
-}
-
 /**
- * Tendencia del peso RELATIVA a una fecha (para el encabezado, que mira el dia
- * visible): promedio de la semana que termina en `date` vs la anterior.
- * "Si sigues asi, en 7d estarás en" = recent + delta.
+ * Ritmo real en kg/semana: promedio de los ultimos 7 dias contra el de los 7
+ * anteriores. Negativo = bajando. Null si no hay dos ventanas con datos.
  */
-export function weightTrendAt(records: DayLog[], date: string): { delta: number; recent: number } | null {
+export function weeklyPace(records: DayLog[], date = todayStr()): number | null {
   const recent = weightAvg(records, addDays(date, -6), date)
-  if (recent === null) return null
   const prev = weightAvg(records, addDays(date, -13), addDays(date, -7))
-  if (prev === null) return null
-  return { delta: Math.round((recent - prev) * 10) / 10, recent }
+  if (recent === null || prev === null) return null
+  return Math.round((recent - prev) * 10) / 10
 }
 
-export function weightSeries(records: DayLog[], days = RULES.weightChartDays): { date: string; weight: number }[] {
-  const from = addDays(todayStr(), -(days - 1))
-  return records
-    .filter(r => r.weight != null && r.date >= from)
-    .map(r => ({ date: r.date, weight: r.weight as number }))
-}
-
-// --- Proyeccion hacia la meta ---
-
-export interface WeightProjection {
-  /** Peso estimado en la fecha objetivo al ritmo actual. */
-  projected: number
-  /** Kg que separan la proyeccion de la meta (positivo = le falta, negativo = la supera). */
-  gap: number
-  recent: number
-  perWeek: number
+// --- Estado de una meta ---
+export interface GoalStatus {
   daysLeft: number
-  targetDate: string
-  targetWeight: number
+  /** Ultimo peso registrado. */
+  current: number | null
+  /** Kg que faltan (positivo = hay que bajar, negativo = ya la superaste). */
+  remaining: number | null
+  /** Kg/semana que hay que bajar desde hoy para llegar. */
+  neededPerWeek: number | null
+  /** Ritmo real de los ultimos 7 dias contra los 7 anteriores. */
+  actualPerWeek: number | null
+  /** Peso estimado el dia de la meta al ritmo actual. */
+  projected: number | null
 }
 
-/**
- * Proyecta el peso a la fecha de una meta usando la tendencia semanal
- * (kg/semana de weightTrend). Devuelve null si la fecha ya paso o si no hay
- * dos ventanas de datos para medir el ritmo.
- */
-export function weightProjection(records: DayLog[], goal: Goal, refDate = todayStr()): WeightProjection | null {
-  const daysLeft = daysBetween(refDate, goal.date)
-  if (daysLeft < 0) return null
-  const trend = weightTrend(records)
-  if (!trend) return null
-  const projected = trend.recent + trend.delta * (daysLeft / 7)
-  return {
-    projected: Math.round(projected * 10) / 10,
-    gap: Math.round((goal.targetWeight - projected) * 10) / 10,
-    recent: trend.recent,
-    perWeek: trend.delta,
-    daysLeft,
-    targetDate: goal.date,
-    targetWeight: goal.targetWeight,
-  }
-}
-
-export function waistSeries(records: DayLog[], days = RULES.waistChartDays): { date: string; waist: number }[] {
-  const from = addDays(todayStr(), -(days - 1))
-  return records
-    .filter(r => r.waist != null && r.date >= from)
-    .map(r => ({ date: r.date, waist: r.waist as number }))
-}
-
-// --- Sueno ---
-export function hmToMinutes(s?: string): number | null {
-  if (!s) return null
-  const m = s.trim().match(/^(\d{1,2}):(\d{2})$/)
-  if (!m) return null
-  const h = parseInt(m[1], 10)
-  const min = parseInt(m[2], 10)
-  if (h > 23 || min > 59) return null
-  return h * 60 + min
-}
-
-/**
- * Normaliza una hora a "HH:MM" antes de guardarla. Acepta variantes que suelta
- * el input (horas de un digito, segundos de mas) pero rechaza formatos raros:
- * si un valor no-conformante llega al record, el input lo marca como invalido
- * (tooltip nativo) y el sueno deja de calcular.
- */
-export function normTime(v: string): string | undefined {
-  if (!v) return undefined
-  const t = v.trim()
-  const m = /^(\d{1,2}):(\d{2})(?::\d{2}(?:\.\d{1,3})?)?$/.exec(t)
-  if (!m) return undefined
-  const h = parseInt(m[1], 10)
-  const min = parseInt(m[2], 10)
-  if (h > 23 || min > 59) return undefined
-  return `${String(h).padStart(2, '0')}:${m[2]}`
-}
-
-export function sleepHours(bed?: string, wake?: string): number | null {
-  const b = hmToMinutes(bed)
-  const w = hmToMinutes(wake)
-  if (b === null || w === null) return null
-  let m = w - b
-  if (m < 0) m += 1440
-  return Math.round((m / 60) * 10) / 10
-}
-
-export function sleepRegularity(records: DayLog[]): number | null {
-  const mins: number[] = []
-  for (const d of lastNDates(7)) {
-    const r = getRecord(records, d)
-    if (!r) continue
-    const h = sleepHours(r.bedTime, r.wakeTime)
-    if (h !== null) mins.push(h * 60)
-  }
-  if (mins.length < 2) return null
-  const mean = mins.reduce((a, b) => a + b, 0) / mins.length
-  const variance = mins.reduce((a, b) => a + (b - mean) ** 2, 0) / mins.length
-  return Math.round(Math.sqrt(variance))
-}
-
-// --- Veredicto ---
-export type Verdict = 'welcome' | 'ok' | 'ajustar' | 'ejecucion' | 'regreso'
-
-export function getVerdict(records: DayLog[], settings: AppSettings): Verdict {
-  if (records.length === 0) return 'welcome'
-  const t = todayStr()
-  const last = lastActiveDate(records)
-  if (last && daysBetween(last, t) >= RULES.absenceDays) return 'regreso'
-  const dates = lastNDates(7)
-  const a = adherence(records, dates, settings)
-  if (a.logged < RULES.minLoggedDays) return 'ejecucion'
-  if (a.onTarget < Math.ceil(a.logged * RULES.onTargetShare)) return 'ejecucion'
-  const trend = weightTrend(records)
-  if (trend && trend.delta < 0) return 'ok'
-  return 'ajustar'
-}
-
-// --- Entrenamiento ---
-export function splitDayForDate(split: SplitDay[], date: string): SplitDay | null {
-  const wd = weekdayOf(date)
-  return split.find(s => s.weekday === wd) ?? null
-}
-
-/** El entreno de un dia: lo elegido a mano si existe, si no lo que toca por split. */
-export function workoutForDate(record: DayLog | undefined, split: SplitDay[], date: string): SplitDay | null {
-  if (record && 'workoutId' in record) {
-    if (record.workoutId === null) return null // descanso explicito
-    const chosen = split.find(s => s.id === record.workoutId)
-    if (chosen) return chosen
-  }
-  return splitDayForDate(split, date)
-}
-
-/**
- * Peso de trabajo del ultimo entreno del ejercicio ANTES de `date` (el maximo
- * de esa sesion). Sirve de placeholder y de arranque del wheel: press de pecho
- * suele ser similar al entreno anterior.
- */
-export function lastSessionWeight(records: DayLog[], exerciseId: string, date: string, span = 90): number | null {
-  for (let i = 1; i <= span; i++) {
-    const r = getRecord(records, addDays(date, -i))
-    const list = r?.sets?.[exerciseId]
-    if (!list || list.length === 0) continue
-    const nums = list.map(s => parseFloat(s.weight)).filter(n => Number.isFinite(n) && n > 0)
-    if (nums.length > 0) return Math.max(...nums)
-  }
-  return null
-}
-
-export function isRestDay(record: DayLog | undefined, split: SplitDay[], date: string): boolean {
-  return workoutForDate(record, split, date) === null
-}
-
-export function makeEmptySets(count: number): SetEntry[] {
-  return Array.from({ length: count }, () => ({ weight: '', reps: '' }))
-}
-
-/** Mejor peso levantado en un ejercicio dentro de un rango de fechas. */
-export function bestWeight(records: DayLog[], exerciseId: string, dates: string[]): number | null {
-  let best: number | null = null
-  for (const d of dates) {
-    const sets = getRecord(records, d)?.sets?.[exerciseId]
-    if (!sets) continue
-    for (const s of sets) {
-      const w = parseFloat(s.weight)
-      if (!isNaN(w) && (best === null || w > best)) best = w
-    }
-  }
-  return best
-}
-
-/** Ejercicios que bajaron de peso respecto a la semana anterior. */
-export function strengthDrops(records: DayLog[], split: SplitDay[]): { name: string; from: number; to: number }[] {
-  const w = RULES.strengthWindowDays
-  const cur = lastNDates(w)
-  const prev = cur.map(d => addDays(d, -w))
-  const out: { name: string; from: number; to: number }[] = []
-  // Un mismo ejercicio puede estar en dos dias del split (p. ej. Cable Row en
-  // Upper y Pull) y compartir id: se reporta una sola vez.
-  const seen = new Set<string>()
-  for (const day of split) {
-    for (const ex of day.exercises) {
-      if (seen.has(ex.id)) continue
-      seen.add(ex.id)
-      const a = bestWeight(records, ex.id, prev)
-      const b = bestWeight(records, ex.id, cur)
-      if (a !== null && b !== null && b < a) out.push({ name: ex.name, from: a, to: b })
-    }
-  }
-  return out
+export function goalStatus(records: DayLog[], goal: Goal, today = todayStr()): GoalStatus {
+  const daysLeft = daysBetween(today, goal.date)
+  const current = latestWeigh(records, today)?.weight ?? null
+  const remaining = current != null ? Math.round((current - goal.targetWeight) * 10) / 10 : null
+  const neededPerWeek = remaining != null && daysLeft > 0 && remaining > 0
+    ? Math.round((remaining / (daysLeft / 7)) * 100) / 100
+    : null
+  const actualPerWeek = weeklyPace(records, today)
+  const projected = current != null && actualPerWeek != null && daysLeft > 0
+    ? Math.round((current + actualPerWeek * (daysLeft / 7)) * 10) / 10
+    : null
+  return { daysLeft, current, remaining, neededPerWeek, actualPerWeek, projected }
 }

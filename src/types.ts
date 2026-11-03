@@ -1,71 +1,3 @@
-// --- Macros ---
-export interface Macros {
-  prot: number
-  carb: number
-  grasa: number
-}
-
-export type MacroKey = keyof Macros
-
-// --- Comidas ---
-export type MealSlot = 'desayuno' | 'almuerzo' | 'cena' | 'extra'
-
-/** Comida guardada como repetida (vino de una estimacion con foto+IA). */
-export interface SavedMeal {
-  id: string
-  name: string
-  prot: number
-  carb: number
-  grasa: number
-  note?: string
-}
-
-/**
- * Una comida registrada. No hay catalogo: los macros de la comida vienen de
- * `custom`. Cuando se registro con foto + texto, la IA los estimo (`ai`).
- */
-export interface MealLog {
-  id: string
-  slot: MealSlot
-  portion: number // 1 = porcion normal
-  at: number
-  /** Macros y nombre de la comida. */
-  custom?: { name: string; prot: number; carb: number; grasa: number }
-  /** Comentario del usuario (lo que le dio contexto a la IA). */
-  note?: string
-  /** true si los macros los estimo la IA a partir de una foto. */
-  ai?: boolean
-  /**
-   * La comida se guardo rapido y sus macros estan pendientes de la IA.
-   * Mientras tanto suma ceros y muestra "Estimando...". La foto vive solo
-   * en el localStorage del telefono hasta que la estimacion funciona.
-   */
-  aiPending?: boolean
-  /** Ultimo error de estimacion (persiste para el boton Reintentar). */
-  aiError?: string
-}
-
-// --- Entrenamiento ---
-export interface Exercise {
-  id: string
-  name: string
-  sets: number
-  reps: string
-}
-
-/** Un dia del split. `weekday` 0-6 (dom-sab), null si no tiene dia fijo. */
-export interface SplitDay {
-  id: string
-  name: string
-  weekday: number | null
-  exercises: Exercise[]
-}
-
-export interface SetEntry {
-  weight: string
-  reps: string
-}
-
 /** Una fecha objetivo: nombre del evento, dia y peso al que llegar. */
 export interface Goal {
   id: string
@@ -74,39 +6,17 @@ export interface Goal {
   targetWeight: number
 }
 
-// --- Registro diario ---
+// --- Registro diario: solo el peso ---
 export interface DayLog {
   date: string // YYYY-MM-DD
   weight?: number // peso en ayunas
-  steps?: number
-  waist?: number // cintura, semanal
-  bedTime?: string // HH:MM
-  wakeTime?: string // HH:MM
-  meals?: MealLog[]
-  skipped?: MealSlot[] // comidas que se salto a proposito (no comio)
-  workoutId?: string | null // id de SplitDay; null = descanso
-  sets?: Record<string, SetEntry[]> // por id de ejercicio
 }
 
 // --- Ajustes ---
 export interface AppSettings {
-  targets: Macros // objetivo diario
-  /** Que fraccion del objetivo diario va en cada comida (0-1). */
-  slotShare: Record<MealSlot, number>
-  /** Comidas repetidas: se guardan una vez (foto+IA) y se usan sin tokens. */
-  savedMeals: SavedMeal[]
-  split: SplitDay[]
-  /** Horas de sueno objetivo. */
-  /** Metas de peso por evento (cumples, bodas...). El home muestra la mas proxima. */
+  /** Metas por evento (cumples, bodas...). La mas proxima manda. */
   goals: Goal[]
-  sleepTarget: number
-  /** Pasos diarios: convierte el registro en una decision, no solo en un dato. */
-  stepsTarget: number
-  /** Margen para dar un dia por cumplido (0.12 = ±12%). */
-  tolerance: number
   startDate: string
-  /** false hasta que el usuario define sus objetivos por primera vez. */
-  setupDone: boolean
 }
 
 // --- Estado global ---

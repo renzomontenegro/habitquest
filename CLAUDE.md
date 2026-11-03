@@ -1,15 +1,17 @@
-# Sistema - PWA de macros, peso y entrenamiento
+# Sistema (Traza) - PWA de cuenta regresiva y peso
 
 ## Que es
-PWA personal (un solo usuario) para registrar comida por macros, peso, pasos, sueno y
-entrenamiento de fuerza. Stack: React + TypeScript + Vite + Tailwind CSS + Framer Motion.
+PWA personal (un solo usuario). Desde la v5.00 hace solo dos cosas: **peso diario** y una
+**cuenta regresiva hacia la meta mas proxima** (evento + fecha + peso objetivo). La presion
+real viene de las **notificaciones push diarias**: "te quedan N dias, si hoy la cagas es un dia
+menos". Stack: React + TypeScript + Vite + Tailwind CSS + Framer Motion.
 
-El objetivo de producto es **friccion minima al registrar**: agregar una comida es una foto
-(opcional un texto) y un tap: la IA estima los macros. Todo lo que se le pide al usuario tiene
-que alimentar alguna decision o grafico; si un campo no se lee en ningun lado, se elimina.
+Se elimino por completo el registro de comidas (foto + IA), entrenamiento, pasos, sueno,
+cintura, puntuacion semanal y el onboarding de macros: el usuario no los usaba y lo unico que lo
+motiva es el tiempo que falta y ver bajar el peso. **No volver a agregar campos de registro
+nuevos** salvo que alimenten la cuenta regresiva o las notificaciones.
 
-> Nota: el repo y la URL siguen llamandose "habitquest" por historia. La app ya no tiene XP,
-> niveles, rachas, logros ni ligas: eso se elimino por completo.
+> Nota: el repo y la URL siguen llamandose "habitquest" por historia.
 
 ## Deployment
 - **Frontend**: Vercel (auto-deploy desde `main` en GitHub)
@@ -46,47 +48,10 @@ que alimentar alguna decision o grafico; si un campo no se lee en ningun lado, s
 - **n8n API Key credential**: "n8n API Key (internal)" (id: `mFap4LinpRbFmxIY`), header `X-N8N-API-KEY`
 - **API path correcto**: `/api/v1/data-tables/{id}/rows` (con guion, NO `/api/v1/datatable/`)
 
-### Workflow: Estimar Comida (IA)
-- **ID**: `5lwcNn83WTAqecLh` (activo)
-- **Webhook**: POST `/webhook/habitquest-estimate` — recibe `{ slot, note, image }` (image en
-  base64, ya comprimida en el browser) y devuelve `{ prot, carb, grasa, kcal, nombre }`.
-- **Auth**: mismo Bearer "Header Auth PWA" (`AQKgx9XV1nvU6bv0`).
-- **Flujo**: validacion de entrada (Code) -> HTTP Request a `https://opencode.ai/zen/go/v1/chat/completions`
-  con el modelo **`mimo-v2.5`** (vision, barato, ~0.14 USD/M token) -> parse del JSON ->
-  responder 200 / 400 / 502. El parse busca `choices[0].message.content` y cae a
-  `reasoning_content` si el JSON corto.
-- **La key de Opencode GO vive SOLO en n8n**: credential `httpHeaderAuth` "Opencode GO API"
-  (id: `Ik3mnm12LdnGwAcv`, restringida al dominio `opencode.ai`). Nunca en el bundle ni en el repo.
-- Endpoint base de GO: `https://opencode.ai/zen/go/v1` (NO `opencode.go`: ese dominio no existe).
-- La foto NO se almacena en ningun lado: viaja a la IA y se descarta.
-- **Header `x-opencode-session`**: OpenCode GO lo exige desde el 06/09/2026 (sin el, los
-  requests del useragent `n8n` pueden fallar). Esta en AMBOS nodos HTTP ("Pedir a la IA" y
-  "Pedir a la IA (Ideas)") como header fijo con el UUID estable
-  `557fa092-410b-4eed-8225-13d6ac771aaa`. Si cambias de cuenta GO, genera otro y actualizalo
-  en los dos nodos.
-- **Timeouts**: el nodo HTTP tiene 120 s y el cliente (`estimateMeal`/`suggestIdeas` en
-  `sync.ts`) corta a los 120 s. mimo-v2.5 tarda 5-200 s segun el caso (medido 199 s en la
-  ejecucion 7417); NO bajar el techo del cliente por debajo del servidor o el
-  usuario vera "se corto" aunque la IA responda bien despues.
-- **Fallas reales (rev. 20/09/2026)**: n8n NO registra ejecuciones fallidas ni 400/502 en
-  este flujo; el fallo tipico es el corte del cliente a los 120 s contra una IA lenta
-  (los clusters de ejecuciones con minutos de diferencia son reintentos manuales).
-  Por eso `estimateMeal()` reintenta hasta 3 veces con backoff (3 s, 8 s) solo ante fallas
-  transitorias (timeout, red, 429/502/503/504 o 200 sin macros); un 400/401/403 nunca se
-  reintenta. La estimacion no tiene efectos en el servidor, asi que reintentar es seguro.
-
-### Workflow: Ideas de comida (mismo workflow)
-- En el mismo workflow hay un **segundo webhook**: POST `/webhook/habitquest-suggest`
-  ("Webhook Ideas" -> "Validar Ideas" -> "Pedir a la IA (Ideas)" -> "Parsear Ideas").
-  Recibe `{ slot, protein, source, gymDay, carbsTarget, carbsEatenToday,
-  carbsRemainingToday, weekCarbsDelta, weekDaysLogged, protTarget, protEatenToday, slotRef }`
-  y devuelve `{ ideas: [{ nombre, detalle, prot, carb, grasa, kcal }] }` (4 max).
-- Proteina viene de la lista aprobada (config.ts `PROTEINS`); `source` es `cocinar` o `rappi`.
-- **Carb cycling**: la IA recibe gym hoy, carbos restantes del dia y el acumulado semanal;
-  por eso pide mas carbos si hay entreno o semana en deficit, y menos si no.
-- `max_tokens` en vivo: **4096** (el doc decia 8192; no se observan 502 por tramo,
-  asi que el corte no es la causa actual). Si vuelven los 502 con `finish_reason=length`,
-  subirlo es el primer lugar que mirar (a costa de mas latencia).
+### Workflows de IA (ya no se usan)
+"Estimar Comida (IA)" (`5lwcNn83WTAqecLh`, webhooks `habitquest-estimate` y
+`habitquest-suggest`) quedo huerfano desde la v5.00: la app ya no lo llama. Se puede
+desactivar/borrar en n8n; la credential "Opencode GO API" (`Ik3mnm12LdnGwAcv`) tambien.
 
 ### Credenciales n8n
 - `AQKgx9XV1nvU6bv0` — Header Auth PWA (Bearer token para webhooks)
@@ -111,87 +76,17 @@ El MCP de n8n se define en **dos archivos** y opencode manda sobre el otro:
 > decepciona.
 
 ## Modelo de datos (`src/types.ts`)
+- `DayLog` — `{ date, weight? }`. Solo el peso en ayunas.
+- `Goal` — `{ id, name, date, targetWeight }`. La meta mas proxima sin pasar manda
+  (`nearestGoal`).
+- `AppSettings` — `{ goals, startDate }`.
+- `goalStatus()` (`logic.ts`) calcula dias que faltan, kg que faltan, kg/semana necesarios,
+  ritmo real (promedio 7 dias vs 7 anteriores) y proyeccion.
 
-**Las comidas se registran con FOTO + TEXTO y la IA estima los macros.** No hay catalogo de
-alimentos ni opciones con macros escritos a mano ("Seco de res" con 40P fue un experimento que
-no funciono para este usuario). La foto viaja a la IA (n8n -> Opencode GO) y NO se guarda; lo
-que queda en el registro es el resultado estimado.
-
-- `MealLog` — una comida registrada: `slot`, `portion` (1 = porcion normal), `at`,
-  `custom` = `{ name, prot, carb, grasa }` (siempre presente), `note` (comentario del usuario
-  que le dio contexto a la IA), `ai` (true si los macros los estimo la IA),
-  `aiPending` (macros pendientes: suma ceros y muestra "Estimando...") y `aiError`
-  (ultimo error, persiste para el boton Reintentar). Las fotos pendientes viven aparte
-  en `localStorage['sistema_pending_photos']` por id de comida (`src/lib/pendingPhotos.ts`):
-  nunca entran al AppState ni viajan a la nube.
-- `DayLog` — `weight`, `steps`, `waist`, `bedTime`, `wakeTime`, `meals[]`,
-  `workoutId` (id de `SplitDay`, `null` = descanso), `sets` (por **id** de ejercicio).
-- `SplitDay` / `Exercise` — el split es **data editable por el usuario**, no constantes.
-  `weekday` 0-6 fija el dia; `null` = solo aparece si se elige a mano.
-- `AppSettings` — `targets`, `slotShare`, `split`, `goals`, `sleepTarget`, `stepsTarget`,
-  `tolerance`, `startDate`, `setupDone`. (Ya no hay `options` ni meta unica:
-  `goals` es la lista de eventos con fecha y peso objetivo, y el home muestra
-  la mas proxima con los dias restantes.)
-
-### El plan NO vive en el codigo
-`config.ts` no contiene comidas ni rutina del usuario. Una instalacion nueva arranca con
-`split: []` (las comidas se registran por foto, no hay catalogo que sembrar), y pasa por
-`SetupScreen` (solo objetivos). Todo lo demas se crea desde Mi plan. Si algun dia hace falta un
-valor de plan nuevo, va a `AppSettings`, no a una constante.
-
-Lo que queda en `config.ts` es de dos tipos, separados a proposito:
-- **Arranques neutros** (`DEFAULT_*`): el punto de partida antes del onboarding. No son un
-  plan: son objetivos genericos y un reparto por comida, ambos editables.
-- **`RULES`**: umbrales del algoritmo del veredicto y rangos de los graficos. Son reglas, no
-  preferencias; viven juntas para que no haya numeros magicos sueltos en la logica.
-
-No hay nombres de comidas en el codigo. La unica excepcion es `ROUTINE_TEMPLATE`: la rutina
-Upper/Lower del usuario (4 dias: Upper A, Lower A, Upper B, Lower B), que **no se siembra** y
-solo se materializa cuando toca "Cargar rutina" en Mi plan → Entrenamiento
-(`loadRoutineTemplate()`). Se agrega a lo que ya exista, saltando los dias cuyo nombre ya este,
-asi que tocarlo dos veces no duplica.
-
-Los ejercicios de la plantilla usan **el nombre como id** a proposito: el historial de series
-del modelo viejo estaba indexado por nombre, asi que cargarla reconecta esos pesos. El efecto
-secundario es que un ejercicio repetido en dos dias (Cable Row en Upper y Pull) comparte id e
-historial; `strengthDrops()` lo deduplica.
-
-`slotReference(settings, slot)` deriva los macros de referencia de una comida como
-`targets × slotShare[slot]`. Es lo que muestra el registro con foto como guia, asi que sale de
-los numeros del usuario. `slotShare` es editable en Mi plan → Objetivo diario.
-
-Cuando un texto de la UI menciona un umbral (p. ej. "±12%"), debe leerlo del ajuste, nunca
-repetirlo escrito: si no, se desincroniza en cuanto el usuario lo cambia.
-
-### Que pasa con el estado del modelo viejo
-`storage.ts` **no reconstruye el plan** a partir del formato anterior. Se conserva solo lo que
-eran numeros reales escritos por el usuario:
-
-- Se conservan: `weight`, `steps`, `waist`, `bedTime`, `wakeTime` y `sets`.
-- Se descartan: `recipeLists` / `selectedRecipes` (la rutina y las recetas estaban quemadas en
-  el codigo, no las eligio el usuario), `meals` en formato `'sí'/'otra'/'no'` (no tenian macros
-  detras), `mealSeverity`, `carbSources`, `walkAfterLunch`, `sugaryOrAlcohol` y `lastMealTime`.
-- `setupDone` solo es true si se definio en esta version, asi que un estado viejo pasa por el
-  onboarding y arranca con Entrenamiento vacio (las comidas nunca tuvieron catalogo: se
-  registran por foto).
-- Las series viejas quedan indexadas por **nombre** de ejercicio. Vuelven a aparecer en cuanto
-  se cree un ejercicio con ese mismo nombre; hasta entonces siguen guardadas sin mostrarse.
-
-No hay constantes `LEGACY_*`: sembrar el plan viejo era exactamente el hardcodeo que habia
-que eliminar.
-
-### Purga de la siembra de las versiones 2.0-2.2
-Esas versiones si sembraban comidas y rutina de ejemplo, y **eso quedo guardado en el estado
-del usuario y en la DataTable**. Quitar las constantes del codigo no las borra: `sanitize` ya
-las lee como datos suyos. Por eso `isSeededId()` las descarta al cargar.
-
-La regla es el id: la app los escribia a mano con guion bajo (`o_muffins`, `s_upper`,
-`e_bench`), mientras que `uid()` genera `<prefijo><base36><random>` sin guion bajo. Nada
-creado por el usuario cae en el filtro. **Si algun dia se generan ids con guion bajo, esta
-purga empezaria a borrar datos reales.**
-
-Ajustes tiene ademas "Vaciar mi plan" (`clearPlan()`), que limpia el `split` sin tocar
-`records`.
+`storage.sanitize` **descarta** todo lo que no sea peso/metas al cargar (comidas, pasos, sueno,
+entrenos, macros de versiones anteriores). El respaldo en JSON de Ajustes sigue disponible.
+Las filas viejas de la DataTable siguen existiendo (la API no borra), solo cambia que la app ya
+no las lee.
 
 ## Arquitectura de Sync (`src/lib/sync.ts`)
 La app **nunca se bloquea** por un fallo de red. Reglas:
@@ -214,24 +109,27 @@ La app **nunca se bloquea** por un fallo de red. Reglas:
 - Al reconectar, `mergeStates` toma la nube como base y **gana lo local solo en las fechas
   marcadas**. Luego se sube. Las marcas se limpian cuando la nube confirma.
 
-## Notificaciones push
-El service worker (`src/sw.ts`) ya maneja `push` y `notificationclick`. El cliente pide
-permiso, obtiene la suscripcion y la registra con `registerPushSubscription()` contra
+## Notificaciones push (el corazon de la app)
+El service worker (`src/sw.ts`) maneja `push` y `notificationclick`. El cliente pide permiso,
+obtiene la suscripcion y la registra con `registerPushSubscription()` contra
 **POST `/webhook/habitquest-push`**.
 
-El backend ya existe: el workflow **"Sistema Push"** (`XI555krGiKbDvH4F`) registra la
-suscripcion (webhook `habitquest-push`, upsert en DataTable `e1410wlZvquWmkLD` con key
-`push_sub`) y envia recordatorios contextuales a las **9:00, 12:55, 19:55 y 23:00**. Antes de
-notificar lee el ultimo estado de la DataTable: a las 23:00 pide pasos solo si faltan; a la
-manana recupera los pasos de ayer; el domingo pide cintura y el lunes hace un unico rescate si se
-omitio. Almuerzo,
-cena, peso y cierre tambien se omiten si ya estan registrados. El envio usa un Code node con la
-implementacion manual del protocolo Web Push (JWT ES256 + aes128gcm) con el
-par VAPID embebido (`VAPID_PUBLIC`/`VAPID_PRIVATE` en el propio Code node). El webhook
-`sistema-push-send` permite enviar a mano para probar. Si se cambia el par VAPID en el
-frontend, hay que actualizar AMBAS claves en ese Code node.
+Backend: workflow **"Sistema Push"** (`XI555krGiKbDvH4F`). Cron a las **8:00** y **20:00**
+(hora Lima). El Code node "Preparar mensaje" (copia en `scripts/push-countdown.js`, hay que
+mantenerlas iguales) lee el ultimo estado de la DataTable y:
+- **8:00**: "Quedan N dias · <meta>" + frase rotativa ("Mañana seran N-1...", "Si hoy la cagas,
+  es un dia menos...") + peso actual, kg que faltan, kg/semana necesarios vs ritmo real. Si hoy
+  no te pesaste agrega "Pesate hoy"; si el ultimo pesaje tiene 3+ dias lo dice.
+- **20:00**: solo si hoy no hubo pesaje ("Hoy no te pesaste").
+- Sin meta proxima no manda nada.
+El envio usa un Code node con Web Push manual (JWT ES256 + aes128gcm) y el par VAPID embebido
+(`VAPID_PUBLIC`/`VAPID_PRIVATE` en el propio Code node "Enviar push"). El webhook
+`sistema-push-send` manda un push a mano ({ title, body }); el boton "Push de prueba" de Ajustes
+lo usa. Si se cambia el par VAPID en el frontend, actualizar AMBAS claves en ese Code node.
 
 > Ojo: las claves VAPID viven DENTRO del Code node del workflow, no en una credencial de n8n.
+> Ojo 2: n8n separa borrador y publicado; tras editar con el MCP verificar con
+> `n8n_get_workflow mode=active`.
 
 ## Refresh
 - **Tap en la pestana ya activa** → `refreshFromCloud()`
@@ -239,22 +137,18 @@ frontend, hay que actualizar AMBAS claves en ese Code node.
 - **Boton "Sincronizar ahora"** en Ajustes → `refreshFromCloud()`
 
 ## Archivos clave
-- `src/types.ts` — modelo de datos
-- `src/lib/config.ts` — `APP_VERSION`, slots, `SLOT_REFERENCE` + semillas (split, targets), `ROUTINE_TEMPLATE`
-- `src/lib/logic.ts` — fechas, sumas de macros, adherencia, veredicto, helpers de split
-- `src/lib/storage.ts` — localStorage, `sanitize` y la migracion del modelo viejo
-- `src/lib/sync.ts` — cola de guardado, reintentos, flush, `estimateMeal()` (foto -> IA,
-  3 intentos con backoff solo ante fallas transitorias)
-- `src/hooks/useAppState.ts` — estado global, acciones, merge offline (`AppController`)
-- `src/components/ui.tsx` — BottomSheet, Stepper, MacroBar, SaveDot, Toast, ConfirmButton, TimeWheel, WeightWheel.
-  `BottomSheet` se ajusta a `visualViewport` para que ningun input quede detras del teclado movil.
-- `src/components/MealEstimateSheet.tsx` — captura rapida (foto + texto -> Guardar al
-  instante); la IA completa los macros en segundo plano (`logPendingMeal` +
-  `processOneEstimate` en `useAppState.ts`: arranque, `online`, al volver a la app y
-  boton Reintentar; la nube nunca borra una comida pendiente)
-- `src/components/MealIdeaSheet.tsx` — asistente de idea: proteina + cocinar/rappi + carb cycling -> la IA sugiere (webhook `habitquest-suggest`)
-- `src/components/charts.tsx` — LineChart, DayBars, PaceBar, Stat (SVG a mano)
-- `src/screens/` — SetupScreen (primer arranque), TodayScreen, WeekScreen, PlanScreen, SettingsSheet
+- `src/types.ts` — modelo de datos (peso + metas)
+- `src/lib/config.ts` — `APP_VERSION`, dias del grafico
+- `src/lib/logic.ts` — fechas, `nearestGoal`, `goalStatus`, ritmo de peso
+- `src/lib/storage.ts` — localStorage y `sanitize`
+- `src/lib/sync.ts` — cola de guardado, reintentos, flush, registro de push
+- `src/lib/notifications.ts` — permiso y suscripcion push
+- `src/hooks/useAppState.ts` — estado global, `setWeight`, metas, merge offline
+- `src/screens/HomeScreen.tsx` — cuenta regresiva, pesaje, grafico, metas y editor de meta
+- `src/screens/SettingsSheet.tsx` — sync, actualizaciones, push, respaldo
+- `src/components/ui.tsx` — BottomSheet, Stepper, SaveDot, Toast, ConfirmButton, WeightWheel
+- `src/components/charts.tsx` — LineChart (SVG a mano; huecos, nunca ceros)
+- `scripts/push-countdown.js` — copia del Code node de los mensajes push
 - `src/styles.css` — tema, app shell, safe areas iOS
 
 ## Reglas de desarrollo
@@ -265,21 +159,14 @@ frontend, hay que actualizar AMBAS claves en ese Code node.
   (NO `restart`). Backup antes: `sudo cp docker-compose.yml docker-compose.yml.bak-$(date +%Y%m%d-%H%M)`.
 - **VITE_ env vars son build-time**: cambiarlas en Vercel requiere redeploy.
 - **No hacer POST de prueba al webhook**: sobreescribe el estado real. Para probar, leer con
-  GET. En local el sync queda desactivado solo si NO existe `VITE_SYNC_URL` en `.env`.
-- **Los graficos son SVG a mano**, no `recharts`: el lenguaje visual es mono + hairlines y las
-  librerias genericas no encajan. Un dia sin registro se dibuja **hueco**, nunca como un cero.
+  GET. OJO: con `VITE_SYNC_URL` en `.env`, abrir el dev server YA sube el estado a la nube (el
+  efecto de persistencia guarda tras cargar). Para previsualizar sin tocar la nube, arrancar con
+  `env VITE_SYNC_URL= VITE_SYNC_TOKEN= npm run dev`.
+- **El grafico es SVG a mano**, no `recharts`. Un dia sin registro se dibuja **hueco**, nunca como un cero.
 - **Errores inline y no bloqueantes**: mostrar el problema donde ocurre, sin deshabilitar la UI.
-- **Cada campo que se pide debe usarse**: si un dato del registro diario no alimenta un calculo
-  ni un grafico, se elimina. Es la regla que mata la friccion.
-- **Registrar una comida = foto (opcional) + texto + Guardar, y salir.** La comida se guarda
-  al instante como pendiente y la IA completa los macros en segundo plano (con o sin internet;
-  si falla, las fotos persisten en el telefono y hay boton Reintentar). Sin foto la IA
-  estima solo con el comentario. La porcion se ajusta despues desde la tarjeta. Un dia sin registro
-  no cuenta. Cualquier paso extra obligatorio (pesar, elegir ingredientes, esperar a la IA)
-  va contra el producto.
-- **Nada del plan del usuario se escribe en el codigo.** Si aparece la tentacion de poner una
-  comida, una rutina o un objetivo "por defecto" en `config.ts`, va en `AppSettings` y se
-  edita desde la app. Sin excepciones: tampoco "de ejemplo" ni "para migrar".
+- **Cada campo que se pide debe usarse**: si un dato no alimenta la cuenta regresiva, el grafico
+  o una notificacion, se elimina.
+- **Nada del plan del usuario se escribe en el codigo**: las metas viven en `AppSettings`.
 - **UI en espanol** (sin tildes en el codigo por consistencia).
 
 ## Problemas conocidos
@@ -294,9 +181,6 @@ frontend, hay que actualizar AMBAS claves en ese Code node.
 - **DataTable acumula filas**: cada save inserta una fila nueva (la API no soporta PATCH/DELETE).
   El load toma la mas reciente (`sortBy=updatedAt:desc&limit=1`). Limpiar periodicamente via MCP
   (`n8n_manage_datatable` action `deleteRows`).
-- **Nombres de ejercicio repetidos en la migracion**: si un ejercicio existia en dos dias del
-  split viejo (p. ej. "Cable Row" en Upper y Pull), sus series historicas se atribuyen al primero.
-  No habia forma de desambiguar.
 
 ## Skills de diseno UI/UX (ux-ui-agent-skills)
 Este proyecto incluye el kit `ux-ui-agent-skills` (v2.4.0). Los skills viven en

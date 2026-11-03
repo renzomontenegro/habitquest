@@ -277,31 +277,6 @@ export function Stepper({ value, onChange, step = 10, min = 0, suffix, ariaLabel
   )
 }
 
-// --- Barra de macro: lo que FALTA es el numero grande ---
-export function MacroBar({ label, eaten, target, tone }: {
-  label: string
-  eaten: number
-  target: number
-  tone: 'prot' | 'carb' | 'grasa'
-}) {
-  const left = Math.round(target - eaten)
-  const pct = target > 0 ? (eaten / target) * 100 : 0
-  const over = pct > 105
-  return (
-    <div className="mx-mb" data-tone={tone} data-over={over ? '1' : '0'}>
-      <div className="mx-eyebrow">{label}</div>
-      <div className="mx-mb-v mx-mono">
-        {left >= 0 ? left : `+${-left}`}<span className="mx-u">g</span>
-      </div>
-      <div className="mx-mb-t">{left >= 0 ? 'faltan' : 'te pasaste'}</div>
-      <div className="mx-mb-track">
-        <i style={{ width: `${Math.min(100, pct)}%` }} />
-      </div>
-      <div className="mx-mb-n mx-mono">{Math.round(eaten)} / {Math.round(target)}</div>
-    </div>
-  )
-}
-
 // --- Indicador de guardado ---
 const SAVE_TEXT: Record<SaveStatus, string> = {
   idle: '',
@@ -380,60 +355,6 @@ export function ConfirmButton({ label, confirmLabel, onConfirm, className }: {
     </button>
   )
 }
-
-// --- Rueda de repeticiones: 0-20, arranca en el limite inferior del rango ---
-const REPS_COUNT = 21
-
-export function RepsWheel({ open, onClose, title, initial, hasValue, onChange }: {
-  open: boolean
-  onClose: () => void
-  title: string
-  initial: number
-  hasValue: boolean
-  onChange: (v: number | undefined) => void
-}) {
-  return (
-    <BottomSheet open={open} onClose={onClose} title={title}>
-      {open && (
-        <RepsBody initial={initial} hasValue={hasValue} onChange={onChange} onClose={onClose} />
-      )}
-    </BottomSheet>
-  )
-}
-
-function RepsBody({ initial, hasValue, onChange, onClose }: {
-  initial: number
-  hasValue: boolean
-  onChange: (v: number | undefined) => void
-  onClose: () => void
-}) {
-  const [v, setV] = useState(Math.max(0, Math.min(REPS_COUNT - 1, Math.round(initial))))
-
-  return (
-    <>
-      <div className="mx-wv mx-mono">{v} <span className="mx-u">reps</span></div>
-      <div className="mx-wheel">
-        <WheelCol label="Repeticiones" count={REPS_COUNT} selected={v} onSelect={setV} fmt={String} />
-      </div>
-      <div className="mx-acts">
-        {hasValue && (
-          <button
-            className="mx-btn mx-btn-danger"
-            onClick={() => { onChange(undefined); onClose() }}
-          >
-            Borrar
-          </button>
-        )}
-        <button className="mx-btn" data-p="1" onClick={() => { onChange(v); onClose() }}>
-          Listo
-        </button>
-      </div>
-    </>
-  )
-}
-
-// --- Rueda de hora estilo iOS (alarma) ---
-// Dos columnas con scroll-snap siempre producen "HH:MM" valido: imposible que
 // el record reciba un string que el input marque como invalido.
 const WHEEL_ITEM = 44
 const WHEEL_VISIBLE = 5
@@ -540,70 +461,6 @@ function WheelCol({ label, count, selected, onSelect, fmt = pad2, loop = false }
   )
 }
 
-export function TimeWheel({ open, onClose, title, value, initialValue, onChange }: {
-  open: boolean
-  onClose: () => void
-  title: string
-  value: string | undefined
-  initialValue?: string
-  onChange: (v: string | undefined) => void
-}) {
-  const m = (value ?? initialValue)?.match(/^(\d{1,2}):(\d{2})$/)
-  const startH = m ? Math.min(23, parseInt(m[1], 10)) : 20
-  const startM = m ? Math.min(59, parseInt(m[2], 10)) : 0
-
-  return (
-    <BottomSheet open={open} onClose={onClose} title={title}>
-      {open && (
-        <WheelBody
-          startH={startH}
-          startM={startM}
-          hasValue={value !== undefined}
-          onChange={onChange}
-          onClose={onClose}
-        />
-      )}
-    </BottomSheet>
-  )
-}
-
-// El cuerpo se monta solo al abrir, asi el estado arranca del valor del record
-// sin necesidad de sincronizarlo con un effect.
-function WheelBody({ startH, startM, hasValue, onChange, onClose }: {
-  startH: number
-  startM: number
-  hasValue: boolean
-  onChange: (v: string | undefined) => void
-  onClose: () => void
-}) {
-  const [h, setH] = useState(startH)
-  const [min, setMin] = useState(startM)
-
-  const commit = () => onChange(`${pad2(h)}:${pad2(min)}`)
-
-  return (
-    <>
-      <div className="mx-wheel">
-        <WheelCol label="Horas" count={24} selected={h} onSelect={setH} fmt={i => pad2(i)} loop />
-        <div className="mx-wheel-sep mx-mono">:</div>
-        <WheelCol label="Minutos" count={60} selected={min} onSelect={setMin} fmt={i => pad2(i)} loop />
-      </div>
-      <div className="mx-acts">
-        {hasValue && (
-          <button
-            className="mx-btn mx-btn-danger"
-            onClick={() => { onChange(undefined); onClose() }}
-          >
-            Borrar
-          </button>
-        )}
-        <button className="mx-btn" data-p="1" onClick={() => { commit(); onClose() }}>
-          Listo
-        </button>
-      </div>
-    </>
-  )
-}
 
 // --- Pesaje con rueda: entero + decimal, en kg o lb, siempre se guarda en kg ---
 const KG_TO_LB = 2.2046226218
