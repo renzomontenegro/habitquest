@@ -45,46 +45,78 @@ const recent = avg(dateAt(-6), today);
 const prev = avg(dateAt(-13), dateAt(-7));
 const perWeek = recent != null && prev != null ? recent - prev : null;
 
-// 20:00: solo si hoy no te pesaste.
+const dd = `${daysLeft} ${daysLeft === 1 ? 'día' : 'días'}`;
+const next = daysLeft > 1 ? `Mañana serán ${daysLeft - 1}` : 'Mañana es el día';
+const pick = list => list[((dayNum(today) % list.length) + list.length) % list.length];
+
+// 20:00: solo si hoy no te pesaste. Siempre discreto: sin evento ni cifras.
 if (hour === 20) {
   if (weighedToday) return [];
-  return [{ json: {
-    title: 'Hoy no te pesaste',
-    body: `Quedan ${daysLeft} ${daysLeft === 1 ? 'día' : 'días'} para ${goal.name}. Sin pesaje no sabes dónde estás parado.`,
-  } }];
+  const [t, b] = pick([
+    ['Falta tu pesaje', 'Hoy no te pesaste. Sin dato no sabes dónde estás parado.'],
+    [dd, 'Hoy no te pesaste. El día se acaba y no se repite.'],
+    ['Pesaje pendiente', 'Mañana en ayunas, lo primero. Sin dato no hay ajuste.'],
+  ]);
+  return [{ json: { title: t, body: b } }];
 }
 if (hour !== 8) return [];
 
-// 08:00: la cuenta regresiva.
-const title = daysLeft === 0 ? `Hoy es ${goal.name}`
-  : daysLeft === 1 ? `Mañana es ${goal.name}`
-  : `Quedan ${daysLeft} días · ${goal.name}`;
+// 08:00: el mensaje del dia. Cada mensaje es "directo" (nombra el evento y las
+// cifras) o "discreto" (nada que se entienda si alguien ve la pantalla). Se
+// alternan por dia para que no sea siempre el mismo tono.
+const stale = last ? dayNum(today) - dayNum(last.date) : null;
+const remaining = last ? last.weight - goal.targetWeight : null;
+const need = remaining != null && remaining > 0 && daysLeft > 0 ? remaining / (daysLeft / 7) : null;
+const lose = perWeek != null ? -perWeek : null; // kg/sem que realmente estas bajando
 
-const tagline = daysLeft === 0 ? 'Se acabó la preparación. Hoy se ve lo que hiciste.'
-  : daysLeft === 1 ? 'Último día para ajustar. Todo lo de hoy cuenta.'
-  : [
-      `Mañana serán ${daysLeft - 1}. Hoy no se repite.`,
-      `Si hoy la cagas, es un día menos y no se devuelve. Quedarán ${daysLeft - 1}.`,
-      `Cada día que pasa no vuelve. Mañana: ${daysLeft - 1}.`,
-    ][dayNum(today) % 3];
+let situation;
+if (!last) situation = 'nodata';
+else if (stale >= 3) situation = 'stale';
+else if (remaining <= 0) situation = 'reached';
+else if (daysLeft === 0) situation = 'dday';
+else if (lose != null && (lose >= 0.4 || (need != null && lose >= need * 0.8))) situation = 'ontrack';
+else situation = 'behind';
 
-let weightLine;
-if (!last) {
-  weightLine = 'Todavía no tienes ningún pesaje. Pésate hoy.';
-} else {
-  const remaining = last.weight - goal.targetWeight;
-  if (remaining <= 0) {
-    weightLine = `Estás en ${fmt(last.weight)} kg y la meta es ${fmt(goal.targetWeight)}. Ya llegaste: no lo sueltes.`;
-  } else if (daysLeft === 0) {
-    weightLine = `Estás en ${fmt(last.weight)} kg, la meta era ${fmt(goal.targetWeight)}.`;
-  } else {
-    const need = remaining / (daysLeft / 7);
-    weightLine = `Estás en ${fmt(last.weight)} kg y te faltan ${fmt(remaining)}. Necesitas bajar ${fmt(need, 2)} kg/sem`
-      + (perWeek != null ? (perWeek < 0 ? `; vas a ${fmt(-perWeek)}.` : '; tu peso no está bajando.') : '.');
-  }
-  const stale = dayNum(today) - dayNum(last.date);
-  if (stale >= 3) weightLine += ` Último pesaje hace ${stale} días.`;
-  else if (!weighedToday) weightLine += ' Pésate hoy.';
-}
+const w = last ? fmt(last.weight) : '';
+const paceTxt = need == null ? ''
+  : lose == null ? `Necesitas bajar ${fmt(need, 2)} kg/sem.`
+  : lose > 0 ? `Necesitas ${fmt(need, 2)} kg/sem y vas a ${fmt(lose)}.`
+  : `Necesitas ${fmt(need, 2)} kg/sem y tu peso no está bajando.`;
 
-return [{ json: { title, body: `${tagline} ${weightLine}` } }];
+const pools = {
+  nodata: () => [
+    [`Quedan ${dd} · ${goal.name}`, 'Sin pesaje no sabes dónde estás parado. Pésate hoy.'],
+    [dd, 'Pésate en ayunas hoy. Sin dato no hay plan.'],
+    ['Carb cycling', 'Día de entreno: carbos arriba. Día de descanso: carbos abajo. Y pésate hoy.'],
+  ],
+  stale: () => [
+    ['Pésate', `Último pesaje hace ${stale} días. Sin dato no hay cuenta.`],
+    [`${dd} · ${goal.name}`, `Llevas ${stale} días sin pesarte. Pésate hoy y vemos dónde estás.`],
+    [dd, `Hace ${stale} días que no te pesas. Mañana serán uno menos igual.`],
+  ],
+  reached: () => [
+    ['Meta alcanzada', 'Ya estás en el peso. Mantén lo que haces y no lo sueltes.'],
+    [goal.name, `Ya llegaste (${w} kg). Mantén el carb cycling igual hasta el día.`],
+  ],
+  dday: () => [
+    [`Hoy es ${goal.name}`, 'Se acabó la preparación. Hoy se ve lo que hiciste.'],
+    ['Hoy es el día', `Estás en ${w} kg, la meta era ${fmt(goal.targetWeight)}.`],
+  ],
+  ontrack: () => [
+    ['Va bien', `Bajas ${fmt(lose)} kg/sem. Sigue así, no cambies nada de lo que haces.`],
+    [`${dd} · ${goal.name}`, `Bajas ${fmt(lose)} kg/sem y estás en ${w} kg. Esto funciona: no lo toques.`],
+    ['Constancia', 'Lo que haces está funcionando. No cambies el carb cycling ni nada: repite hoy.'],
+    [dd, `${next} y vas en la dirección correcta. Sigue igual.`],
+  ],
+  behind: () => [
+    [`Quedan ${dd} · ${goal.name}`, `${next}. Hoy no se repite. Estás en ${w} kg y te faltan ${fmt(remaining)}. ${paceTxt}`.trim()],
+    [dd, 'Si hoy la cagas, es un día menos y no se devuelve.'],
+    ['Carb cycling', 'Carbos altos solo si hoy entrenas; si descansas, bájalos. Sin ese contraste el peso no se mueve.'],
+    ['Hoy decide', `Te faltan ${fmt(remaining)} kg y quedan ${dd}. Hoy decide si llegas o no. ${paceTxt}`.trim()],
+    ['Un día menos', `${next}. Que los carbos de hoy sigan tu día: más si entrenas, menos si descansas.`],
+    [goal.name, `Quedan ${dd}. ${paceTxt || 'Pésate y ajusta.'}`.trim()],
+  ],
+};
+
+const [title, text] = pick(pools[situation]());
+return [{ json: { title, body: text } }];

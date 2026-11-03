@@ -117,10 +117,14 @@ obtiene la suscripcion y la registra con `registerPushSubscription()` contra
 Backend: workflow **"Sistema Push"** (`XI555krGiKbDvH4F`). Cron a las **8:00** y **20:00**
 (hora Lima). El Code node "Preparar mensaje" (copia en `scripts/push-countdown.js`, hay que
 mantenerlas iguales) lee el ultimo estado de la DataTable y:
-- **8:00**: "Quedan N dias · <meta>" + frase rotativa ("Mañana seran N-1...", "Si hoy la cagas,
-  es un dia menos...") + peso actual, kg que faltan, kg/semana necesarios vs ritmo real. Si hoy
-  no te pesaste agrega "Pesate hoy"; si el ultimo pesaje tiene 3+ dias lo dice.
-- **20:00**: solo si hoy no hubo pesaje ("Hoy no te pesaste").
+- **8:00**: un mensaje que rota por dia (`dayNum % largo del pool`) y depende de la
+  situacion: `nodata`, `stale` (3+ dias sin pesar), `reached`, `dday`, `ontrack` (bajas >= 0.4
+  kg/sem o >= 80% del ritmo necesario: "sigue asi, no cambies nada") y `behind`. Los mensajes
+  alternan **directos** (nombran el evento y las cifras) y **discretos** (solo "N dias" o un
+  recordatorio de carb cycling, sin evento ni peso: nadie que vea la pantalla debe entenderlo).
+  El carb cycling (carbos altos si entrenas, bajos si descansas) se recuerda sin depender de
+  datos de entreno, que la app ya no guarda. Cuando vas bien nunca se sugiere cambiar nada.
+- **20:00**: solo si hoy no hubo pesaje, siempre discreto (sin evento ni cifras).
 - Sin meta proxima no manda nada.
 El envio usa un Code node con Web Push manual (JWT ES256 + aes128gcm) y el par VAPID embebido
 (`VAPID_PUBLIC`/`VAPID_PRIVATE` en el propio Code node "Enviar push"). El webhook
